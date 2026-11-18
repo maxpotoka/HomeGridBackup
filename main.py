@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# [ФАЙЛ: main.py (v1.50) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v1.008 | 18.11.2026 17:48) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
 import os
 import sys
@@ -47,7 +47,7 @@ if not is_compiled_app():
         except Exception:
             pass
 
-from core.config import GUI_MODE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN
+from core.config import GUI_MODE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN, IS_ANDROID
 from core.engine import BackupEngine
 from core.backup import run_backup_task
 
@@ -77,6 +77,11 @@ def main():
             run_backup_task(engine, state.get("server", ""), True, silent_skip_clean, False)
             run_silent_exit_countdown(engine, 8)
             os._exit(engine.exit_code)
+        return
+
+    if IS_ANDROID:
+        from mobile.android_app import run_android_ui
+        run_android_ui(engine)
         return
 
     import tkinter as tk
