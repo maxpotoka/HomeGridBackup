@@ -2,7 +2,6 @@ name: Build HomeGrid Backup for macOS (Intel x86_64)
 
 on:
   workflow_dispatch:
-   
 
 jobs:
   build-mac-intel:
@@ -50,14 +49,19 @@ jobs:
             --output-dir=dist_mac \
             --output-filename=HomeGridBackup \
             main.py
+          ls -la dist_mac
 
-      - name: Package HomeGridBackup.app into ZIP
+      - name: Package .app into macOS .dmg installer
         run: |
-          cd dist_mac
-          ditto -c -k --sequesterRsrc --keepParent main.app HomeGridBackup_macOS_Intel.zip
+          mkdir -p dist_mac/dmg_root
+          APP_BUNDLE=$(find dist_mac -maxdepth 1 -name "*.app" | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" dist_mac/dmg_root/HomeGridBackup.app
+          ln -s /Applications dist_mac/dmg_root/Applications
+          hdiutil create -volname "HomeGrid Backup" -srcfolder dist_mac/dmg_root -ov -format UDZO dist_mac/HomeGridBackup_macOS_Intel.dmg
 
-      - name: Upload macOS Intel Artifact
+      - name: Upload macOS Intel DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HomeGridBackup-macOS-Intel
-          path: dist_mac/HomeGridBackup_macOS_Intel.zip
+          name: HomeGridBackup-macOS-Intel-DMG
+          path: dist_mac/HomeGridBackup_macOS_Intel.dmg
