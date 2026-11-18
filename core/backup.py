@@ -133,16 +133,24 @@ def _backup_stage1_prepare(engine, raw_url, force_skip):
     srv_label = f"{p_host}:{c_port}" if c_port not in (80, 443) else p_host
     return srv, srv_label, job_id
 
-def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0):
+def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=1048576):
     name = os.path.basename(zip_path)
     if not os.path.isfile(zip_path):
         return {"name": name, "status": "err", "detail": "Файл не знайдено"}
     processed = 0
+    last_rep_t = 0.0
+    chunk_sz = max(1024, int(buf_size))
 
-    def report(stage):
-        if progress_callback:
-            pct = int(min(99, (overall_start + processed) * 100.0 / overall_total)) if overall_total else 0
-            progress_callback(pct, f"{stage}: {name}")
+    def report(stage, force=False):
+        nonlocal last_rep_t
+        if not progress_callback:
+            return
+        now = time.time()
+        if not force and (now - last_rep_t) < 0.15:
+            return
+        last_rep_t = now
+        pct = int(min(99, (overall_start + processed) * 100.0 / overall_total)) if overall_total else 0
+        progress_callback(pct, f"{stage}: {name}")
 
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
@@ -154,7 +162,7 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
                 crc = 0
                 with zf.open(info, "r") as member:
                     while True:
-                        chunk = member.read(1024 * 1024)
+                        chunk = member.read(chunk_sz)
                         if not chunk:
                             break
                         crc = zlib.crc32(chunk, crc)
@@ -177,7 +185,7 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
         h = hashlib.sha256()
         with open(zip_path, "rb") as f_in:
             while True:
-                blk = f_in.read(1024 * 1024)
+                blk = f_in.read(chunk_sz)
                 if not blk:
                     break
                 h.update(blk)
@@ -190,14 +198,11 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
     except Exception as e:
         return {"name": name, "status": "err", "detail": f"Помилка перевірки SHA-256: {e}"}
 
-def verify_all_archives(state, progress_callback=None):
+def verify_all_archives(state, progress_callback=None, buf_size=1048576):
+    t0 = time.time()
     bdir = state["backup_dir"]
     os.makedirs(bdir, exist_ok=True)
-    zips = sorted(
-        [os.path.join(bdir, f) for f in os.listdir(bdir) if f.lower().endswith(".zip")],
-        key=lambda p: os.path.getmtime(p),
-        reverse=True,
-    )
+    zips = sorted([os.path.join(bdir, f) for f in os.listdir(bdir) if f.lower().endswith(".zip")], key=os.path.getmtime, reverse=True)
     work_sizes = []
     for path in zips:
         try:
@@ -205,26 +210,21 @@ def verify_all_archives(state, progress_callback=None):
                 crc_size = sum(i.file_size for i in zf.infolist())
         except Exception:
             crc_size = 0
-        try:
-            sha_size = os.path.getsize(path) if os.path.exists(path + ".sha256") else 0
-        except OSError:
-            sha_size = 0
+        sha_size = os.path.getsize(path) if os.path.exists(path + ".sha256") else 0
         work_sizes.append(crc_size + sha_size)
-    total_work = sum(work_sizes)
-    completed_work = 0
-    results = []
+    total_work, completed_work, results = sum(work_sizes), 0, []
     for index, path in enumerate(zips, 1):
         if progress_callback:
-            progress_callback(int(completed_work * 100 / total_work) if total_work else int((index - 1) * 100 / max(1, len(zips))),
-                              f"Архив {index}/{len(zips)}: {os.path.basename(path)}")
-        results.append(verify_single_archive(path, progress_callback, completed_work, total_work))
+            pct = int(completed_work * 100 / total_work) if total_work else int((index - 1) * 100 / max(1, len(zips)))
+            progress_callback(pct, f"Архів {index}/{len(zips)}: {os.path.basename(path)}")
+        results.append(verify_single_archive(path, progress_callback, completed_work, total_work, buf_size=buf_size))
         completed_work += work_sizes[index - 1]
+    elapsed = max(0.001, time.time() - t0)
+    total_mb = total_work / 1048576.0
+    speed_mbs = total_mb / elapsed
     if progress_callback:
-        progress_callback(100, f"Перевірку завершено: {len(zips)} архівів")
-    ok_cnt = sum(1 for r in results if r["status"] == "ok")
-    warn_cnt = sum(1 for r in results if r["status"] == "warn")
-    err_cnt = sum(1 for r in results if r["status"] == "err")
-    return {"total": len(results), "ok_cnt": ok_cnt, "warn_cnt": warn_cnt, "err_cnt": err_cnt, "items": results}
+        progress_callback(100, f"Завершено за {elapsed:.2f} с ({speed_mbs:.1f} МБ/с)")
+    return {"total": len(results), "ok_cnt": sum(1 for r in results if r["status"] == "ok"), "warn_cnt": sum(1 for r in results if r["status"] == "warn"), "err_cnt": sum(1 for r in results if r["status"] == "err"), "elapsed": round(elapsed, 2), "speed_mbs": round(speed_mbs, 1), "total_mb": round(total_mb, 1), "items": results}
 
 def _copy_to_mirror(engine, out_file, sha_file):
     if not engine.state.get("mirror_enabled", True):

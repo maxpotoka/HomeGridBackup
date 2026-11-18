@@ -1,3 +1,5 @@
+import time
+from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 # [ФАЙЛ: gui/dialogs.py (v1.018 | 18.11.2026 20:23) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
@@ -28,8 +30,10 @@ class DialogsMixin:
 
         dlg_w = max(360, outer_w - fw)
         dlg_h = max(160, outer_h - fh)
+        self._ignore_resize_until = time.time() + 0.7
         dlg = tk.Toplevel(self.root)
-        dlg.title(title)
+        dlg.bind('<Destroy>', lambda e: setattr(self, '_ignore_resize_until', time.time() + 0.7) if e.widget is dlg else None)
+        dlg.title(tr(title, self.engine.state.get("lang", "en")))
         dlg.configure(bg=p["panel"])
         dlg.transient(self.root)
         dlg.grab_set()
@@ -68,6 +72,7 @@ class DialogsMixin:
         bf.pack(side="bottom", fill="x", padx=16, pady=12)
         tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="right", padx=8)
         tk.Button(bf, text="✖ Так, вийти", command=lambda: (dlg.destroy(), _force_quit_app(self.engine)), bg=p["red"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=5).pack(side="right", padx=8)
+        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
     def _show_engine_modal(self, m):
         fs = self.metrics["font_sz"]
@@ -141,6 +146,7 @@ class DialogsMixin:
 
         _render()
         tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=12)
+        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
     def open_settings(self):
         _sync_scheduler_from_windows(self.engine.state)
@@ -161,6 +167,7 @@ class DialogsMixin:
         v_theme = tk.StringVar(value=st.get("theme", "dark"))
         v_scale = tk.StringVar(value=st.get("ui_scale", "auto"))
         v_font = tk.IntVar(value=int(st.get("ui_font", 0)))
+        v_lang = tk.StringVar(value=st.get("lang", "en"))
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
 
@@ -199,7 +206,15 @@ class DialogsMixin:
         f_del = tk.LabelFrame(top_grid, text=" 2. Системний трей та тихий режим ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=6)
         f_del.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=2)
         tk.Checkbutton(f_del, text="📌 Згортати у системний трей при закритті [X]", variable=v_tray_min, bg=p["card"], fg=p["amber"], selectcolor=p["inp_bg"], font=("Segoe UI", fs, "bold")).pack(anchor="w", pady=6)
-        tk.Checkbutton(f_del, text="🧹 Очищати старі копії у тихому режимі (GFS)", variable=v_sclean, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=6)
+        tk.Checkbutton(f_del, text="🧹 Очищати старі копії у тихому режимі (GFS)", variable=v_sclean, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=4)
+        l_row = tk.Frame(f_del, bg=p["card"])
+        l_row.pack(fill="x", pady=4)
+        tk.Label(l_row, text="Мова / Language:", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold")).pack(side="left")
+        lang_map = {"English (Default)": "en", "Українська": "uk"}
+        rev_lang = {"en": "English (Default)", "uk": "Українська"}
+        cb_lang = ttk.Combobox(l_row, values=list(lang_map.keys()), width=18, state="readonly", font=("Segoe UI", fs))
+        cb_lang.set(rev_lang.get(v_lang.get(), "English (Default)"))
+        cb_lang.pack(side="left", padx=8)
 
         fs_sch = fs + 1
         f_sch = tk.LabelFrame(host, text=" 3. Автозапуск за розкладом (Планувальник завдань Windows) ", bg=p["card"], fg=p["blue"], font=("Segoe UI", fs_sch, "bold"), padx=12, pady=8)
@@ -302,6 +317,9 @@ class DialogsMixin:
         def _upd_prev(_e=None):
             code = style_map.get(cb_style.get(), "v8")
             t_code = theme_map.get(cb_theme.get(), "dark")
+            if t_code == "modern_card" and _e and str(getattr(_e, "widget", "")) == str(cb_theme):
+                code = "s_modern_slim"
+                cb_style.set(rev_map.get(code, PBAR_STYLE_LABELS[0][1]))
             v_pstyle.set(code)
             v_theme.set(t_code)
             prev_bar.set_state(65, False, code, False, THEMES.get(t_code, THEMES["dark"]))
@@ -317,6 +335,7 @@ class DialogsMixin:
             st["weekly_count"] = max(0, int(v_week.get()))
             st["monthly_count"] = max(0, int(v_month.get()))
             st["yearly_count"] = max(0, int(v_year.get()))
+            st["lang"] = lang_map.get(cb_lang.get(), "en")
             st["delete_mode"] = "trash" if v_trash.get() else "direct"
             st["minimize_to_tray"] = bool(v_tray_min.get())
             st["silent_cleanup"] = bool(v_sclean.get())
@@ -338,6 +357,7 @@ class DialogsMixin:
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=6, cursor="hand2").pack(side="right", padx=(6, 6), pady=6)
         tk.Button(bf, text="💾 Зберегти та закрити", command=lambda: _commit_settings(True), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
         tk.Button(bf, text="✅ Застосувати", command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
+        dlg.after(20, lambda: apply_widget_i18n(dlg, st.get("lang", "en")))
 
     def open_analyze(self):
         import threading
@@ -417,19 +437,25 @@ class DialogsMixin:
             except Exception:
                 pass
 
+        buf_options = {"4 КБ": 4096, "16 КБ": 16384, "64 КБ": 65536, "256 КБ": 262144, "1 МБ": 1048576, "4 МБ": 4194304, "8 МБ": 8388608}
+        v_buf = tk.StringVar(value="1 МБ")
+
         def _verify_done(res):
             verify_running["value"] = False
             btn_verify.configure(state="normal")
+            cb_buf.configure(state="readonly")
             ok_all = (res["err_cnt"] == 0)
-            msg = f"SHA-256 + CRC32: справних {res['ok_cnt']} | без .sha256: {res['warn_cnt']} | пошкоджених: {res['err_cnt']}"
+            perf_txt = f"Час: {res.get('elapsed', 0):.2f} с | Швидкість: {res.get('speed_mbs', 0)} МБ/с (буфер {v_buf.get()})"
+            msg = f"SHA-256 + CRC32: справних {res['ok_cnt']} | без .sha256: {res['warn_cnt']} | пошкоджених: {res['err_cnt']} | {perf_txt}"
             lbl_ver.configure(text=msg, fg=p["green"] if ok_all else p["red"])
-            verify_status.configure(text=f"100% — Перевірено архівів: {res['total']}")
+            verify_status.configure(text=f"100% — Усі {res['total']} архівів ({res.get('total_mb', 0)} МБ) | {perf_txt}")
             verify_bar["value"] = 100
             self.engine.log(msg, "ok" if ok_all else "err")
 
         def _verify_failed(exc):
             verify_running["value"] = False
             btn_verify.configure(state="normal")
+            cb_buf.configure(state="readonly")
             verify_status.configure(text=f"Помилка перевірки: {exc}", fg=p["red"])
             self.engine.log(f"Помилка ручної перевірки архівів: {exc}", "err")
 
@@ -438,13 +464,15 @@ class DialogsMixin:
                 return
             verify_running["value"] = True
             btn_verify.configure(state="disabled")
-            lbl_ver.configure(text="Перевірка виконується…", fg=p["cyan"])
+            cb_buf.configure(state="disabled")
+            chosen_buf = buf_options.get(v_buf.get(), 1048576)
+            lbl_ver.configure(text=f"Перевірка усіх файлів (буфер {v_buf.get()})…", fg=p["cyan"])
             verify_bar["value"] = 0
             verify_status.configure(text="Підготовка списку архівів…", fg=p["cyan"])
 
             def _worker():
                 try:
-                    res = verify_all_archives(self.engine.state, _verify_progress)
+                    res = verify_all_archives(self.engine.state, _verify_progress, buf_size=chosen_buf)
                     dlg.after(0, lambda result=res: _verify_done(result) if dlg.winfo_exists() else None)
                 except Exception as exc:
                     dlg.after(0, lambda error=exc: _verify_failed(error) if dlg.winfo_exists() else None)
@@ -458,14 +486,18 @@ class DialogsMixin:
         _refresh()
         bf = tk.Frame(dlg, bg=p["panel"])
         bf.pack(side="bottom", fill="x", padx=14, pady=10)
-        btn_verify = tk.Button(bf, text="🛡️ Перевірити SHA-256 + CRC32 усіх", command=_verify, bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
-        btn_verify.pack(side="left", padx=(0, 8))
+        btn_verify = tk.Button(bf, text="🛡️ Перевірити SHA-256 + CRC32", command=_verify, bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
+        btn_verify.pack(side="left", padx=(0, 6))
+        tk.Label(bf, text="Буфер:", bg=p["panel"], fg=p["muted"], font=(fam, fs)).pack(side="left", padx=(4, 4))
+        cb_buf = ttk.Combobox(bf, textvariable=v_buf, values=list(buf_options.keys()), width=7, state="readonly", font=(fam, fs))
+        cb_buf.pack(side="left", padx=(0, 10))
         tk.Button(bf, text="🗑️ Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=6)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
+        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
     def open_stats_modal(self):
         fs = self.metrics["font_sz"]
-        dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 720, 520)
+        dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 760, 530)
         st = self.engine.get_detailed_stats() if hasattr(self.engine, "get_detailed_stats") else {}
 
         tk.Label(dlg, text="Зведена аналітика за періодами та структурою локального сховища:", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
@@ -496,7 +528,7 @@ class DialogsMixin:
         tot_c = st.get("total_cnt", 0)
         sha_pct = int(round((st.get("sha_cnt", 0) / tot_c) * 100)) if tot_c > 0 else 0
         rel_txt = f"Середній розмір архіву: {st.get('avg_mb', 0.0)} МБ   •   Захист SHA-256: {st.get('sha_cnt', 0)}/{tot_c} ({sha_pct}%)   •   Успішність запусків: {st.get('success_rate', 100)}%   •   Глибина архіву: {st.get('span_days', 0)} дн."
-        tk.Label(mid_f, text=rel_txt, bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w", pady=(4, 0))
+        tk.Label(mid_f, text=rel_txt, bg=p["card"], fg=p["muted"], justify="left", wraplength=int(700 * self.metrics["k"]), font=("Segoe UI", max(8, fs - 1))).pack(anchor="w", pady=(4, 0))
 
         chart_card = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
         chart_card.pack(fill="both", expand=True, padx=14, pady=(4, 6))
@@ -531,6 +563,7 @@ class DialogsMixin:
         dlg.after(40, _draw_chart)
 
         tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=(4, 12))
+        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
     def open_ops_history(self):
         fs = self.metrics["font_sz"]
@@ -552,7 +585,7 @@ class DialogsMixin:
                 tk.Label(row, text=f" {st_lbl:<9} ", bg=p["card"], fg=col, font=("Segoe UI", fs, "bold")).pack(side="left", padx=4)
                 tk.Label(row, text=f"{mb_txt:>9}  |  {item.get('detail', '')}", bg=p["card"], fg=p["text"], font=("Consolas", max(8, fs - 1))).pack(side="left")
 
-        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=12)
+        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=10, before=dlg.winfo_children()[0])
 
     def open_about(self):
         fs = self.metrics["font_sz"]
@@ -568,3 +601,4 @@ class DialogsMixin:
         )
         tk.Label(dlg, text=info, bg=p["panel"], fg=p["text"], justify="left", wraplength=int(560 * self.metrics["k"]), font=(fam, fs)).pack(padx=18, pady=18, anchor="w", fill="x")
         tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["green"], fg=p["green_txt"], font=(fam, fs, "bold"), padx=bpx + 4, pady=bpy, cursor="hand2").pack(side="bottom", anchor="e", padx=18, pady=14)
+        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))

@@ -81,7 +81,7 @@ THEMES = {
         "font": "Helvetica Neue", "relief": "groove"
     },
     "mac_light": {
-        "bg": "#ececec", "panel": "#f6f6f6", "card": "#ffffff", "border": "#d1d1d6",
+        "bg": "#d1d1d6", "panel": "#ffffff", "card": "#f2f2f7", "border": "#8e8e93",
         "text": "#1d1d1f", "muted": "#6e6e73", "blue": "#007aff", "green": "#34c759",
         "amber": "#ff9500", "red": "#ff3b30", "cyan": "#007aff",
         "inp_bg": "#ffffff", "log_bg": "#fafafa", "btn_txt": "#ffffff", "green_txt": "#ffffff",
@@ -102,7 +102,7 @@ THEMES = {
         "font": "Segoe UI", "relief": "solid"
     },
     "light": {
-        "bg": "#f1f5f9", "panel": "#ffffff", "card": "#f8fafc", "border": "#cbd5e1",
+        "bg": "#cbd5e1", "panel": "#ffffff", "card": "#f1f5f9", "border": "#94a3b8",
         "text": "#0f172a", "muted": "#475569", "blue": "#2563eb", "green": "#059669",
         "amber": "#d97706", "red": "#dc2626", "cyan": "#0284c7",
         "inp_bg": "#ffffff", "log_bg": "#f8fafc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
@@ -130,7 +130,7 @@ THEMES = {
         "font": "Tahoma", "relief": "groove"
     },
     "win7": {
-        "bg": "#b9d1ea", "panel": "#eef4fb", "card": "#ffffff", "border": "#8e9fb3",
+        "bg": "#8faed1", "panel": "#f4f8fd", "card": "#e2ecf7", "border": "#5b7da3",
         "text": "#1e293b", "muted": "#475569", "blue": "#2874c5", "green": "#1e9e35",
         "amber": "#d97706", "red": "#c92a2a", "cyan": "#0b5cab",
         "inp_bg": "#ffffff", "log_bg": "#f8fbff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
@@ -189,34 +189,27 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
         lw, lh = live_outer_wh
         outer_w = max(640, int(lw))
         outer_h = max(480, int(lh))
-    elif sc != "auto" and "x" in sc:
-        rw_s, rh_s = sc.split("x", 1)
-        outer_w = min(sw, int(rw_s))
-        outer_h = min(sh, int(rh_s))
+        scale_ratio = (outer_w / 1200.0 + outer_h / 720.0) / 2.0
+        k_prof = round(max(0.80, min(2.10, scale_ratio)), 2)
+        base_fs = max(9, min(24, int(round(10.0 * k_prof))))
+        raw_fs = base_fs
     else:
-        outer_w, outer_h = sw, sh
-
-    if outer_w <= 850:
-        base_fs, k_prof = 8, 0.82
-    elif outer_w <= 1050:
-        base_fs, k_prof = 9, 0.90
-    elif outer_w <= 1400:
-        base_fs, k_prof = 10, 1.00
-    elif outer_w <= 1950:
-        base_fs, k_prof = 11, 1.12
-    elif outer_w <= 2700:
-        base_fs, k_prof = 14, 1.32
-    else:
-        base_fs, k_prof = 17, 1.55
-
-    if live_outer_wh is None and sc == "auto" and dpi_mult >= 1.25:
-        base_fs = max(base_fs, int(round(10 * dpi_mult)))
-        k_prof = max(k_prof, round(dpi_mult, 2))
+        if sc != "auto" and "x" in sc:
+            rw_s, rh_s = sc.split("x", 1)
+            outer_w = min(sw, int(rw_s))
+            outer_h = min(sh, int(rh_s))
+        else:
+            outer_w, outer_h = sw, sh
+        k_prof = round(max(0.80, min(1.85, outer_w / 1280.0)), 2)
+        base_fs = max(9, min(22, int(round(10.0 * k_prof))))
+        if sc == "auto" and dpi_mult >= 1.25:
+            base_fs = max(base_fs, int(round(10 * dpi_mult)))
+            k_prof = max(k_prof, round(dpi_mult, 2))
+        raw_fs = int(font_pref) if (isinstance(font_pref, int) and 8 <= font_pref <= 28) else base_fs
 
     win_w = max(620, outer_w - frame_w)
     win_h = max(440, outer_h - frame_h)
-    raw_fs = int(font_pref) if (isinstance(font_pref, int) and 8 <= font_pref <= 28) else base_fs
-    max_fs_by_w = 9 if outer_w <= 850 else (10 if outer_w <= 1100 else (12 if outer_w <= 1400 else 26))
+    max_fs_by_w = 9 if outer_w < 920 else (11 if outer_w < 1150 else max(12, min(26, int(outer_w / 65))))
     font_sz = min(raw_fs, max_fs_by_w)
     k = max(k_prof, round(font_sz / 10.5, 2))
     pad_x, pad_y = max(6, int(round(11 * k))), max(3, int(round(6 * k)))

@@ -17,7 +17,7 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.021"
+SCRIPT_VER = "1.022"
 BUILD_DATE = "18.11.2026 20:19"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
@@ -96,7 +96,7 @@ def get_fast_sysinfo():
     elif sys.platform == "darwin":
         mac_v = (platform.mac_ver()[0] if platform.mac_ver() else "")
         mac_names = {"15": "Sequoia", "14": "Sonoma", "13": "Ventura", "12": "Monterey", "11": "Big Sur"}
-        maj = mac_v.split(".") if mac_v else ""
+        maj = mac_v.split(".")[0] if mac_v else ""
         cname = f" ({mac_names[maj]})" if maj in mac_names else ""
         os_label = f"macOS {mac_v}{cname}"
         try:
@@ -220,7 +220,7 @@ def load_state():
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
         "mirror_dir": "", "mirror_enabled": True, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
-        "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True,
+        "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
         "progress_style": "v8", "silent_sec_digits": True, "silent_cleanup": False,
         "sched_time": "03:00", "sched_mode": "--hidden", "sched_missed": True,
@@ -244,6 +244,8 @@ def load_state():
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
                 state["mirror_enabled"] = data["mirror_enabled"]
+            if data.get("lang") in ("en", "uk"):
+                state["lang"] = data["lang"]
             if data.get("theme") in VALID_THEMES:
                 state["theme"] = data["theme"]
             if data.get("ui_scale") in VALID_SCALES:
@@ -342,7 +344,7 @@ def commit_state(state):
     pub_keys = (
         "server", "server_history", "op_history", "backup_dir", "mirror_dir", "mirror_enabled",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
-        "delete_mode", "theme", "ui_scale", "ui_font", "minimize_to_tray",
+        "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
         "sched_time", "sched_mode", "sched_missed", "sched_wake", "sched_prio"
     )

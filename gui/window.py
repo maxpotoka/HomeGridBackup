@@ -1,3 +1,5 @@
+import time
+from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 # [ФАЙЛ: gui/window.py (v1.018 | 18.11.2026 20:23) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
@@ -29,6 +31,7 @@ class HomeGridApp(DialogsMixin):
         self._srv_typing_timer = None
         self._resize_timer = None
         self._last_live_wh = (0, 0)
+        self._ignore_resize_until = time.time() + 1.0
 
         self.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})")
         m = self.metrics
@@ -60,8 +63,16 @@ class HomeGridApp(DialogsMixin):
     def _on_root_configure(self, event=None):
         if event is None or event.widget is not self.root:
             return
+        if self.root.grab_current() is not None or time.time() < getattr(self, '_ignore_resize_until', 0):
+            return
         w, h = int(event.width), int(event.height)
-        if w < 500 or h < 350 or (w, h) == self._last_live_wh:
+        if w < 500 or h < 350:
+            return
+        pw, ph = self._last_live_wh
+        if pw == 0 and ph == 0:
+            self._last_live_wh = (w, h)
+            return
+        if abs(w - pw) < 12 and abs(h - ph) < 12:
             return
         self._last_live_wh = (w, h)
         if self._resize_timer:
@@ -69,9 +80,15 @@ class HomeGridApp(DialogsMixin):
                 self.root.after_cancel(self._resize_timer)
             except Exception:
                 pass
-        self._resize_timer = self.root.after(160, lambda: self.apply_theme_and_mode(resize_win=False, live_outer_wh=(w + 16, h + 40)))
+        self._resize_timer = self.root.after(90, lambda: self._on_live_resize_done(w + 16, h + 40))
+
+    def _on_live_resize_done(self, ow, oh):
+        if self.engine.state.get("ui_font", 0) != 0:
+            self.engine.state["ui_font"] = 0
+        self.apply_theme_and_mode(resize_win=False, live_outer_wh=(ow, oh))
 
     def show_window(self):
+        self._ignore_resize_until = time.time() + 0.7
         try:
             self.root.deiconify()
             if self.root.state() in ("iconic", "withdrawn"):
@@ -231,13 +248,13 @@ class HomeGridApp(DialogsMixin):
         self.t3_val = tk.Label(stat_mid, textvariable=self.var_last_bkp, font=("Segoe UI", fs + 1, "bold"))
         self.t3_val.pack(anchor="w", pady=(2, 0))
 
-        stat_btns = tk.Frame(stat_row)
-        stat_btns.grid(row=0, column=2, sticky="e")
-        self.btn_stats = tk.Button(stat_btns, text="📊 Статистика", command=self.open_stats_modal, padx=10, pady=5, cursor="hand2")
+        self.stat_btns = tk.Frame(stat_row)
+        self.stat_btns.grid(row=0, column=2, sticky="e")
+        self.btn_stats = tk.Button(self.stat_btns, text="📊 Статистика", command=self.open_stats_modal, padx=10, pady=5, cursor="hand2")
         self.btn_stats.pack(side="left", padx=(0, 6))
-        self.btn_ops_hist = tk.Button(stat_btns, text="📜 Журнал операцій", command=self.open_ops_history, padx=10, pady=5, cursor="hand2")
+        self.btn_ops_hist = tk.Button(self.stat_btns, text="📜 Журнал операцій", command=self.open_ops_history, padx=10, pady=5, cursor="hand2")
         self.btn_ops_hist.pack(side="left", padx=(0, 6))
-        self.btn_analyze = tk.Button(stat_btns, text="🔍 Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
+        self.btn_analyze = tk.Button(self.stat_btns, text="🔍 Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
         self.btn_analyze.pack(side="left")
         ToolTip(self.btn_analyze, "Відкрити список архівів, керування мітками KEEP та перевірку цілісності SHA-256")
 
@@ -342,16 +359,25 @@ class HomeGridApp(DialogsMixin):
         for lbl in (self.l_srv, self.l_dir, self.l_mir):
             lbl.configure(bg=p["panel"], fg=p["muted"], font=f_main)
 
-        avail_chars = max(16, int((m["win_w"] - int(460 * m["k"])) / max(7, fs * 0.65)))
-        ent_chars = max(20, min(52, avail_chars))
+        is_narrow = (m["win_w"] < 1120)
+        if hasattr(self, "stat_btns"):
+            if is_narrow:
+                self.stat_btns.grid_configure(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+            else:
+                self.stat_btns.grid_configure(row=0, column=2, columnspan=1, sticky="e", pady=0)
+        avail_chars = max(14, int((m["win_w"] - int(530 * m["k"])) / max(7, fs * 0.72)))
+        ent_chars = max(16, min(48, avail_chars))
         for ent in (self.ent_srv, self.ent_dir, self.ent_mir):
             ent.configure(bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], font=f_main, width=ent_chars)
 
+        f_big = f_bold
         self.t2_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
-        self.t2_val.configure(bg=p["panel"], fg=p["green"], font=f_bold)
+        self.t2_val.configure(bg=p["panel"], fg=p["green"], font=f_big)
         if hasattr(self, "t3_cap"):
             self.t3_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
-            self.t3_val.configure(bg=p["panel"], fg=p["cyan"], font=f_bold)
+            self.t3_val.configure(bg=p["panel"], fg=p["cyan"], font=f_big)
+        if hasattr(self, "lbl_pct"):
+            self.lbl_pct.configure(bg=p["panel"], fg=p["green"], font=f_big)
 
         self.pbar.configure(height=max(20, fs + 9))
         self.txt_log.configure(bg=p["log_bg"], fg=p["text"], font=("Consolas", max(8, fs - 1)))
@@ -385,15 +411,20 @@ class HomeGridApp(DialogsMixin):
             bg=p["card"], fg=p["amber"] if is_lite else p["green"], disabledforeground=dis_fg, font=f_main, padx=bpx, pady=bpy
         )
         self._update_mirror_btn()
+        lang = self.engine.state.get("lang", "en")
+        self.root.title(tr(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})", lang))
+        apply_widget_i18n(self.root, lang)
 
     def cycle_theme_quick(self):
-        import sys
         cur = self.engine.state.get("theme", "dark")
-        is_dark_now = cur in ("dark", "mac_dark", "crt", "norton")
-        if sys.platform == "darwin":
-            self.engine.state["theme"] = "mac_light" if is_dark_now else "mac_dark"
-        else:
-            self.engine.state["theme"] = "light" if is_dark_now else "dark"
+        pair_map = {
+            "dark": "light", "light": "dark",
+            "mac_dark": "mac_light", "mac_light": "mac_dark",
+            "win7": "dark", "winxp": "norton", "norton": "winxp",
+            "win95": "crt", "crt": "win95",
+            "mac_aqua": "mac_dark", "mac_classic": "crt"
+        }
+        self.engine.state["theme"] = pair_map.get(cur, "light")
         if self.engine.state.get("lite_mode", False):
             self.engine.state["lite_mode"] = False
         commit_state(self.engine.state)
@@ -560,11 +591,11 @@ class HomeGridApp(DialogsMixin):
 
             z_cnt, z_mb, free_gb = self.engine.get_storage_stats()
             free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
-            self.var_disk.set(f"{z_cnt} архівів ({z_mb} МБ){free_txt}")
+            self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", st.get("lang", "en")))
 
             if hasattr(self.engine, "get_last_backup_info") and hasattr(self, "t3_val"):
                 lb_txt, lb_st = self.engine.get_last_backup_info()
-                self.var_last_bkp.set(lb_txt)
+                self.var_last_bkp.set(tr(lb_txt, st.get("lang", "en")))
                 p_cur = self._get_palette()
                 self.t3_val.configure(fg=p_cur["green"] if lb_st == "ok" else (p_cur["amber"] if lb_st == "warn" else p_cur["muted"]))
 
@@ -574,8 +605,10 @@ class HomeGridApp(DialogsMixin):
                 ptxt = getattr(self.engine, "pill_text", "") or "Очікування"
                 if " | " in ptxt and ptype == "idle":
                     ptxt = "Очікування"
-                pill_fg = {"ok": p_cur["green"], "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
-                self.lbl_pill.configure(text=ptxt, bg=p_cur["card"], fg=pill_fg, highlightbackground=p_cur["border"], font=("Segoe UI", max(8, self.metrics["font_sz"] - 1), "bold"))
+                pill_fg = {"ok": p_cur.get("pill_ok_fg", p_cur["green"]), "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
+                pill_bg = p_cur.get("pill_ok_bg", p_cur["card"]) if ptype in ("ok", "idle") and "pill_ok_bg" in p_cur else p_cur["card"]
+                bd_pill = 0 if "pill_ok_bg" in p_cur else 1
+                self.lbl_pill.configure(text=tr(ptxt, st.get("lang", "en")), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=("Segoe UI", max(8, self.metrics["font_sz"] - 1), "bold"))
 
             self.var_stage.set(self.engine.stage)
             self.var_pct.set("пошук..." if self.engine.indeterminate else f"{self.engine.progress}%")
@@ -593,25 +626,41 @@ class HomeGridApp(DialogsMixin):
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
                 if disc and not self.engine.is_running:
-                    self.btn_pick_lan.configure(text=f"📡 Обрати виявлений ({len(disc)}) ▾", state="normal")
+                    self.btn_pick_lan.configure(text=tr(f"📡 Обрати виявлений ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
                 else:
                     cnt_d = len(disc)
                     lbl_d = f"📡 Обрати виявлений ({cnt_d}) ▾" if cnt_d else "📡 Обрати виявлений (0)"
-                    self.btn_pick_lan.configure(text=lbl_d, state="disabled")
+                    self.btn_pick_lan.configure(text=tr(lbl_d, st.get("lang", "en")), state="disabled")
 
             logs = self.engine.logs
-            if logs and (len(logs) != self.last_log_len or logs[-1] is not self._last_log_item):
+            if not logs and self.last_log_len != 0:
                 self.txt_log.configure(state="normal")
-                rebuild = (self.last_log_len > 0 and self._last_log_item is not None
-                           and not any(item is self._last_log_item for item in logs))
-                if rebuild:
-                    self.txt_log.delete("1.0", "end")
+                self.txt_log.delete("1.0", "end")
+                self.txt_log.configure(state="disabled")
+                self.last_log_len = 0
+                self._last_log_item = None
+            elif logs and (len(logs) != self.last_log_len or logs[-1] is not self._last_log_item):
+                self.txt_log.configure(state="normal")
+                if self._last_log_item is None or self.last_log_len <= 0:
                     items_to_add = logs
+                    self.txt_log.delete("1.0", "end")
                 else:
-                    items_to_add = logs[self.last_log_len:] if len(logs) >= self.last_log_len else logs
+                    last_idx = -1
+                    for idx in range(len(logs) - 1, -1, -1):
+                        if logs[idx] is self._last_log_item:
+                            last_idx = idx
+                            break
+                    if last_idx != -1:
+                        items_to_add = logs[last_idx + 1:]
+                    else:
+                        self.txt_log.delete("1.0", "end")
+                        items_to_add = logs
                 for item in items_to_add:
                     self.txt_log.insert("end", f"[{item['ts']}] ", "dim")
                     self.txt_log.insert("end", f"{item['msg']}\n", item.get("level", "info"))
+                line_cnt = int(self.txt_log.index("end-1c").split(".")[0])
+                if line_cnt > 401:
+                    self.txt_log.delete("1.0", f"{line_cnt - 400}.0")
                 self.txt_log.see("end")
                 self.txt_log.configure(state="disabled")
                 self.last_log_len = len(logs)

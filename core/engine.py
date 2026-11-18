@@ -1,3 +1,4 @@
+from core.i18n import tr
 # ==============================================================================
 # [ФАЙЛ: core/engine.py (v1.018 | 18.11.2026 20:19) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
@@ -83,7 +84,7 @@ class BackupEngine:
         self.progress = 0
         self.indeterminate = False
         self.sys_summary = get_fast_sysinfo()
-        self.stage = "Готовий до резервного копіювання"
+        self.stage = tr("Готовий до резервного копіювання", self.state.get("lang", "en"))
         self.pill_text = f"v{SCRIPT_VER} | {BUILD_DATE}"
         self.pill_type = "idle"
         self.op_history = list(self.state.get("op_history") or [])
@@ -112,6 +113,7 @@ class BackupEngine:
         self.log(f"ОС та залізо: {self.sys_summary}", "info")
 
     def log(self, msg, level="info"):
+        msg = tr(msg, self.state.get("lang", "en"))
         ts = datetime.now().strftime("%H:%M:%S")
         write_file_log(f"[{level.upper()}] {msg}", self.state.get("backup_dir"))
         if CLI_MODE or (SILENT_MODE and not HIDDEN_MODE):
@@ -132,17 +134,19 @@ class BackupEngine:
                 self.indeterminate = False
                 self.progress = max(0, min(100, int(pct)))
             if stage_text is not None:
-                self.stage = stage_text
+                self.stage = tr(stage_text, self.state.get("lang", "en"))
         if not HIDDEN_MODE and (CLI_MODE or SILENT_MODE):
             from console.terminal import _print_cli_line
             _print_cli_line(self)
 
     def set_pill(self, text, state_type="idle"):
         with self.lock:
-            self.pill_text = text
+            self.pill_text = tr(text, self.state.get("lang", "en"))
             self.pill_type = state_type
 
     def ask_modal(self, mtype, title, text, default_val=""):
+        lang = self.state.get("lang", "en")
+        title, text = tr(title, lang), tr(text, lang)
         if SILENT_MODE:
             return (not NO_CLEAN) if mtype == "confirm" else ""
         if CLI_MODE:
@@ -250,7 +254,7 @@ class BackupEngine:
                 return "Ще немає створених копій", "idle"
             latest = max(zips, key=os.path.getmtime)
             st = os.stat(latest)
-            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y о %H:%M")
+            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%H:%M  (%d.%m.%Y)")
             mb_s = round(st.st_size / 1048576.0, 1)
             has_sha = os.path.exists(latest + ".sha256")
             if has_sha:
@@ -330,5 +334,11 @@ class BackupEngine:
         if ops:
             ok_ops = sum(1 for x in ops if x.get("status") == "Успішно")
             res["success_rate"] = int(round((ok_ops / len(ops)) * 100))
-        res["months"] = [(k[5:] + "." + k[2:4], m_counts[k]) for k in m_keys]
+        _m_names = {
+            "01": "Січень", "02": "Лютий", "03": "Березень", "04": "Квітень",
+            "05": "Травень", "06": "Червень", "07": "Липень", "08": "Серпень",
+            "09": "Вересень", "10": "Жовтень", "11": "Листопад", "12": "Грудень"
+        }
+        lang = self.state.get("lang", "en")
+        res["months"] = [(tr(_m_names.get(k[5:], k[5:]), lang), m_counts[k]) for k in m_keys]
         return res
