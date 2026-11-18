@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.004 | 18.11.2026 17:20) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.008 | 18.11.2026 17:48) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,12 +17,19 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.004"
-BUILD_DATE = "18.11.2026 17:20"
+SCRIPT_VER = "1.008"
+BUILD_DATE = "18.11.2026 17:48"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
-DEFAULT_BACKUP_DIR = os.path.join(os.path.expanduser("~"), "BackupHGM")
-SECURE_DIR = os.path.join(os.path.expanduser("~"), ".backup_hgm")
+IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
+if IS_ANDROID:
+    _and_dl = "/storage/emulated/0/Download"
+    _and_base = _and_dl if os.path.isdir(_and_dl) else os.path.expanduser("~")
+    DEFAULT_BACKUP_DIR = os.path.join(_and_base, "BackupHGM")
+    SECURE_DIR = os.path.join(os.path.expanduser("~"), ".backup_hgm")
+else:
+    DEFAULT_BACKUP_DIR = os.path.join(os.path.expanduser("~"), "BackupHGM")
+    SECURE_DIR = os.path.join(os.path.expanduser("~"), ".backup_hgm")
 CFG_FILE = os.path.join(SECURE_DIR, "config.json")
 ENV_FILE = os.path.join(SECURE_DIR, ".env")
 
@@ -37,12 +44,12 @@ SECRET_KEYS = ("client_token", "session_token", "login_pin", "editor_pin")
 SCHED_TASK_NAME = "HomeGridBackup"
 
 VALID_PBAR_STYLES = (
-    "v8", "amber_pro", "emerald_pro", "classic",
+    "v8", "amber_pro", "emerald_pro", "s_20s_macos", "classic",
     "s_00s_win7", "s_00s_aqua", "s_00s_winxp",
-    "s_90s_win95", "s_80s_dos", "s_70s_crt", "s_60s_tty",
+    "s_90s_win95", "s_80s_mac1", "s_80s_dos", "s_70s_crt", "s_60s_tty",
     "digits_only"
 )
-VALID_THEMES = ("dark", "light", "norton", "win95", "winxp", "win7", "crt")
+VALID_THEMES = ("crt", "norton", "mac_classic", "win95", "winxp", "mac_aqua", "win7", "mac_light", "mac_dark", "dark", "light")
 VALID_SCALES = ("auto", "800x600", "1024x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440")
 
 def get_fast_sysinfo():
@@ -75,6 +82,17 @@ def get_fast_sysinfo():
                 os_label = f"{prod}{code_part} (Build {build})"
         except Exception:
             pass
+    elif IS_ANDROID:
+        try:
+            import subprocess
+            rel = subprocess.check_output(["getprop", "ro.build.version.release"], timeout=0.4).decode().strip()
+            sdk = subprocess.check_output(["getprop", "ro.build.version.sdk"], timeout=0.4).decode().strip()
+            model = subprocess.check_output(["getprop", "ro.product.model"], timeout=0.4).decode().strip()
+            os_label = f"Android {rel} (API {sdk})"
+            if model:
+                cpu_name = f"{model} ({platform.machine()})"
+        except Exception:
+            os_label = "Android OS"
     elif sys.platform == "darwin":
         mac_v = platform.mac_ver() or ""
         mac_names = {"15": "Sequoia", "14": "Sonoma", "13": "Ventura", "12": "Monterey", "11": "Big Sur"}
@@ -247,6 +265,19 @@ def load_state():
         state["lite_mode"] = True
     if not state["hw_checked"]:
         state["hw_checked"] = True
+        if sys.platform == "darwin":
+            try:
+                import subprocess
+                res_m = subprocess.run(["defaults", "read", "-g", "AppleInterfaceStyle"], capture_output=True, text=True, timeout=0.5)
+                is_mac_dark = ("dark" in (res_m.stdout or "").lower())
+                state["theme"] = "mac_dark" if is_mac_dark else "mac_light"
+                state["hw_auto_notice"] = (
+                    f"Виявлено macOS ({'темний' if is_mac_dark else 'світлий'} системний режим).\n\n"
+                    f"Автоматично встановлено тему оформлення «{'macOS Sonoma Dark' if is_mac_dark else 'macOS Yosemite Light'}».\n"
+                    f"Ви можете змінити її у будь-який момент кнопкою «🎨 Тема» або в налаштуваннях."
+                )
+            except Exception:
+                state["theme"] = "mac_light"
         is_low, reason = _detect_low_end_or_win7()
         if is_low:
             auto_theme = "win7" if "Windows 7" in reason else "win95"

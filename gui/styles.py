@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.002 | 18.11.2026 17:14) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.006 | 18.11.2026 17:36) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import ctypes
 from ctypes import wintypes
@@ -7,13 +7,17 @@ import tkinter as tk
 from core.config import VALID_SCALES
 
 THEME_LABELS = [
-    ("dark", "🌙 Темна (сучасна нічна)"),
-    ("light", "☀️ Світла (класична денна)"),
-    ("norton", "💾 Norton Commander (синій DOS)"),
-    ("win95", "🖥️ Windows 95 / 98 Classic"),
-    ("winxp", "🪟 Windows XP Luna (синьо-оливкова)"),
-    ("win7", "💎 Windows 7 Aero (небесно-скляна)"),
-    ("crt", "📟 Термінал CRT (зелений монохром)"),
+    ("crt", "1970-ті — 📟 Термінал CRT (зелений монохром)"),
+    ("norton", "1980-ті — 💾 Norton Commander (синій DOS)"),
+    ("mac_classic", "1984 — 🍏 Macintosh System 1 (ч/б класика)"),
+    ("win95", "1995 — 🖥️ Windows 95 / 98 Classic"),
+    ("winxp", "2001 — 🪟 Windows XP Luna (синьо-оливкова)"),
+    ("mac_aqua", "2004 — 💧 macOS X Aqua (сріблясто-блакитна)"),
+    ("win7", "2007 — 💎 Windows 7 Aero (небесно-скляна)"),
+    ("mac_light", "2014 — 🏔️ macOS Yosemite Light (світла)"),
+    ("mac_dark", "2024 — 🌌 macOS Sonoma Dark (графітова)"),
+    ("dark", "2026 — 🌙 Темна (сучасна нічна)"),
+    ("light", "2026 — ☀️ Світла (класична денна)"),
 ]
 
 UI_SCALE_LABELS = [
@@ -48,11 +52,13 @@ PBAR_STYLE_LABELS = [
     ("v8", "2026 — Неоновий кібер-градієнт (v8)"),
     ("amber_pro", "2026 — Бурштиново-жовтий градієнт"),
     ("emerald_pro", "2026 — Смарагдовий градієнт"),
+    ("s_20s_macos", "2024 — macOS Sonoma (фірмовий синій)"),
     ("classic", "2015 — Сучасний плоский синій"),
     ("s_00s_win7", "2007 — Windows Vista / 7 Aero"),
-    ("s_00s_aqua", "2004 — macOS Aqua (глянцеві смуги)"),
+    ("s_00s_aqua", "2004 — macOS X Aqua (глянцеві смуги)"),
     ("s_00s_winxp", "2001 — Windows XP Luna (зелені блоки)"),
     ("s_90s_win95", "1995 — Windows 95 / 98 Classic"),
+    ("s_80s_mac1", "1984 — Macintosh System 1 (ч/б штрих)"),
     ("s_80s_dos", "1980-ті — MS-DOS / Norton Commander"),
     ("s_70s_crt", "1970-ті — Термінал мейнфрейму CRT"),
     ("s_60s_tty", "1960-ті — Телетайп / Перфострічка"),
@@ -60,6 +66,34 @@ PBAR_STYLE_LABELS = [
 ]
 
 THEMES = {
+    "mac_classic": {
+        "bg": "#d8d8d8", "panel": "#ffffff", "card": "#f4f4f4", "border": "#000000",
+        "text": "#000000", "muted": "#333333", "blue": "#000000", "green": "#111111",
+        "amber": "#444444", "red": "#000000", "cyan": "#000000",
+        "inp_bg": "#ffffff", "log_bg": "#ffffff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "font": "Helvetica Neue", "relief": "solid"
+    },
+    "mac_aqua": {
+        "bg": "#d6dde5", "panel": "#eef2f6", "card": "#ffffff", "border": "#9cb0c4",
+        "text": "#1b2430", "muted": "#4f6075", "blue": "#1b74e4", "green": "#189b49",
+        "amber": "#d97706", "red": "#d63031", "cyan": "#0984e3",
+        "inp_bg": "#ffffff", "log_bg": "#f7f9fc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "font": "Helvetica Neue", "relief": "groove"
+    },
+    "mac_light": {
+        "bg": "#ececec", "panel": "#f6f6f6", "card": "#ffffff", "border": "#d1d1d6",
+        "text": "#1d1d1f", "muted": "#6e6e73", "blue": "#007aff", "green": "#34c759",
+        "amber": "#ff9500", "red": "#ff3b30", "cyan": "#007aff",
+        "inp_bg": "#ffffff", "log_bg": "#fafafa", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "font": "Helvetica Neue", "relief": "solid"
+    },
+    "mac_dark": {
+        "bg": "#1c1c1e", "panel": "#2c2c2e", "card": "#3a3a3c", "border": "#48484a",
+        "text": "#f5f5f7", "muted": "#aeaeb2", "blue": "#0a84ff", "green": "#30d158",
+        "amber": "#ff9f0a", "red": "#ff453a", "cyan": "#64d2ff",
+        "inp_bg": "#161618", "log_bg": "#161618", "btn_txt": "#ffffff", "green_txt": "#042f1a",
+        "font": "Helvetica Neue", "relief": "solid"
+    },
     "dark": {
         "bg": "#0a0f18", "panel": "#111827", "card": "#161f33", "border": "#26324d",
         "text": "#f1f5f9", "muted": "#94a3b8", "blue": "#2b7fff", "green": "#10b981",

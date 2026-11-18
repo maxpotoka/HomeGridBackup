@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.004 | 18.11.2026 17:20) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.007 | 18.11.2026 17:42) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -46,6 +46,12 @@ class HomeGridApp(DialogsMixin):
         self.var_stage = tk.StringVar(value=self.engine.stage)
         self.var_pct = tk.StringVar(value="0%")
 
+        import sys
+        if sys.platform == "darwin":
+            self.root.bind_class("Entry", "<Command-v>", lambda e: e.widget.event_generate("<<Paste>>"))
+            self.root.bind_class("Entry", "<Command-c>", lambda e: e.widget.event_generate("<<Copy>>"))
+            self.root.bind_class("Entry", "<Command-x>", lambda e: e.widget.event_generate("<<Cut>>"))
+            self.root.bind_class("Entry", "<Command-a>", lambda e: (e.widget.select_range(0, "end"), "break")[1])
         self._build_ui()
         self.apply_theme_and_mode()
         self.root.after(300, self._poll_ui)
@@ -79,6 +85,14 @@ class HomeGridApp(DialogsMixin):
             pass
 
     def on_window_close(self):
+        import sys
+        if sys.platform == "darwin":
+            if bool(self.engine.state.get("minimize_to_tray", True)):
+                self.root.iconify()
+                self.engine.log("Вікно згорнуто у Dock (програма продовжує роботу).", "info")
+                return
+            self.confirm_exit()
+            return
         keep_tray = bool(self.engine.state.get("minimize_to_tray", True))
         if keep_tray and HAS_TRAY:
             try:
@@ -333,8 +347,10 @@ class HomeGridApp(DialogsMixin):
         self.btn_exit.configure(bg=p["panel"], fg=p["red"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
         short_names = {
-            "dark": "🌙 Темна", "light": "☀️ Світла", "norton": "💾 Norton",
-            "win95": "🖥️ Win 95", "winxp": "🪟 Win XP", "win7": "💎 Win 7", "crt": "📟 CRT"
+            "crt": "📟 CRT (1970)", "norton": "💾 Norton (1980)", "mac_classic": "🍏 Mac OS 1 (1984)",
+            "win95": "🖥️ Win 95 (1995)", "winxp": "🪟 Win XP (2001)", "mac_aqua": "💧 Mac Aqua (2004)",
+            "win7": "💎 Win 7 (2007)", "mac_light": "🏔️ Mac Light (2014)", "mac_dark": "🌌 Mac Dark (2024)",
+            "dark": "🌙 Темна (2026)", "light": "☀️ Світла (2026)"
         }
         t_lbl = short_names.get(cur_theme, "🌙 Темна")
         self.btn_theme.configure(text=f"🎨 {t_lbl}", bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_main, padx=bpx, pady=bpy)

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/gfs.py (v1.002 | 18.11.2026 17:14) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
+# [ФАЙЛ: core/gfs.py (v1.007 | 18.11.2026 17:42) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
 # ==============================================================================
 import os
 import re
@@ -12,7 +12,7 @@ def compute_gfs_plan(state):
     all_items = []
     for name in os.listdir(bdir):
         full = os.path.join(bdir, name)
-        if os.path.isfile(full) and name.lower().endswith(".zip") and re.search(r"backup|KEEP", name):
+        if not name.startswith(".") and os.path.isfile(full) and name.lower().endswith(".zip") and re.search(r"backup|KEEP", name):
             sz = os.path.getsize(full)
             dt = parse_backup_dt(name, os.path.getmtime(full))
             all_items.append({"path": full, "name": name, "size": sz, "dt_str": dt.strftime("%Y-%m-%d %H:%M"), "dt": dt})

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.003 | 18.11.2026 17:17) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.007 | 18.11.2026 17:42) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -176,7 +176,7 @@ class BackupEngine:
         if cache_valid:
             return self._storage_stats_cache
         os.makedirs(bdir, exist_ok=True)
-        zips = [os.path.join(bdir, f) for f in os.listdir(bdir) if f.lower().endswith(".zip")]
+        zips = [os.path.join(bdir, f) for f in os.listdir(bdir) if not f.startswith(".") and f.lower().endswith(".zip")]
         total_mb = round(sum(os.path.getsize(p) for p in zips) / 1048576.0, 1)
         try:
             _, _, free_b = shutil.disk_usage(bdir)

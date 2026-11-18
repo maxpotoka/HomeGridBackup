@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v1.002 | 18.11.2026 17:14) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
+# [ФАЙЛ: gui/widgets.py (v1.006 | 18.11.2026 17:36) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
 # ==============================================================================
 import tkinter as tk
 from gui.styles import THEMES
@@ -83,6 +83,19 @@ class StyledProgressBar(tk.Canvas):
             self.create_rectangle(0, 0, w - 1, h - 1, outline=brd_c)
             if fx2 > fx1:
                 self._draw_gradient(max(2, fx1), 2, min(w - 2, fx2), h - 2, c1, c2)
+        elif st == "s_20s_macos":
+            self.configure(bg="#e5e5ea")
+            self.create_rectangle(0, 0, w - 1, h - 1, outline="#c7c7cc")
+            if fx2 > fx1:
+                self._draw_gradient(max(2, fx1), 2, min(w - 2, fx2), h - 2, "#007aff", "#5ac8fa")
+        elif st == "s_80s_mac1":
+            self.configure(bg="#ffffff")
+            self.create_rectangle(0, 0, w - 1, h - 1, outline="#000000", width=2)
+            if fx2 > fx1:
+                x_a, x_b = max(2, fx1), min(w - 2, fx2)
+                self.create_rectangle(x_a, 2, x_b, h - 2, fill="#000000", outline="")
+                for sx in range(x_a, x_b, 4):
+                    self.create_line(sx, 2, sx, h - 2, fill="#ffffff", width=1)
         elif st == "classic":
             self.configure(bg=self.theme["inp_bg"])
             self.create_rectangle(0, 0, w - 1, h - 1, outline=self.theme["border"])

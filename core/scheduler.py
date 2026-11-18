@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v1.002 | 18.11.2026 17:14) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v1.007 | 18.11.2026 17:42) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -59,9 +59,61 @@ def _sync_scheduler_from_windows(st):
     except Exception:
         pass
 
+def _manage_macos_launchagent(action, time_str="03:00", mode_flag="--hidden"):
+    plist_dir = os.path.expanduser("~/Library/LaunchAgents")
+    plist_path = os.path.join(plist_dir, "com.homegrid.backup.plist")
+    if action == "delete":
+        try:
+            subprocess.run(["launchctl", "unload", plist_path], capture_output=True, timeout=6)
+        except Exception:
+            pass
+        if os.path.exists(plist_path):
+            try:
+                os.remove(plist_path)
+                return True, "Завдання автозапуску macOS (LaunchAgent) видалено."
+            except Exception as e:
+                return False, f"Помилка видалення LaunchAgent: {e}"
+        return False, "Завдання автозапуску macOS не знайдено."
+
+    os.makedirs(plist_dir, exist_ok=True)
+    hh, mm = (time_str.split(":") + ["03", "00"])[:2]
+    if is_compiled_app():
+        exe_p = os.path.abspath(sys.executable)
+        prog_args = f"    <string>{exe_p}</string>\n    <string>{mode_flag}</string>"
+    else:
+        main_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+        prog_args = f"    <string>{sys.executable}</string>\n    <string>{main_py}</string>\n    <string>{mode_flag}</string>"
+
+    plist_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">\n'
+        '<plist version="1.0">\n<dict>\n'
+        '  <key>Label</key><string>com.homegrid.backup</string>\n'
+        '  <key>ProgramArguments</key>\n  <array>\n' + prog_args + '\n  </array>\n'
+        '  <key>StartCalendarInterval</key>\n  <dict>\n'
+        f'    <key>Hour</key><integer>{int(hh)}</integer>\n'
+        f'    <key>Minute</key><integer>{int(mm)}</integer>\n'
+        '  </dict>\n'
+        '  <key>RunAtLoad</key><false/>\n'
+        '</dict>\n</plist>\n'
+    )
+    try:
+        try:
+            subprocess.run(["launchctl", "unload", plist_path], capture_output=True, timeout=5)
+        except Exception:
+            pass
+        with open(plist_path, "w", encoding="utf-8") as pf:
+            pf.write(plist_xml)
+        subprocess.run(["launchctl", "load", plist_path], capture_output=True, timeout=6)
+        return True, f"Завдання macOS LaunchAgent створено на {int(hh):02d}:{int(mm):02d} ({mode_flag})."
+    except Exception as e:
+        return False, f"Помилка створення LaunchAgent: {e}"
+
 def _manage_windows_scheduler(action, time_str="03:00", mode_flag="--hidden", start_missed=True, wake_pc=False, prio=6):
+    if sys.platform == "darwin":
+        return _manage_macos_launchagent(action, time_str, mode_flag)
     if os.name != "nt":
-        return False, "Планувальник завдань підтримується лише у Windows."
+        return False, "Планувальник завдань підтримується лише у Windows та macOS."
     if action == "delete":
         try:
             res = subprocess.run(
