@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.0) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.004 | 18.11.2026 17:20) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,7 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.0"
+SCRIPT_VER = "1.004"
+BUILD_DATE = "18.11.2026 17:20"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 DEFAULT_BACKUP_DIR = os.path.join(os.path.expanduser("~"), "BackupHGM")
@@ -43,6 +44,57 @@ VALID_PBAR_STYLES = (
 )
 VALID_THEMES = ("dark", "light", "norton", "win95", "winxp", "win7", "crt")
 VALID_SCALES = ("auto", "800x600", "1024x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440")
+
+def get_fast_sysinfo():
+    import struct
+    arch_os = "64-bit" if (os.environ.get("PROCESSOR_ARCHITEW6432") or "64" in platform.machine() or struct.calcsize("P") == 8) else "32-bit"
+    app_bits = f"{struct.calcsize('P') * 8}-bit"
+    cpu_name = ""
+    os_label = f"{platform.system()} {platform.release()}"
+
+    if os.name == "nt":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as k:
+                cpu_name = str(winreg.QueryValueEx(k, "ProcessorNameString")[0]).strip()
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion") as k:
+                prod = str(winreg.QueryValueEx(k, "ProductName")[0]).strip()
+                build = str(winreg.QueryValueEx(k, "CurrentBuild")[0]).strip()
+                disp_ver = ""
+                for val_name in ("DisplayVersion", "ReleaseId", "CSDVersion"):
+                    try:
+                        v = str(winreg.QueryValueEx(k, val_name)[0]).strip()
+                        if v:
+                            disp_ver = v
+                            break
+                    except Exception:
+                        pass
+                if build.isdigit() and int(build) >= 22000 and "Windows 10" in prod:
+                    prod = prod.replace("Windows 10", "Windows 11")
+                code_part = f" {disp_ver}" if disp_ver else ""
+                os_label = f"{prod}{code_part} (Build {build})"
+        except Exception:
+            pass
+    elif sys.platform == "darwin":
+        mac_v = platform.mac_ver() or ""
+        mac_names = {"15": "Sequoia", "14": "Sonoma", "13": "Ventura", "12": "Monterey", "11": "Big Sur"}
+        maj = mac_v.split(".") if mac_v else ""
+        cname = f" ({mac_names[maj]})" if maj in mac_names else ""
+        os_label = f"macOS {mac_v}{cname}"
+        try:
+            import subprocess
+            out = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], timeout=0.4).decode().strip()
+            if out:
+                cpu_name = out
+        except Exception:
+            pass
+
+    if not cpu_name:
+        cpu_name = (platform.processor() or os.environ.get("PROCESSOR_IDENTIFIER") or platform.machine() or "Unknown CPU").strip()
+    cpu_name = re.sub(r"\s+", " ", cpu_name).replace("(R)", "").replace("(TM)", "").replace("CPU ", "").strip()
+    if len(cpu_name) > 42:
+        cpu_name = cpu_name[:39] + "..."
+    return f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}"
 
 def _detect_low_end_or_win7():
     try:

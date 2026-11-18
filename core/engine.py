@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.50) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.003 | 18.11.2026 17:17) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -9,8 +9,8 @@ import getpass
 import threading
 from datetime import datetime
 from core.config import (
-    SCRIPT_VER, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN,
-    load_state, write_file_log
+    SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN,
+    load_state, write_file_log, get_fast_sysinfo
 )
 
 _CON_TR_MAP = (
@@ -82,8 +82,9 @@ class BackupEngine:
         self.show_hw_notice = bool(self.state.get("hw_auto_notice"))
         self.progress = 0
         self.indeterminate = False
+        self.sys_summary = get_fast_sysinfo()
         self.stage = "Готовий до резервного копіювання"
-        self.pill_text = f"Очікування | v{SCRIPT_VER}"
+        self.pill_text = f"v{SCRIPT_VER} | {BUILD_DATE}"
         self.pill_type = "idle"
         self.diag_net = "Не перевірено"
         self.diag_ping = "— мс"
@@ -104,7 +105,8 @@ class BackupEngine:
         os.makedirs(self.state["backup_dir"], exist_ok=True)
         mode_lbl = "HIDDEN" if HIDDEN_MODE else ("SILENT" if SILENT_MODE else ("CLI" if CLI_MODE else "APP"))
         sec_lbl = "Keyring" if self.state["storage_backend"] == "keyring" else ".env"
-        self.log(f"Систему запущено (v{SCRIPT_VER}, {mode_lbl}, сховище: {sec_lbl}). Каталог: {self.state['backup_dir']}", "info")
+        self.log(f"Систему запущено (v{SCRIPT_VER} від {BUILD_DATE}, {mode_lbl}, сховище: {sec_lbl}). Каталог: {self.state['backup_dir']}", "info")
+        self.log(f"ОС та залізо: {self.sys_summary}", "info")
 
     def log(self, msg, level="info"):
         ts = datetime.now().strftime("%H:%M:%S")

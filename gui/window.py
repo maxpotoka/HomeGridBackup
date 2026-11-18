@@ -1,10 +1,10 @@
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.42) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.004 | 18.11.2026 17:20) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
 import tkinter as tk
-from core.config import SCRIPT_VER, DEFAULT_BACKUP_DIR, commit_state
+from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state
 from core.files import open_folder_native, choose_folder_native
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
@@ -30,7 +30,7 @@ class HomeGridApp(DialogsMixin):
         self._resize_timer = None
         self._last_live_wh = (0, 0)
 
-        self.root.title(f"HomeGrid Backup v{SCRIPT_VER}")
+        self.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})")
         m = self.metrics
         self.root.geometry(f"{m['win_w']}x{m['win_h']}+{m['pos_x']}+{m['pos_y']}")
         self.root.minsize(620, 420)
@@ -43,7 +43,7 @@ class HomeGridApp(DialogsMixin):
         self.var_net = tk.StringVar(value="Не перевірено")
         self.var_disk = tk.StringVar(value="0 архівів (0 МБ)")
         self.var_strat = tk.StringVar(value="")
-        self.var_stage = tk.StringVar(value="Готовий до резервного копіювання")
+        self.var_stage = tk.StringVar(value=self.engine.stage)
         self.var_pct = tk.StringVar(value="0%")
 
         self._build_ui()
@@ -123,7 +123,7 @@ class HomeGridApp(DialogsMixin):
         hdr_left.pack(side="left", fill="x", expand=True)
         self.lbl_title = tk.Label(hdr_left, text="HomeGrid Backup", font=("Segoe UI", fs + 4, "bold"))
         self.lbl_title.pack(anchor="w")
-        self.lbl_sub = tk.Label(hdr_left, text="Надійне резервне копіювання, перевірка цілісності та GFS-ротація даних інвертора", font=("Segoe UI", max(8, fs - 1)))
+        self.lbl_sub = tk.Label(hdr_left, text=f"Версія v{SCRIPT_VER}  (оновлено: {BUILD_DATE})", font=("Segoe UI", max(8, fs - 1)))
         self.lbl_sub.pack(anchor="w")
 
         hdr_right = tk.Frame(self.header)
@@ -147,49 +147,48 @@ class HomeGridApp(DialogsMixin):
         self.lbl_c1 = tk.Label(self.card_conn, text="Підключення до сервера та папки збереження", font=("Segoe UI", fs, "bold"))
         self.lbl_c1.pack(anchor="w", pady=(0, 4))
 
-        r1 = tk.Frame(self.card_conn)
-        r1.pack(fill="x", pady=4)
+        conn_box = tk.Frame(self.card_conn)
+        conn_box.pack(anchor="w", fill="x")
+        r1 = tk.Frame(conn_box)
+        r1.pack(anchor="w", pady=4)
         self.l_srv = tk.Label(r1, text="Адреса:", width=9, anchor="w")
         self.l_srv.pack(side="left")
         self.ent_srv = tk.Entry(r1, textvariable=self.var_srv, width=42, font=("Segoe UI", fs))
-        self.ent_srv.pack(side="left", padx=(0, 12), ipady=3)
+        self.ent_srv.pack(side="left", padx=(0, 10), ipady=3)
+        self.btn_hist = tk.Button(r1, text="🕘 Історія", command=self.open_history_modal, padx=8, pady=3, cursor="hand2")
+        self.btn_hist.pack(side="left", padx=5)
+        self.btn_conn = tk.Button(r1, text="🔌 Підключити", command=self.do_connect, padx=12, pady=3, cursor="hand2")
+        self.btn_conn.pack(side="left", padx=5)
+        self.btn_scan = tk.Button(r1, text="🔍 Автопошук по LAN", command=self.do_scan, padx=12, pady=3, cursor="hand2")
+        self.btn_scan.pack(side="left", padx=(5, 0))
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
 
-        self.btn_hist = tk.Button(r1, text="🕘 Історія", command=self.open_history_modal, padx=8, pady=3, cursor="hand2")
-        self.btn_hist.pack(side="left", padx=8)
-        self.btn_conn = tk.Button(r1, text="🔌 Підключити", command=self.do_connect, padx=12, pady=3, cursor="hand2")
-        self.btn_conn.pack(side="left", padx=8)
-        self.btn_scan = tk.Button(r1, text="🔍 Автопошук по LAN", command=self.do_scan, padx=12, pady=3, cursor="hand2")
-        self.btn_scan.pack(side="left", padx=(8, 0))
-
-        r2 = tk.Frame(self.card_conn)
-        r2.pack(fill="x", pady=4)
+        r2 = tk.Frame(conn_box)
+        r2.pack(anchor="w", pady=4)
         self.l_dir = tk.Label(r2, text="Папка:", width=9, anchor="w")
         self.l_dir.pack(side="left")
         self.ent_dir = tk.Entry(r2, textvariable=self.var_dir, width=42, font=("Segoe UI", fs))
-        self.ent_dir.pack(side="left", padx=(0, 12), ipady=3)
+        self.ent_dir.pack(side="left", padx=(0, 10), ipady=3)
+        self.btn_dir = tk.Button(r2, text="📁 Папка архівів...", command=self.choose_dir, padx=12, pady=3, cursor="hand2")
+        self.btn_dir.pack(side="left", padx=5)
+        self.btn_open_dir = tk.Button(r2, text="📂 Відкрити папку", command=self.open_backup_folder, padx=12, pady=3, cursor="hand2")
+        self.btn_open_dir.pack(side="left", padx=(5, 0))
         self.ent_dir.bind("<FocusOut>", lambda e: self.save_dir_manual())
 
-        self.btn_dir = tk.Button(r2, text="📁 Папка архівів...", command=self.choose_dir, padx=12, pady=3, cursor="hand2")
-        self.btn_dir.pack(side="left", padx=8)
-        self.btn_open_dir = tk.Button(r2, text="📂 Відкрити папку", command=self.open_backup_folder, padx=12, pady=3, cursor="hand2")
-        self.btn_open_dir.pack(side="left", padx=(8, 0))
-
-        r3 = tk.Frame(self.card_conn)
-        r3.pack(fill="x", pady=4)
+        r3 = tk.Frame(conn_box)
+        r3.pack(anchor="w", pady=4)
         self.l_mir = tk.Label(r3, text="Дзеркало:", width=9, anchor="w")
         self.l_mir.pack(side="left")
         self.ent_mir = tk.Entry(r3, textvariable=self.var_mirror, width=42, font=("Segoe UI", fs))
-        self.ent_mir.pack(side="left", padx=(0, 12), ipady=3)
-        self.ent_mir.bind("<FocusOut>", lambda e: self.save_mirror_manual())
-
+        self.ent_mir.pack(side="left", padx=(0, 10), ipady=3)
         self.btn_mir = tk.Button(r3, text="🪞 Папка дзеркала...", command=self.choose_mirror, padx=12, pady=3, cursor="hand2")
-        self.btn_mir.pack(side="left", padx=8)
+        self.btn_mir.pack(side="left", padx=5)
         self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", True)))
         self.chk_mir_tog = tk.Checkbutton(r3, text="Увімкнено", variable=self.var_mir_en, command=self.toggle_mirror, cursor="hand2")
-        self.chk_mir_tog.pack(side="left", padx=(10, 0))
+        self.chk_mir_tog.pack(side="left", padx=(8, 0))
+        self.ent_mir.bind("<FocusOut>", lambda e: self.save_mirror_manual())
 
         self.card_stat = tk.Frame(self.body, padx=12, pady=py, bd=1, relief="solid")
         self.card_stat.pack(fill="x", pady=(0, py))
@@ -307,7 +306,7 @@ class HomeGridApp(DialogsMixin):
             lbl.configure(bg=p["panel"], fg=p["muted"], font=f_main)
 
         avail_chars = max(16, int((m["win_w"] - int(460 * m["k"])) / max(7, fs * 0.65)))
-        ent_chars = max(16, min(38, avail_chars))
+        ent_chars = max(20, min(52, avail_chars))
         for ent in (self.ent_srv, self.ent_dir, self.ent_mir):
             ent.configure(bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], font=f_main, width=ent_chars)
 
