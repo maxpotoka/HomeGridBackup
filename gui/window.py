@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.010 | 18.11.2026 18:26) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.016 | 18.11.2026 19:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -42,6 +42,7 @@ class HomeGridApp(DialogsMixin):
         self.var_mirror = tk.StringVar(value=self.engine.state.get("mirror_dir", ""))
         self.var_net = tk.StringVar(value="Не перевірено")
         self.var_disk = tk.StringVar(value="0 архівів (0 МБ)")
+        self.var_last_bkp = tk.StringVar(value="Перевірка...")
         self.var_strat = tk.StringVar(value="")
         self.var_stage = tk.StringVar(value=self.engine.stage)
         self.var_pct = tk.StringVar(value="0%")
@@ -175,8 +176,9 @@ class HomeGridApp(DialogsMixin):
         self.btn_conn.pack(side="left", padx=5)
         self.btn_scan = tk.Button(r1, text="🔍 Автопошук по LAN", command=self.do_scan, padx=12, pady=3, cursor="hand2")
         self.btn_scan.pack(side="left", padx=(5, 0))
-        self.btn_pick_lan = tk.Button(r1, text="📡 Обрати виявлений", command=self.open_discovered_menu, padx=10, pady=3, cursor="hand2")
-        self._lan_btn_visible = False
+        self.btn_pick_lan = tk.Button(r1, text="📡 Обрати виявлений (0)", command=self.open_discovered_menu, state="disabled", padx=10, pady=3, cursor="hand2")
+        self.btn_pick_lan.pack(side="left", padx=(6, 0))
+        ToolTip(self.btn_pick_lan, "Список серверів, виявлених під час останнього сканування локальної мережі")
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
@@ -211,15 +213,30 @@ class HomeGridApp(DialogsMixin):
         stat_row = tk.Frame(self.card_stat)
         stat_row.pack(fill="x")
 
+        stat_row.columnconfigure(0, weight=1)
+        stat_row.columnconfigure(1, weight=1)
+        stat_row.columnconfigure(2, weight=0)
+
         stat_left = tk.Frame(stat_row)
-        stat_left.pack(side="left", fill="x", expand=True)
+        stat_left.grid(row=0, column=0, sticky="w", padx=(0, 12))
         self.t2_cap = tk.Label(stat_left, text="ЛОКАЛЬНЕ СХОВИЩЕ", font=("Segoe UI", max(7, fs - 2), "bold"))
         self.t2_cap.pack(anchor="w")
         self.t2_val = tk.Label(stat_left, textvariable=self.var_disk, font=("Segoe UI", fs + 1, "bold"))
         self.t2_val.pack(anchor="w", pady=(2, 0))
 
-        self.btn_analyze = tk.Button(stat_row, text="🔍 Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
-        self.btn_analyze.pack(side="right", padx=(8, 0))
+        stat_mid = tk.Frame(stat_row)
+        stat_mid.grid(row=0, column=1, sticky="w", padx=(8, 12))
+        self.t3_cap = tk.Label(stat_mid, text="ОСТАННІЙ АРХІВ", font=("Segoe UI", max(7, fs - 2), "bold"))
+        self.t3_cap.pack(anchor="w")
+        self.t3_val = tk.Label(stat_mid, textvariable=self.var_last_bkp, font=("Segoe UI", fs + 1, "bold"))
+        self.t3_val.pack(anchor="w", pady=(2, 0))
+
+        stat_btns = tk.Frame(stat_row)
+        stat_btns.grid(row=0, column=2, sticky="e")
+        self.btn_ops_hist = tk.Button(stat_btns, text="📜 Журнал операцій", command=self.open_ops_history, padx=10, pady=5, cursor="hand2")
+        self.btn_ops_hist.pack(side="left", padx=(0, 6))
+        self.btn_analyze = tk.Button(stat_btns, text="🔍 Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
+        self.btn_analyze.pack(side="left")
         ToolTip(self.btn_analyze, "Відкрити список архівів, керування мітками KEEP та перевірку цілісності SHA-256")
 
         self.card_prog = tk.Frame(self.body, padx=12, pady=py, bd=1, relief="solid")
@@ -230,6 +247,8 @@ class HomeGridApp(DialogsMixin):
         self.lbl_stage.pack(side="left")
         self.lbl_pct = tk.Label(p_top, textvariable=self.var_pct, font=("Segoe UI", fs, "bold"))
         self.lbl_pct.pack(side="right")
+        self.lbl_pill = tk.Label(p_top, text="Очікування", padx=8, pady=1, bd=1, relief="solid", font=("Segoe UI", max(8, fs - 1), "bold"))
+        self.lbl_pill.pack(side="right", padx=(0, 10))
         self.pbar = StyledProgressBar(self.card_prog, height=18)
         self.pbar.pack(fill="x")
 
@@ -328,6 +347,9 @@ class HomeGridApp(DialogsMixin):
 
         self.t2_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
         self.t2_val.configure(bg=p["panel"], fg=p["green"], font=f_bold)
+        if hasattr(self, "t3_cap"):
+            self.t3_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
+            self.t3_val.configure(bg=p["panel"], fg=p["cyan"], font=f_bold)
 
         self.pbar.configure(height=max(20, fs + 9))
         self.txt_log.configure(bg=p["log_bg"], fg=p["text"], font=("Consolas", max(8, fs - 1)))
@@ -344,7 +366,7 @@ class HomeGridApp(DialogsMixin):
         self.btn_clear_log.configure(bg=p["card"], fg=p["muted"], disabledforeground=dis_fg, activebackground=p["border"], activeforeground=p["text"], font=f_sub, padx=max(6, bpx - 2), pady=1)
         self.btn_conn.configure(bg=p["blue"], fg=p["btn_txt"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_start.configure(bg=p["green"], fg=p["green_txt"], disabledforeground=dis_fg, font=f_bold, padx=bpx + 4, pady=bpy + 1)
-        for b in (self.btn_analyze, self.btn_strat):
+        for b in (self.btn_analyze, self.btn_ops_hist, self.btn_strat):
             b.configure(bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_exit.configure(bg=p["panel"], fg=p["red"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
@@ -538,6 +560,21 @@ class HomeGridApp(DialogsMixin):
             free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
             self.var_disk.set(f"{z_cnt} архівів ({z_mb} МБ){free_txt}")
 
+            if hasattr(self.engine, "get_last_backup_info") and hasattr(self, "t3_val"):
+                lb_txt, lb_st = self.engine.get_last_backup_info()
+                self.var_last_bkp.set(lb_txt)
+                p_cur = self._get_palette()
+                self.t3_val.configure(fg=p_cur["green"] if lb_st == "ok" else (p_cur["amber"] if lb_st == "warn" else p_cur["muted"]))
+
+            if hasattr(self, "lbl_pill"):
+                p_cur = self._get_palette()
+                ptype = getattr(self.engine, "pill_type", "idle")
+                ptxt = getattr(self.engine, "pill_text", "") or "Очікування"
+                if " | " in ptxt and ptype == "idle":
+                    ptxt = "Очікування"
+                pill_fg = {"ok": p_cur["green"], "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
+                self.lbl_pill.configure(text=ptxt, bg=p_cur["card"], fg=pill_fg, highlightbackground=p_cur["border"], font=("Segoe UI", max(8, self.metrics["font_sz"] - 1), "bold"))
+
             self.var_stage.set(self.engine.stage)
             self.var_pct.set("пошук..." if self.engine.indeterminate else f"{self.engine.progress}%")
             self.pbar.set_state(
@@ -553,14 +590,12 @@ class HomeGridApp(DialogsMixin):
                 b.configure(state=btn_state)
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
-                if disc:
-                    self.btn_pick_lan.configure(text=f"📡 Обрати виявлений ({len(disc)}) ▾", state=btn_state)
-                    if not getattr(self, "_lan_btn_visible", False):
-                        self.btn_pick_lan.pack(side="left", padx=(6, 0))
-                        self._lan_btn_visible = True
-                elif getattr(self, "_lan_btn_visible", False):
-                    self.btn_pick_lan.pack_forget()
-                    self._lan_btn_visible = False
+                if disc and not self.engine.is_running:
+                    self.btn_pick_lan.configure(text=f"📡 Обрати виявлений ({len(disc)}) ▾", state="normal")
+                else:
+                    cnt_d = len(disc)
+                    lbl_d = f"📡 Обрати виявлений ({cnt_d}) ▾" if cnt_d else "📡 Обрати виявлений (0)"
+                    self.btn_pick_lan.configure(text=lbl_d, state="disabled")
 
             logs = self.engine.logs
             if logs and (len(logs) != self.last_log_len or logs[-1] is not self._last_log_item):

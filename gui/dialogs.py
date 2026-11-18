@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.009 | 18.11.2026 18:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.012 | 18.11.2026 18:54) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -462,6 +462,30 @@ class DialogsMixin:
         btn_verify.pack(side="left", padx=(0, 8))
         tk.Button(bf, text="🗑️ Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=6)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
+
+    def open_ops_history(self):
+        fs = self.metrics["font_sz"]
+        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 680, 420)
+        tk.Label(dlg, text="Останні 25 операцій створення резервних копій (дата, розмір та підсумок):", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
+        box = tk.Frame(dlg, bg=p["log_bg"], bd=1, relief="solid")
+        box.pack(fill="both", expand=True, padx=14)
+
+        ops = getattr(self.engine, "op_history", []) or []
+        if not ops:
+            tk.Label(box, text="Журнал операцій поки порожній. Запустіть резервне копіювання.", bg=p["log_bg"], fg=p["muted"], font=("Segoe UI", fs)).pack(pady=24)
+        else:
+            for item in ops:
+                st_lbl = item.get("status", "")
+                is_ok = (st_lbl == "Успішно")
+                col = p["green"] if is_ok else p["red"]
+                mb_txt = f"{item.get('size_mb', 0)} МБ" if is_ok else "—"
+                row = tk.Frame(box, bg=p["card"], padx=8, pady=4)
+                row.pack(fill="x", padx=6, pady=2)
+                tk.Label(row, text=f"[{item.get('ts', '')}]", bg=p["card"], fg=p["muted"], font=("Consolas", max(8, fs - 1))).pack(side="left")
+                tk.Label(row, text=f" {st_lbl:<9} ", bg=p["card"], fg=col, font=("Segoe UI", fs, "bold")).pack(side="left", padx=4)
+                tk.Label(row, text=f"{mb_txt:>9}  |  {item.get('detail', '')}", bg=p["card"], fg=p["text"], font=("Consolas", max(8, fs - 1))).pack(side="left")
+
+        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=12)
 
     def open_about(self):
         fs = self.metrics["font_sz"]

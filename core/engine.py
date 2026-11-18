@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.007 | 18.11.2026 17:42) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.017 | 18.11.2026 19:50) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -86,6 +86,7 @@ class BackupEngine:
         self.stage = "Готовий до резервного копіювання"
         self.pill_text = f"v{SCRIPT_VER} | {BUILD_DATE}"
         self.pill_type = "idle"
+        self.op_history = list(self.state.get("op_history") or [])
         self.diag_net = "Не перевірено"
         self.diag_ping = "— мс"
         self.logs = []
@@ -188,3 +189,88 @@ class BackupEngine:
         self._storage_stats_cache_time = now
         self._storage_stats_cache_dir = bdir
         return result
+
+    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0):
+        from datetime import datetime
+        from core.config import commit_state
+        entry = {
+            "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "status": status_lbl,
+            "detail": detail_txt,
+            "size_mb": round(float(size_mb), 1)
+        }
+        if not hasattr(self, "op_history"):
+            self.op_history = list(self.state.get("op_history") or [])
+        self.op_history.insert(0, entry)
+        self.op_history = self.op_history[:25]
+        self.state["op_history"] = self.op_history
+        try:
+            commit_state(self.state)
+        except Exception:
+            pass
+
+    def get_last_backup_info(self):
+        from datetime import datetime
+        bdir = self.state.get("backup_dir", "")
+        if not bdir or not os.path.isdir(bdir):
+            return "Ще немає створених копій", "idle"
+        try:
+            zips = [
+                os.path.join(bdir, f) for f in os.listdir(bdir)
+                if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
+            ]
+            if not zips:
+                return "Ще немає створених копій", "idle"
+            latest = max(zips, key=os.path.getmtime)
+            st = os.stat(latest)
+            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y о %H:%M")
+            mb_s = round(st.st_size / 1048576.0, 1)
+            has_sha = os.path.exists(latest + ".sha256")
+            if has_sha:
+                return f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok"
+            return f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn"
+        except Exception:
+            return "Невідомо", "idle"
+
+    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0):
+        from datetime import datetime
+        from core.config import commit_state
+        entry = {
+            "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "status": status_lbl,
+            "detail": detail_txt,
+            "size_mb": round(float(size_mb), 1)
+        }
+        if not hasattr(self, "op_history"):
+            self.op_history = list(self.state.get("op_history") or [])
+        self.op_history.insert(0, entry)
+        self.op_history = self.op_history[:25]
+        self.state["op_history"] = self.op_history
+        try:
+            commit_state(self.state)
+        except Exception:
+            pass
+
+    def get_last_backup_info(self):
+        from datetime import datetime
+        bdir = self.state.get("backup_dir", "")
+        if not bdir or not os.path.isdir(bdir):
+            return "Ще немає створених копій", "idle"
+        try:
+            zips = [
+                os.path.join(bdir, f) for f in os.listdir(bdir)
+                if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
+            ]
+            if not zips:
+                return "Ще немає створених копій", "idle"
+            latest = max(zips, key=os.path.getmtime)
+            st = os.stat(latest)
+            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y о %H:%M")
+            mb_s = round(st.st_size / 1048576.0, 1)
+            has_sha = os.path.exists(latest + ".sha256")
+            if has_sha:
+                return f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok"
+            return f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn"
+        except Exception:
+            return "Невідомо", "idle"
+

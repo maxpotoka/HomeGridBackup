@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.009 | 18.11.2026 18:24) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.015 | 18.11.2026 19:17) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -353,10 +353,12 @@ def run_scan_task(engine):
             engine.diag_net = f"{ip}:18899 (ОНЛАЙН)"
             engine.diag_ping = f"TCP {t_ms} мс | API {a_ms} мс"
             engine.set_pill(f"ОНЛАЙН | {a_ms} мс", "ok")
+            engine.discovered_servers = [(url, t_ms, a_ms)]
             engine.log(f"Знайдено сервер: {url} (TCP: {t_ms} мс, API: {a_ms} мс)", "ok")
             engine.set_progress(100, "Сервер знайдено та збережено")
             found_single = True
         else:
+            engine.discovered_servers = [(f"http://{ip}:18899", t_ms, a_ms) for ip, t_ms, a_ms in servers]
             engine.log(f"Знайдено кілька серверів ({len(servers)} шт.):", "warn")
             for ip, t_ms, a_ms in servers:
                 engine.log(f"  • http://{ip}:18899 (TCP: {t_ms} мс, API: {a_ms} мс)", "info")

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.010 | 18.11.2026 18:26) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.017 | 18.11.2026 19:50) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,8 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.010"
-BUILD_DATE = "18.11.2026 18:26"
+SCRIPT_VER = "1.017"
+BUILD_DATE = "18.11.2026 19:50"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -199,7 +199,7 @@ def record_server_history(state, srv_url):
 
 def load_state():
     state = {
-        "server": "", "server_history": [], "client_token": "", "session_token": "",
+        "server": "", "server_history": [], "op_history": [], "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
         "mirror_dir": "", "mirror_enabled": True, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
@@ -217,6 +217,8 @@ def load_state():
                 data = json.load(f)
             if data.get("server"):
                 state["server"] = str(data["server"]).strip()
+            if isinstance(data.get("op_history"), list):
+                state["op_history"] = data["op_history"][:25]
             if isinstance(data.get("server_history"), list):
                 state["server_history"] = [str(x).strip() for x in data["server_history"] if str(x).strip()][:15]
             if data.get("backup_dir"):
@@ -321,7 +323,7 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "backup_dir", "mirror_dir", "mirror_enabled",
+        "server", "server_history", "op_history", "backup_dir", "mirror_dir", "mirror_enabled",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "theme", "ui_scale", "ui_font", "minimize_to_tray",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
