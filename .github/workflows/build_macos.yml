@@ -2,8 +2,7 @@ name: Build HomeGrid Backup for macOS (Intel x86_64)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
+   
 
 jobs:
   build-mac-intel:
