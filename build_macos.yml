@@ -1,0 +1,64 @@
+name: Build HomeGrid Backup for macOS (Intel x86_64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-mac-intel:
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11 (Intel x86_64)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+
+      - name: Install build dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install nuitka pillow pystray keyring send2trash
+
+      - name: Convert icon.ico to macOS icon.icns (if exists)
+        run: |
+          if [ -f "icon.ico" ]; then
+            python3 -c "from PIL import Image; Image.open('icon.ico').save('icon.icns')" || true
+          fi
+
+      - name: Build macOS Intel .app bundle with Nuitka
+        run: |
+          ICON_ARG=""
+          if [ -f "icon.icns" ]; then
+            ICON_ARG="--macos-app-icon=icon.icns"
+          fi
+          python3 -m nuitka \
+            --standalone \
+            --macos-create-app-bundle \
+            --macos-target-arch=x86_64 \
+            --enable-plugin=tk-inter \
+            $ICON_ARG \
+            --include-package=core \
+            --include-package=console \
+            --include-package=gui \
+            --include-package=pystray \
+            --include-package=PIL \
+            --include-package=keyring \
+            --include-package=send2trash \
+            --output-dir=dist_mac \
+            --output-filename=HomeGridBackup \
+            main.py
+
+      - name: Package HomeGridBackup.app into ZIP
+        run: |
+          cd dist_mac
+          ditto -c -k --sequesterRsrc --keepParent main.app HomeGridBackup_macOS_Intel.zip
+
+      - name: Upload macOS Intel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeGridBackup-macOS-Intel
+          path: dist_mac/HomeGridBackup_macOS_Intel.zip
