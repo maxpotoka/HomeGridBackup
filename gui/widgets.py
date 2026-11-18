@@ -13,9 +13,11 @@ class StyledProgressBar(tk.Canvas):
         self.lite_mode = False
         self.theme = THEMES["dark"]
         self._phase = 0
+        self.status_lbl = ""
         self.bind("<Configure>", lambda e: self.redraw())
 
-    def set_state(self, pct, indet, style_name, lite_mode, theme):
+    def set_state(self, pct, indet, style_name, lite_mode, theme, status_lbl=""):
+        self.status_lbl = str(status_lbl or "")
         self.pct = max(0, min(100, int(pct or 0)))
         self.indet = bool(indet)
         self.style_name = style_name or "v8"
@@ -76,11 +78,11 @@ class StyledProgressBar(tk.Canvas):
             fx2 = 2 + int(((w - 4) * self.pct) / 100.0)
 
         if st in ("v8", "amber_pro", "emerald_pro"):
-            bg_c = "#050811" if st == "v8" else ("#141005" if st == "amber_pro" else "#03140e")
-            brd_c = "#334155" if st == "v8" else ("#d97706" if st == "amber_pro" else "#10b981")
+            bg_c = "#1e293b" if st == "v8" else ("#141005" if st == "amber_pro" else "#03140e")
+            brd_c = "#94a3b8" if st == "v8" else ("#d97706" if st == "amber_pro" else "#10b981")
             c1, c2 = ("#2563eb", "#10b981") if st == "v8" else (("#d97706", "#facc15") if st == "amber_pro" else ("#059669", "#6ee7b7"))
             self.configure(bg=bg_c)
-            self.create_rectangle(0, 0, w - 1, h - 1, outline=brd_c)
+            self.create_rectangle(0, 0, w - 1, h - 1, outline=brd_c, width=1)
             if fx2 > fx1:
                 self._draw_gradient(max(2, fx1), 2, min(w - 2, fx2), h - 2, c1, c2)
         elif st == "s_20s_macos":
@@ -98,7 +100,7 @@ class StyledProgressBar(tk.Canvas):
                     self.create_line(sx, 2, sx, h - 2, fill="#ffffff", width=1)
         elif st == "classic":
             self.configure(bg=self.theme["inp_bg"])
-            self.create_rectangle(0, 0, w - 1, h - 1, outline=self.theme["border"])
+            self.create_rectangle(0, 0, w - 1, h - 1, outline="#64748b")
             if fx2 > fx1:
                 self.create_rectangle(max(2, fx1), 2, min(w - 2, fx2), h - 2, fill="#3b82f6", outline="")
         elif st == "s_00s_win7":

@@ -1,6 +1,6 @@
 from core.i18n import tr
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.018 | 18.11.2026 20:19) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.025 | 18.11.2026 23:20) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -213,22 +213,24 @@ class BackupEngine:
                 self.op_history.append({
                     "ts": dt_s,
                     "status": "Успішно",
-                    "detail": f"{os.path.basename(p)} (знайдено на диску)",
-                    "size_mb": mb_s
+                    "detail": os.path.basename(p),
+                    "size_mb": mb_s,
+                    "dur_sec": None
                 })
             if self.op_history:
                 self.state["op_history"] = self.op_history
         except Exception:
             pass
 
-    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0):
+    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0, dur_sec=None):
         from datetime import datetime
         from core.config import commit_state
         entry = {
             "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),
             "status": status_lbl,
             "detail": detail_txt,
-            "size_mb": round(float(size_mb), 1)
+            "size_mb": round(float(size_mb), 1),
+            "dur_sec": round(float(dur_sec), 1) if dur_sec is not None else None
         }
         if not hasattr(self, "op_history"):
             self.op_history = list(self.state.get("op_history") or [])

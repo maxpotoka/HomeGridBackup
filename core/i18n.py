@@ -2,6 +2,25 @@
 import re
 
 EN_EXACT = {
+    "Автопошук": "Auto-scan",
+    "Виявлені (0)": "Found (0)",
+    "Виявлені": "Found",
+    "Історія": "History",
+    "Підключити": "Connect",
+    "Папка архівів...": "Backup folder...",
+    "Відкрити папку": "Open folder",
+    "Папка дзеркала...": "Mirror folder...",
+    "Статистика": "Statistics",
+    "Журнал операцій": "Operations log",
+    "Аналіз GFS / SHA-256": "GFS / SHA-256 Analysis",
+    "Очистити": "Clear",
+    "ЗАПУСТИТИ БЕКАП": "START BACKUP",
+    "Налаштування": "Settings",
+    "Про програму": "About",
+    "Вихід": "Exit",
+    "Світла тема": "Light theme",
+    "Темна тема": "Dark theme",
+
     "Готовий до резервного копіювання": "Ready for backup",
     "Очікування": "Idle",
     "Не перевірено": "Not checked",

@@ -7,27 +7,27 @@ import tkinter as tk
 from core.config import VALID_SCALES
 
 THEME_LABELS = [
-    ("crt", "1970-ті — 📟 Термінал CRT (зелений монохром)"),
-    ("norton", "1980-ті — 💾 Norton Commander (синій DOS)"),
-    ("mac_classic", "1984 — 🍏 Macintosh System 1 (ч/б класика)"),
-    ("win95", "1995 — 🖥️ Windows 95 / 98 Classic"),
-    ("winxp", "2001 — 🪟 Windows XP Luna (синьо-оливкова)"),
-    ("mac_aqua", "2004 — 💧 macOS X Aqua (сріблясто-блакитна)"),
-    ("win7", "2007 — 💎 Windows 7 Aero (небесно-скляна)"),
-    ("mac_light", "2014 — 🏔️ macOS Yosemite Light (світла)"),
-    ("mac_dark", "2024 — 🌌 macOS Sonoma Dark (графітова)"),
-    ("dark", "2026 — 🌙 Темна (сучасна нічна)"),
-    ("light", "2026 — ☀️ Світла (класична денна)"),
+    ("crt", "1970-ті — Термінал CRT"),
+    ("norton", "1980-ті — Norton Commander"),
+    ("mac_classic", "1984 — Macintosh System 1"),
+    ("win95", "1995 — Windows 95 / 98"),
+    ("winxp", "2001 — Windows XP Luna"),
+    ("mac_aqua", "2004 — macOS X Aqua"),
+    ("win7", "2007 — Windows 7 Aero"),
+    ("mac_light", "2014 — macOS Yosemite Light"),
+    ("mac_dark", "2024 — macOS Sonoma Dark"),
+    ("dark", "2026 — Темна (нічна)"),
+    ("light", "2026 — Світла (денна)"),
 ]
 
 UI_SCALE_LABELS = [
-    ("auto", "Автоматично (під монітор і DPI)"),
-    ("800x600", "800 × 600 (SVGA Компактний)"),
-    ("1024x600", "1024 × 600 (Нетбук / Atom)"),
-    ("1024x768", "1024 × 768 (XGA Класичний)"),
+    ("auto", "Авто (під монітор і DPI)"),
+    ("800x600", "800 × 600 (SVGA)"),
+    ("1024x600", "1024 × 600 (Нетбук)"),
+    ("1024x768", "1024 × 768 (XGA)"),
     ("1280x720", "1280 × 720 (HD 720p)"),
-    ("1366x768", "1366 × 768 (Ноутбучний WXGA)"),
-    ("1600x900", "1600 × 900 (HD+ Середній)"),
+    ("1366x768", "1366 × 768 (WXGA)"),
+    ("1600x900", "1600 × 900 (HD+)"),
     ("1920x1080", "1920 × 1080 (Full HD)"),
     ("2560x1440", "2560 × 1440 (2K QHD)"),
 ]
@@ -154,13 +154,6 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
         u32 = ctypes.windll.user32
         gdi32 = ctypes.windll.gdi32
         try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except Exception:
-            try:
-                u32.SetProcessDPIAware()
-            except Exception:
-                pass
-        try:
             dpi = u32.GetDpiForSystem()
         except Exception:
             hdc = u32.GetDC(0)
@@ -183,15 +176,19 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
         pass
 
     dpi_mult = max(1.0, dpi / 96.0)
+    try:
+        root.tk.call("tk", "scaling", dpi / 72.0)
+    except Exception:
+        pass
     sc = scale_pref if scale_pref in VALID_SCALES else "auto"
 
     if live_outer_wh is not None:
         lw, lh = live_outer_wh
         outer_w = max(640, int(lw))
         outer_h = max(480, int(lh))
-        scale_ratio = (outer_w / 1200.0 + outer_h / 720.0) / 2.0
-        k_prof = round(max(0.80, min(2.10, scale_ratio)), 2)
-        base_fs = max(9, min(24, int(round(10.0 * k_prof))))
+        scale_ratio = ((outer_w / dpi_mult) / 1200.0 + (outer_h / dpi_mult) / 720.0) / 2.0
+        k_prof = round(max(0.80, min(1.60, scale_ratio)), 2)
+        base_fs = max(9, min(16, int(round(10.0 * k_prof))))
         raw_fs = base_fs
     else:
         if sc != "auto" and "x" in sc:
@@ -200,20 +197,18 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
             outer_h = min(sh, int(rh_s))
         else:
             outer_w, outer_h = sw, sh
-        k_prof = round(max(0.80, min(1.85, outer_w / 1280.0)), 2)
-        base_fs = max(9, min(22, int(round(10.0 * k_prof))))
-        if sc == "auto" and dpi_mult >= 1.25:
-            base_fs = max(base_fs, int(round(10 * dpi_mult)))
-            k_prof = max(k_prof, round(dpi_mult, 2))
+        k_prof = round(max(0.80, min(1.60, (outer_w / dpi_mult) / 1280.0)), 2)
+        base_fs = max(9, min(16, int(round(10.0 * k_prof))))
         raw_fs = int(font_pref) if (isinstance(font_pref, int) and 8 <= font_pref <= 28) else base_fs
 
     win_w = max(620, outer_w - frame_w)
     win_h = max(440, outer_h - frame_h)
-    max_fs_by_w = 9 if outer_w < 920 else (11 if outer_w < 1150 else max(12, min(26, int(outer_w / 65))))
+    ow_l = outer_w / dpi_mult
+    max_fs_by_w = 10 if ow_l < 920 else (11 if ow_l < 1150 else max(12, min(16, int(ow_l / 65))))
     font_sz = min(raw_fs, max_fs_by_w)
     k = max(k_prof, round(font_sz / 10.5, 2))
-    pad_x, pad_y = max(6, int(round(11 * k))), max(3, int(round(6 * k)))
-    btn_px, btn_py = max(6, int(round(10 * k))), max(2, int(round(4 * k)))
+    pad_x, pad_y = max(6, int(round(11 * k * dpi_mult))), max(3, int(round(6 * k * dpi_mult)))
+    btn_px, btn_py = max(6, int(round(10 * k * dpi_mult))), max(2, int(round(4 * k * dpi_mult)))
     pos_x = wa_x + max(0, (sw - outer_w) // 2)
     pos_y = wa_y + max(0, (sh - outer_h) // 2)
     return {
