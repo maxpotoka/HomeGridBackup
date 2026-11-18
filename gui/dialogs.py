@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.002 | 18.11.2026 17:14) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.009 | 18.11.2026 18:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -120,12 +120,9 @@ class DialogsMixin:
                 tk.Label(box, text="Історія адрес порожня.", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(pady=20)
                 return
             for i, u in enumerate(hist):
-                lan_set = getattr(self.engine, "lan_found_urls", set())
-                is_lan = u in lan_set
                 row = tk.Frame(box, bg=p["card"], padx=8, pady=5, bd=1, relief="solid")
                 row.pack(fill="x", pady=3)
-                lbl_txt = f"#{i+1}  {u}  [Знайдено в LAN]" if is_lan else f"#{i+1}  {u}"
-                tk.Label(row, text=lbl_txt, bg=p["card"], fg=p["green"] if is_lan else p["cyan"], font=("Segoe UI", fs, "bold")).pack(side="left")
+                tk.Label(row, text=f"#{i+1}  {u}", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold")).pack(side="left")
                 tk.Button(row, text="✖", bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=8, command=lambda url=u: _del(url)).pack(side="right", padx=4)
                 tk.Button(row, text="Обрати", bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs), padx=10, command=lambda url=u: _pick(url)).pack(side="right", padx=6)
 

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.007 | 18.11.2026 17:42) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.010 | 18.11.2026 18:26) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -144,7 +144,7 @@ class HomeGridApp(DialogsMixin):
         hdr_right.pack(side="right")
         self.btn_theme = tk.Button(hdr_right, text="🎨 Тема: Темна", command=self.cycle_theme_quick, padx=10, pady=4, cursor="hand2")
         self.btn_theme.pack(side="left", padx=8)
-        ToolTip(self.btn_theme, "Натисніть, щоб по колу перемкнути одну з 7 тем оформлення (Dark, Light, Norton, Win95, WinXP, Win7, CRT)")
+        ToolTip(self.btn_theme, "Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)")
 
         self.btn_mode = tk.Button(hdr_right, text="🖥️ Графіка (1920×1080) ▾", command=self.open_mode_menu, padx=10, pady=4, cursor="hand2")
         self.btn_mode.pack(side="left", padx=(6, 0))
@@ -175,6 +175,8 @@ class HomeGridApp(DialogsMixin):
         self.btn_conn.pack(side="left", padx=5)
         self.btn_scan = tk.Button(r1, text="🔍 Автопошук по LAN", command=self.do_scan, padx=12, pady=3, cursor="hand2")
         self.btn_scan.pack(side="left", padx=(5, 0))
+        self.btn_pick_lan = tk.Button(r1, text="📡 Обрати виявлений", command=self.open_discovered_menu, padx=10, pady=3, cursor="hand2")
+        self._lan_btn_visible = False
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
@@ -346,14 +348,11 @@ class HomeGridApp(DialogsMixin):
             b.configure(bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_exit.configure(bg=p["panel"], fg=p["red"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
-        short_names = {
-            "crt": "📟 CRT (1970)", "norton": "💾 Norton (1980)", "mac_classic": "🍏 Mac OS 1 (1984)",
-            "win95": "🖥️ Win 95 (1995)", "winxp": "🪟 Win XP (2001)", "mac_aqua": "💧 Mac Aqua (2004)",
-            "win7": "💎 Win 7 (2007)", "mac_light": "🏔️ Mac Light (2014)", "mac_dark": "🌌 Mac Dark (2024)",
-            "dark": "🌙 Темна (2026)", "light": "☀️ Світла (2026)"
-        }
-        t_lbl = short_names.get(cur_theme, "🌙 Темна")
-        self.btn_theme.configure(text=f"🎨 {t_lbl}", bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_main, padx=bpx, pady=bpy)
+        is_dark_now = cur_theme in ("dark", "mac_dark", "crt", "norton")
+        t_lbl = "☀️ Світла тема" if is_dark_now else "🌙 Темна тема"
+        self.btn_theme.configure(text=t_lbl, bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_main, padx=bpx, pady=bpy)
+        if hasattr(self, "btn_pick_lan"):
+            self.btn_pick_lan.configure(bg=p["card"], fg=p["green"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
         res_txt = f"{m['outer_w']}×{m['outer_h']}"
         mode_lbl = f"⚡ LITE ({res_txt}) ▾" if is_lite else f"🖥️ Графіка ({res_txt}) ▾"
@@ -364,14 +363,39 @@ class HomeGridApp(DialogsMixin):
         self._update_mirror_btn()
 
     def cycle_theme_quick(self):
-        order = [code for code, _ in THEME_LABELS]
+        import sys
         cur = self.engine.state.get("theme", "dark")
-        idx = (order.index(cur) + 1) % len(order) if cur in order else 0
-        self.engine.state["theme"] = order[idx]
+        is_dark_now = cur in ("dark", "mac_dark", "crt", "norton")
+        if sys.platform == "darwin":
+            self.engine.state["theme"] = "mac_light" if is_dark_now else "mac_dark"
+        else:
+            self.engine.state["theme"] = "light" if is_dark_now else "dark"
         if self.engine.state.get("lite_mode", False):
             self.engine.state["lite_mode"] = False
         commit_state(self.engine.state)
         self.apply_theme_and_mode()
+
+    def open_discovered_menu(self):
+        found = getattr(self.engine, "discovered_servers", []) or []
+        if not found:
+            return
+        p = self._get_palette()
+        fs = self.metrics["font_sz"]
+        menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=("Segoe UI", fs))
+        for url, t_ms, a_ms in found:
+            menu.add_command(
+                label=f"📡 {url}   (TCP: {t_ms} мс, API: {a_ms} мс)",
+                command=lambda u=url: self._select_discovered_server(u)
+            )
+        x = self.btn_pick_lan.winfo_rootx()
+        y = self.btn_pick_lan.winfo_rooty() + self.btn_pick_lan.winfo_height()
+        menu.tk_popup(x, y)
+
+    def _select_discovered_server(self, url):
+        self.var_srv.set(url)
+        self.engine.state["server"] = url
+        self._last_synced_srv = url
+        self.engine.log(f"Обрано виявлений у мережі сервер: {url}", "ok")
 
     def open_mode_menu(self):
         p = self._get_palette()
@@ -527,6 +551,16 @@ class HomeGridApp(DialogsMixin):
             btn_state = "disabled" if self.engine.is_running else "normal"
             for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_start, self.btn_strat):
                 b.configure(state=btn_state)
+            disc = getattr(self.engine, "discovered_servers", []) or []
+            if hasattr(self, "btn_pick_lan"):
+                if disc:
+                    self.btn_pick_lan.configure(text=f"📡 Обрати виявлений ({len(disc)}) ▾", state=btn_state)
+                    if not getattr(self, "_lan_btn_visible", False):
+                        self.btn_pick_lan.pack(side="left", padx=(6, 0))
+                        self._lan_btn_visible = True
+                elif getattr(self, "_lan_btn_visible", False):
+                    self.btn_pick_lan.pack_forget()
+                    self._lan_btn_visible = False
 
             logs = self.engine.logs
             if logs and (len(logs) != self.last_log_len or logs[-1] is not self._last_log_item):

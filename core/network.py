@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.002 | 18.11.2026 17:14) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.009 | 18.11.2026 18:24) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -12,7 +12,7 @@ import urllib.error
 import http.cookiejar
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
-from core.config import DEFAULT_TOK, SILENT_MODE, commit_state, record_server_history
+from core.config import DEFAULT_TOK, SILENT_MODE, commit_state
 
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
@@ -358,21 +358,13 @@ def run_scan_task(engine):
             found_single = True
         else:
             engine.log(f"Знайдено кілька серверів ({len(servers)} шт.):", "warn")
-            lan_urls = []
-            for ip, t_ms, a_ms in reversed(servers):
-                u_ip = f"http://{ip}:18899"
-                record_server_history(engine.state, u_ip)
             for ip, t_ms, a_ms in servers:
-                u_ip = f"http://{ip}:18899"
-                lan_urls.append(u_ip)
-                engine.log(f"  • {u_ip} (TCP: {t_ms} мс, API: {a_ms} мс)", "info")
-            engine.lan_found_urls = set(lan_urls)
+                engine.log(f"  • http://{ip}:18899 (TCP: {t_ms} мс, API: {a_ms} мс)", "info")
             first_ip, _, _ = next(iter(servers))
             engine.state["server"] = f"http://{first_ip}:18899"
-            commit_state(engine.state)
-            engine.log("Усі знайдені адреси збережено у «🕘 Історія» для швидкого вибору.", "ok")
+            engine.log("Натисніть «📡 Обрати виявлений», щоб вибрати потрібний сервер зі списку.", "ok")
             engine.set_pill(f"Знайдено: {len(servers)}", "ok")
-            engine.set_progress(100, f"Знайдено {len(servers)} серверів — оберіть потрібний у «🕘 Історія»")
+            engine.set_progress(100, f"Знайдено {len(servers)} серверів — натисніть «📡 Обрати виявлений»")
     finally:
         with engine.lock:
             engine.is_running = False
