@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v1.007 | 18.11.2026 17:42) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v1.018 | 18.11.2026 20:19) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -17,7 +17,7 @@ def is_compiled_app():
 
 def _resolve_exe_path():
     if is_compiled_app():
-        argv0 = os.path.abspath(sys.argv if sys.argv else "")
+        argv0 = os.path.abspath(sys.argv[0] if sys.argv else "")
         if argv0.lower().endswith(".exe") and os.path.exists(argv0):
             return argv0
     exe_p = os.path.abspath(sys.executable or "")

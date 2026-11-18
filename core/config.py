@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.017 | 18.11.2026 19:50) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.018 | 18.11.2026 20:19) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,8 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.017"
-BUILD_DATE = "18.11.2026 19:50"
+SCRIPT_VER = "1.021"
+BUILD_DATE = "18.11.2026 20:19"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -94,7 +94,7 @@ def get_fast_sysinfo():
         except Exception:
             os_label = "Android OS"
     elif sys.platform == "darwin":
-        mac_v = platform.mac_ver() or ""
+        mac_v = (platform.mac_ver()[0] if platform.mac_ver() else "")
         mac_names = {"15": "Sequoia", "14": "Sonoma", "13": "Ventura", "12": "Monterey", "11": "Big Sur"}
         maj = mac_v.split(".") if mac_v else ""
         cname = f" ({mac_names[maj]})" if maj in mac_names else ""
@@ -104,6 +104,23 @@ def get_fast_sysinfo():
             out = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], timeout=0.4).decode().strip()
             if out:
                 cpu_name = out
+        except Exception:
+            pass
+
+    elif sys.platform.startswith("linux"):
+        try:
+            if os.path.exists("/etc/os-release"):
+                with open("/etc/os-release", "r", encoding="utf-8") as f_os:
+                    for ln in f_os:
+                        if ln.startswith("PRETTY_NAME="):
+                            os_label = ln.split("=", 1)[1].strip().strip('"')
+                            break
+            if os.path.exists("/proc/cpuinfo"):
+                with open("/proc/cpuinfo", "r", encoding="utf-8") as f_cpu:
+                    for ln in f_cpu:
+                        if ln.lower().startswith("model name") and ":" in ln:
+                            cpu_name = ln.split(":", 1)[1].strip()
+                            break
         except Exception:
             pass
 

@@ -1,3 +1,5 @@
+import os
+import sys
 # ==============================================================================
 # [ФАЙЛ: core/network.py (v1.015 | 18.11.2026 19:17) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
@@ -124,10 +126,18 @@ def invoke_http(url, state, method="GET", body=None, origin="", ref="", timeout=
 def ping_host(host, timeout_ms=2000):
     t0 = time.time()
     try:
-        cmd = ["ping", "-n", "1", "-w", str(timeout_ms), host]
-        res = subprocess.run(
-            cmd, stdin=subprocess.DEVNULL, capture_output=True, encoding="cp866", errors="replace", timeout=4, creationflags=0x08000000
-        )
+        if os.name == "nt":
+            cmd = ["ping", "-n", "1", "-w", str(timeout_ms), host]
+            res = subprocess.run(
+                cmd, stdin=subprocess.DEVNULL, capture_output=True, encoding="cp866", errors="replace", timeout=4, creationflags=0x08000000
+            )
+        else:
+            sec = max(1, int(round(timeout_ms / 1000.0)))
+            w_flag = "-t" if sys.platform == "darwin" else "-W"
+            cmd = ["ping", "-c", "1", w_flag, str(sec), host]
+            res = subprocess.run(
+                cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=4
+            )
         if res.returncode == 0:
             m = re.search(r"time[=<]\s*([\d.,]+)\s*ms", res.stdout or "", re.I)
             if m:

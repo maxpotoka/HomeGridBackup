@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.002 | 18.11.2026 17:14) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.018 | 18.11.2026 20:19) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -458,10 +458,14 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
         engine.log(f"УСПІХ! Резервне копіювання завершено за {total_sec} с.", "ok")
+        if hasattr(engine, "record_op_event"):
+            engine.record_op_event("Успішно", f"{os.path.basename(out_file)} ({total_sec} с)", round(total_mb, 1))
     except Exception as exc:
         engine.exit_code = 1
         engine.log(f"ПОМИЛКА: {exc}", "err")
         engine.set_pill("Помилка бекапу", "err")
+        if hasattr(engine, "record_op_event"):
+            engine.record_op_event("Помилка", str(exc)[:65], 0.0)
         engine.set_progress(0, f"Помилка: {exc}")
         if not SILENT_MODE:
             engine.ask_modal("alert", "Помилка резервного копіювання", str(exc))

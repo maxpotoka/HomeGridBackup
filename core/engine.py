@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.017 | 18.11.2026 19:50) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.018 | 18.11.2026 20:19) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -87,6 +87,8 @@ class BackupEngine:
         self.pill_text = f"v{SCRIPT_VER} | {BUILD_DATE}"
         self.pill_type = "idle"
         self.op_history = list(self.state.get("op_history") or [])
+        if not self.op_history:
+            self._seed_op_history_from_disk()
         self.diag_net = "Не перевірено"
         self.diag_ping = "— мс"
         self.logs = []
@@ -190,6 +192,31 @@ class BackupEngine:
         self._storage_stats_cache_dir = bdir
         return result
 
+    def _seed_op_history_from_disk(self):
+        bdir = self.state.get("backup_dir", "")
+        if not bdir or not os.path.isdir(bdir):
+            return
+        try:
+            zips = [
+                os.path.join(bdir, f) for f in os.listdir(bdir)
+                if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
+            ]
+            zips.sort(key=os.path.getmtime, reverse=True)
+            for p in zips[:25]:
+                st = os.stat(p)
+                dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y %H:%M")
+                mb_s = round(st.st_size / 1048576.0, 1)
+                self.op_history.append({
+                    "ts": dt_s,
+                    "status": "Успішно",
+                    "detail": f"{os.path.basename(p)} (знайдено на диску)",
+                    "size_mb": mb_s
+                })
+            if self.op_history:
+                self.state["op_history"] = self.op_history
+        except Exception:
+            pass
+
     def record_op_event(self, status_lbl, detail_txt, size_mb=0.0):
         from datetime import datetime
         from core.config import commit_state
@@ -232,45 +259,76 @@ class BackupEngine:
         except Exception:
             return "Невідомо", "idle"
 
-    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0):
-        from datetime import datetime
-        from core.config import commit_state
-        entry = {
-            "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),
-            "status": status_lbl,
-            "detail": detail_txt,
-            "size_mb": round(float(size_mb), 1)
-        }
-        if not hasattr(self, "op_history"):
-            self.op_history = list(self.state.get("op_history") or [])
-        self.op_history.insert(0, entry)
-        self.op_history = self.op_history[:25]
-        self.state["op_history"] = self.op_history
-        try:
-            commit_state(self.state)
-        except Exception:
-            pass
-
-    def get_last_backup_info(self):
+    def get_detailed_stats(self):
+        import time
         from datetime import datetime
         bdir = self.state.get("backup_dir", "")
-        if not bdir or not os.path.isdir(bdir):
-            return "Ще немає створених копій", "idle"
-        try:
-            zips = [
-                os.path.join(bdir, f) for f in os.listdir(bdir)
-                if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
-            ]
-            if not zips:
-                return "Ще немає створених копій", "idle"
-            latest = max(zips, key=os.path.getmtime)
-            st = os.stat(latest)
-            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%d.%m.%Y о %H:%M")
-            mb_s = round(st.st_size / 1048576.0, 1)
-            has_sha = os.path.exists(latest + ".sha256")
-            if has_sha:
-                return f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok"
-            return f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn"
-        except Exception:
-            return "Невідомо", "idle"
+        now_ts = time.time()
+        now_dt = datetime.now()
+        today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        week_start = now_ts - 7 * 86400
+        month_start = now_ts - 30 * 86400
 
+        res = {
+            "today_cnt": 0, "today_mb": 0.0, "week_cnt": 0, "week_mb": 0.0,
+            "month_cnt": 0, "month_mb": 0.0, "total_cnt": 0, "total_mb": 0.0,
+            "gfs_daily": 0, "gfs_weekly": 0, "gfs_monthly": 0,
+            "sha_cnt": 0, "avg_mb": 0.0, "span_days": 0, "success_rate": 100, "months": []
+        }
+        m_keys = []
+        y, m = now_dt.year, now_dt.month
+        for _ in range(6):
+            m_keys.append(f"{y:04d}-{m:02d}")
+            m -= 1
+            if m == 0:
+                m, y = 12, y - 1
+        m_keys.reverse()
+        m_counts = {k: 0 for k in m_keys}
+        mtimes = []
+        if bdir and os.path.isdir(bdir):
+            try:
+                for name in os.listdir(bdir):
+                    if name.startswith(".") or not name.lower().endswith(".zip"):
+                        continue
+                    full = os.path.join(bdir, name)
+                    if not os.path.isfile(full):
+                        continue
+                    st = os.stat(full)
+                    sz_mb, mt = st.st_size / 1048576.0, st.st_mtime
+                    mtimes.append(mt)
+                    res["total_cnt"] += 1
+                    res["total_mb"] += sz_mb
+                    if mt >= today_start:
+                        res["today_cnt"] += 1
+                        res["today_mb"] += sz_mb
+                    if mt >= week_start:
+                        res["week_cnt"] += 1
+                        res["week_mb"] += sz_mb
+                    if mt >= month_start:
+                        res["month_cnt"] += 1
+                        res["month_mb"] += sz_mb
+                    if "KEEP_MONTHLY" in name:
+                        res["gfs_monthly"] += 1
+                    elif "KEEP_WEEKLY" in name:
+                        res["gfs_weekly"] += 1
+                    else:
+                        res["gfs_daily"] += 1
+                    if os.path.exists(full + ".sha256"):
+                        res["sha_cnt"] += 1
+                    ym = datetime.fromtimestamp(mt).strftime("%Y-%m")
+                    if ym in m_counts:
+                        m_counts[ym] += 1
+            except Exception:
+                pass
+        for k in ("today_mb", "week_mb", "month_mb", "total_mb"):
+            res[k] = round(res[k], 1)
+        if res["total_cnt"] > 0:
+            res["avg_mb"] = round(res["total_mb"] / res["total_cnt"], 1)
+        if len(mtimes) >= 2:
+            res["span_days"] = max(1, int((max(mtimes) - min(mtimes)) // 86400))
+        ops = getattr(self, "op_history", []) or []
+        if ops:
+            ok_ops = sum(1 for x in ops if x.get("status") == "Успішно")
+            res["success_rate"] = int(round((ok_ops / len(ops)) * 100))
+        res["months"] = [(k[5:] + "." + k[2:4], m_counts[k]) for k in m_keys]
+        return res

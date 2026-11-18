@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.012 | 18.11.2026 18:54) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.018 | 18.11.2026 20:23) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -165,8 +165,8 @@ class DialogsMixin:
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
 
         sch_parts = (st.get("sched_time") or "03:00").split(":")
-        v_sh = tk.StringVar(value=sch_parts if len(sch_parts) > 0 else "03")
-        v_sm = tk.StringVar(value=sch_parts if len(sch_parts) > 1 else "00")
+        v_sh = tk.StringVar(value=sch_parts[0] if len(sch_parts) > 0 else "03")
+        v_sm = tk.StringVar(value=sch_parts[1] if len(sch_parts) > 1 else "00")
         v_smode = tk.StringVar(value=st.get("sched_mode", "--hidden"))
         v_sprio = tk.IntVar(value=int(st.get("sched_prio", 6)))
         v_smissed = tk.BooleanVar(value=bool(st.get("sched_missed", True)))
@@ -463,12 +463,79 @@ class DialogsMixin:
         tk.Button(bf, text="🗑️ Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=6)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
 
+    def open_stats_modal(self):
+        fs = self.metrics["font_sz"]
+        dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 720, 520)
+        st = self.engine.get_detailed_stats() if hasattr(self.engine, "get_detailed_stats") else {}
+
+        tk.Label(dlg, text="Зведена аналітика за періодами та структурою локального сховища:", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
+
+        grid_f = tk.Frame(dlg, bg=p["panel"])
+        grid_f.pack(fill="x", padx=14, pady=4)
+        for c_i in range(4):
+            grid_f.columnconfigure(c_i, weight=1)
+
+        cards = [
+            ("СЬОГОДНІ", f"{st.get('today_cnt', 0)} шт.", f"{st.get('today_mb', 0.0)} МБ", p["cyan"]),
+            ("ЗА ТИЖДЕНЬ (7 ДН.)", f"{st.get('week_cnt', 0)} шт.", f"{st.get('week_mb', 0.0)} МБ", p["green"]),
+            ("ЗА МІСЯЦЬ (30 ДН.)", f"{st.get('month_cnt', 0)} шт.", f"{st.get('month_mb', 0.0)} МБ", p["blue"]),
+            ("ЗА ВЕСЬ ЧАС", f"{st.get('total_cnt', 0)} шт.", f"{st.get('total_mb', 0.0)} МБ", p["amber"]),
+        ]
+        for idx, (cap, v_cnt, v_mb, col) in enumerate(cards):
+            c = tk.Frame(grid_f, bg=p["card"], bd=1, relief="solid", padx=10, pady=8)
+            c.grid(row=0, column=idx, sticky="nsew", padx=(0 if idx == 0 else 6, 0))
+            tk.Label(c, text=cap, bg=p["card"], fg=p["muted"], font=("Segoe UI", max(7, fs - 2), "bold")).pack(anchor="w")
+            tk.Label(c, text=v_cnt, bg=p["card"], fg=col, font=("Segoe UI", fs + 3, "bold")).pack(anchor="w", pady=(2, 0))
+            tk.Label(c, text=v_mb, bg=p["card"], fg=p["text"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
+
+        mid_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
+        mid_f.pack(fill="x", padx=14, pady=(10, 6))
+        gfs_txt = f"Структура GFS:   Щоденних: {st.get('gfs_daily', 0)}   •   Тижневих (KEEP_WEEKLY): {st.get('gfs_weekly', 0)}   •   Місячних (KEEP_MONTHLY): {st.get('gfs_monthly', 0)}"
+        tk.Label(mid_f, text=gfs_txt, bg=p["card"], fg=p["text"], font=("Segoe UI", fs, "bold")).pack(anchor="w")
+
+        tot_c = st.get("total_cnt", 0)
+        sha_pct = int(round((st.get("sha_cnt", 0) / tot_c) * 100)) if tot_c > 0 else 0
+        rel_txt = f"Середній розмір архіву: {st.get('avg_mb', 0.0)} МБ   •   Захист SHA-256: {st.get('sha_cnt', 0)}/{tot_c} ({sha_pct}%)   •   Успішність запусків: {st.get('success_rate', 100)}%   •   Глибина архіву: {st.get('span_days', 0)} дн."
+        tk.Label(mid_f, text=rel_txt, bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w", pady=(4, 0))
+
+        chart_card = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
+        chart_card.pack(fill="both", expand=True, padx=14, pady=(4, 6))
+        tk.Label(chart_card, text="ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(7, fs - 2), "bold")).pack(anchor="w", pady=(0, 6))
+
+        cv = tk.Canvas(chart_card, height=145, bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
+        cv.pack(fill="both", expand=True)
+
+        months = st.get("months", [])
+        def _draw_chart(_e=None):
+            cv.delete("all")
+            w = max(240, cv.winfo_width())
+            h = max(110, cv.winfo_height())
+            if not months:
+                return
+            max_v = max([v for _, v in months] + [1])
+            n = len(months)
+            pad_x, top_y, bot_y = 28, 22, h - 24
+            slot_w = (w - pad_x * 2) / n
+            bar_w = min(46, max(18, slot_w * 0.52))
+            cv.create_line(pad_x - 6, bot_y, w - pad_x + 6, bot_y, fill=p["border"])
+            for i, (m_lbl, val) in enumerate(months):
+                cx = pad_x + slot_w * (i + 0.5)
+                bh = int(((bot_y - top_y) * val) / max_v) if val > 0 else 2
+                y1 = bot_y - bh
+                col_b = p["green"] if val > 0 else p["border"]
+                cv.create_rectangle(cx - bar_w / 2, y1, cx + bar_w / 2, bot_y, fill=col_b, outline="")
+                cv.create_text(cx, y1 - 9, text=str(val), fill=p["text"], font=("Segoe UI", max(8, fs - 1), "bold"))
+                cv.create_text(cx, bot_y + 11, text=m_lbl, fill=p["muted"], font=("Segoe UI", max(8, fs - 1)))
+
+        cv.bind("<Configure>", _draw_chart)
+        dlg.after(40, _draw_chart)
+
+        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=(4, 12))
+
     def open_ops_history(self):
         fs = self.metrics["font_sz"]
-        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 680, 420)
-        tk.Label(dlg, text="Останні 25 операцій створення резервних копій (дата, розмір та підсумок):", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
-        box = tk.Frame(dlg, bg=p["log_bg"], bd=1, relief="solid")
-        box.pack(fill="both", expand=True, padx=14)
+        dlg, p, box = self._make_dialog("Журнал останніх операцій архівування", 720, 440, scrollable=True)
+        tk.Label(box, text="Останні 25 операцій створення резервних копій (дата, розмір та підсумок):", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
 
         ops = getattr(self.engine, "op_history", []) or []
         if not ops:

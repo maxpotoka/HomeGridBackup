@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.016 | 18.11.2026 19:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.018 | 18.11.2026 20:23) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -233,6 +233,8 @@ class HomeGridApp(DialogsMixin):
 
         stat_btns = tk.Frame(stat_row)
         stat_btns.grid(row=0, column=2, sticky="e")
+        self.btn_stats = tk.Button(stat_btns, text="📊 Статистика", command=self.open_stats_modal, padx=10, pady=5, cursor="hand2")
+        self.btn_stats.pack(side="left", padx=(0, 6))
         self.btn_ops_hist = tk.Button(stat_btns, text="📜 Журнал операцій", command=self.open_ops_history, padx=10, pady=5, cursor="hand2")
         self.btn_ops_hist.pack(side="left", padx=(0, 6))
         self.btn_analyze = tk.Button(stat_btns, text="🔍 Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
@@ -366,7 +368,7 @@ class HomeGridApp(DialogsMixin):
         self.btn_clear_log.configure(bg=p["card"], fg=p["muted"], disabledforeground=dis_fg, activebackground=p["border"], activeforeground=p["text"], font=f_sub, padx=max(6, bpx - 2), pady=1)
         self.btn_conn.configure(bg=p["blue"], fg=p["btn_txt"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_start.configure(bg=p["green"], fg=p["green_txt"], disabledforeground=dis_fg, font=f_bold, padx=bpx + 4, pady=bpy + 1)
-        for b in (self.btn_analyze, self.btn_ops_hist, self.btn_strat):
+        for b in (self.btn_analyze, self.btn_ops_hist, self.btn_stats, self.btn_strat):
             b.configure(bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_exit.configure(bg=p["panel"], fg=p["red"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
