@@ -1,44 +1,25 @@
-name: Build HomeGrid Backup for Android (APK)
+# ==============================================================================
+# [ФАЙЛ: buildozer.spec (v1.027 | 18.11.2026 23:35) — КОНФИГУРАЦИЯ СБОРКИ ANDROID APK]
+# ==============================================================================
+[app]
+title = HomeGrid Backup
+package.name = homegridbackup
+package.domain = org.homegrid
+source.dir = .
+source.include_exts = py,png,jpg,ico,kv,json
+source.exclude_dirs = tests, bin, .git, .github, dist_x86, dist_mac, dist_ubuntu, build, .buildozer, __pycache__
+version = 1.027
+requirements = python3,kivy==2.3.0
+orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE
+android.api = 33
+android.minapi = 21
+android.archs = arm64-v8a, armeabi-v7a
+android.allow_backup = True
+android.accept_sdk_license = True
+p4a.branch = master
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'main.py'
-      - 'buildozer.spec'
-      - 'core/**'
-      - 'mobile/**'
-      - '.github/workflows/build_android.yml'
-
-jobs:
-  build-android:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install system dependencies for Buildozer
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev lld patch
-
-      - name: Install Buildozer and Cython
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.36 virtualenv
-
-      - name: Build Android APK with Buildozer
-        run: |
-          yes | buildozer -v android debug
-
-      - name: Upload Android APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HomeGridBackup-Android-APK
-          path: bin/*.apk
+[buildozer]
+log_level = 2
+warn_on_root = 1
