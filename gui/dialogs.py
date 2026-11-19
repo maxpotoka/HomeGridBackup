@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.063 | 19.11.2026 16:04) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.114 | 19.11.2026 23:12) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -11,87 +11,172 @@ from core.config import SCRIPT_VER, commit_state
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _resolve_exe_path, _sync_scheduler_from_windows, _manage_windows_scheduler
-from gui.styles import THEME_LABELS, UI_SCALE_LABELS, UI_FONT_LABELS, PBAR_STYLE_LABELS, THEMES
+from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, PBAR_STYLE_LABELS, THEMES
 from gui.widgets import StyledProgressBar
 from gui.tray import _force_quit_app
+
+class _EmbeddedDialog(tk.Frame):
+    def __init__(self, root, palette, title_txt, w, h, on_close_cb):
+        self._root = root
+        self._on_close_cb = on_close_cb
+        self._del_protocol = None
+        super().__init__(root, bg=palette["panel"], bd=2, relief="solid", highlightbackground=palette["blue"], highlightthickness=2)
+        hdr = tk.Frame(self, bg=palette["card"], padx=10, pady=6)
+        hdr.pack(side="top", fill="x")
+        self._lbl_t = tk.Label(hdr, text=title_txt, bg=palette["card"], fg=palette["text"], font=("Segoe UI", 10, "bold"))
+        self._lbl_t.pack(side="left")
+        tk.Button(hdr, text="✖", command=self._handle_wm_delete, bg=palette["card"], fg=palette["red"], bd=0, padx=6, cursor="hand2").pack(side="right")
+        self.place(relx=0.5, rely=0.5, anchor="center", width=w, height=h)
+        self.lift()
+
+    def _handle_wm_delete(self):
+        if callable(self._del_protocol):
+            self._del_protocol()
+        else:
+            self.destroy()
+
+    def title(self, txt=None):
+        if txt is not None:
+            self._lbl_t.configure(text=txt)
+        return self._lbl_t.cget("text")
+
+    def protocol(self, name, func=None):
+        if name == "WM_DELETE_WINDOW":
+            self._del_protocol = func
+
+    def transient(self, *_a): pass
+    def grab_set(self): pass
+    def deiconify(self): pass
+    def withdraw(self): pass
+    def geometry(self, *_a): pass
+    def maxsize(self, *_a): return (1920, 1080)
+    def minsize(self, *_a): pass
+    def destroy(self):
+        if callable(self._on_close_cb):
+            self._on_close_cb()
+        super().destroy()
 
 class DialogsMixin:
     def _calc_parent_center(self, parent_win, w_box, h_box):
         m = self.metrics
         try:
-            parent_win.update_idletasks()
             pw, ph = parent_win.winfo_width(), parent_win.winfo_height()
             if pw > 120 and ph > 120:
                 cx = parent_win.winfo_rootx() + (pw - w_box) // 2
                 cy = parent_win.winfo_rooty() + (ph - h_box) // 2
-                vw = max(m["sw"], parent_win.winfo_vrootwidth() or parent_win.winfo_screenwidth() or m["sw"])
-                vh = max(m["sh"], parent_win.winfo_vrootheight() or parent_win.winfo_screenheight() or m["sh"])
-                vx = parent_win.winfo_vrootx() if hasattr(parent_win, "winfo_vrootx") else 0
-                vy = parent_win.winfo_vrooty() if hasattr(parent_win, "winfo_vrooty") else 0
-                x = max(vx + 6, min(cx, vx + vw - w_box - 6))
-                y = max(vy + 6, min(cy, vy + vh - h_box - 30))
+                x = max(6, min(cx, m["sw"] - w_box - 6))
+                y = max(6, min(cy, m["sh"] - h_box - 30))
                 return x, y
         except Exception:
             pass
         return m["wa_x"] + max(0, (m["sw"] - w_box) // 2), m["wa_y"] + max(0, (m["sh"] - h_box) // 2)
 
+    def _finalize_dialog(self, dlg):
+        import sys
+        try:
+            if not dlg.winfo_exists():
+                return
+            dlg.update_idletasks()
+            m = self.metrics
+            req_w, req_h = dlg.winfo_reqwidth(), dlg.winfo_reqheight()
+            cur_w, cur_h = getattr(dlg, "_init_wh", (req_w, req_h))
+            if getattr(dlg, "_fit_flag", False):
+                w_box = min(max(cur_w, req_w), max(360, m["sw"] - 20))
+                h_box = min(max(cur_h, req_h), max(180, m["sh"] - 60))
+                mx_w, mx_h = dlg.maxsize()
+                dlg.maxsize(max(w_box, mx_w), max(h_box, mx_h))
+                dlg.minsize(min(w_box, req_w), min(h_box, req_h))
+            else:
+                w_box, h_box = max(360, cur_w, req_w), max(160, cur_h, req_h)
+            p_ref = getattr(dlg, "_parent_ref", self.root)
+            x, y = self._calc_parent_center(p_ref, w_box, h_box)
+            if not sys.platform.startswith("linux"):
+                dlg.geometry(f"{w_box}x{h_box}+{x}+{y}")
+                dlg.transient(p_ref)
+                dlg.deiconify()
+                dlg.grab_set()
+            else:
+                iw, ih = getattr(dlg, "_init_wh", (w_box, h_box))
+                if abs(w_box - iw) > 20 or abs(h_box - ih) > 20:
+                    dlg.geometry(f"{w_box}x{h_box}+{x}+{y}")
+            if not sys.platform.startswith("linux"):
+                dlg.focus_force()
+        except Exception:
+            pass
+
     def _make_dialog(self, title, w=640, h=420, scrollable=False, min_outer_w=0, min_outer_h=0):
+        import sys
+        if not hasattr(self, "_open_dialogs"):
+            self._open_dialogs = {}
+        dlg_key = str(title).split("—")[0].strip()
+        prev_dlg = self._open_dialogs.get(dlg_key)
+        if prev_dlg is not None:
+            try:
+                if prev_dlg.winfo_exists():
+                    prev_dlg.destroy()
+            except Exception:
+                pass
         p = self._get_palette()
         m = self.metrics
         k = m["k"]
         fw = m.get("outer_w", m["win_w"]) - m["win_w"]
         fh = m.get("outer_h", m["win_h"]) - m["win_h"]
-        bound_w = m.get("outer_w", m["sw"])
-        bound_h = m.get("outer_h", m["sh"])
-
-        target_outer_w = max(min_outer_w, int(round(w * k)))
-        target_outer_h = max(min_outer_h, int(round(h * k)))
-        outer_w = min(bound_w, target_outer_w)
-        outer_h = min(bound_h, target_outer_h)
-
-        dlg_w = max(360, outer_w - fw)
-        dlg_h = max(160, outer_h - fh)
+        dlg_w = max(360, min(m.get("outer_w", m["sw"]), max(min_outer_w, int(round(w * k)))) - fw)
+        dlg_h = max(160, min(m.get("outer_h", m["sh"]), max(min_outer_h, int(round(h * k)))) - fh)
         self._ignore_resize_until = time.time() + 0.7
-        dlg = tk.Toplevel(self.root)
-        dlg.bind('<Destroy>', lambda e: setattr(self, '_ignore_resize_until', time.time() + 0.7) if e.widget is dlg else None)
+        parent_win = self.root if sys.platform.startswith("linux") else (self.root.grab_current() or self.root)
+        px, py = self._calc_parent_center(parent_win, dlg_w, dlg_h)
+        if sys.platform.startswith("linux"):
+            for _k_old, _d_old in list(self._open_dialogs.items()):
+                try:
+                    if _d_old.winfo_exists():
+                        _d_old.destroy()
+                except Exception:
+                    pass
+            self._open_dialogs.clear()
+            rw = max(560, self.root.winfo_width() - 24)
+            rh = max(380, self.root.winfo_height() - 24)
+            ew, eh = min(dlg_w, rw), min(dlg_h, rh)
+            dlg = _EmbeddedDialog(self.root, p, tr(title, self.engine.state.get("lang", "en")), ew, eh, lambda: self._open_dialogs.pop(dlg_key, None))
+            self._open_dialogs[dlg_key] = dlg
+            if not scrollable:
+                return dlg, p, dlg
+            wrap = tk.Frame(dlg, bg=p["panel"])
+            wrap.pack(fill="both", expand=True)
+            canvas = tk.Canvas(wrap, bg=p["panel"], highlightthickness=0, bd=0)
+            vbar = tk.Scrollbar(wrap, orient="vertical", command=canvas.yview)
+            inner = tk.Frame(canvas, bg=p["panel"])
+            inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+            canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win_id, width=e.width))
+            canvas.configure(yscrollcommand=vbar.set)
+            vbar.pack(side="right", fill="y")
+            canvas.pack(side="left", fill="both", expand=True)
+            return dlg, p, inner
+        self.root.option_add("*Toplevel.background", p["panel"])
+        dlg = tk.Toplevel(self.root, bg=p["panel"])
+        if not sys.platform.startswith("linux"):
+            dlg.withdraw()
+        self._open_dialogs[dlg_key] = dlg
+        def _on_dlg_destroy(e):
+            if e.widget is dlg:
+                self._open_dialogs.pop(dlg_key, None)
+                self._ignore_resize_until = time.time() + 0.7
+                try:
+                    self.root.focus_set()
+                except Exception:
+                    pass
+        dlg.bind('<Destroy>', _on_dlg_destroy)
         dlg.title(tr(title, self.engine.state.get("lang", "en")))
         dlg.configure(bg=p["panel"])
-        parent_win = self.root.grab_current() or self.root
-        dlg.transient(parent_win)
-        def _safe_grab(tries=0):
-            try:
-                if dlg.winfo_exists():
-                    dlg.update_idletasks()
-                    dlg.deiconify()
-                    dlg.grab_set()
-            except Exception:
-                if tries < 8 and dlg.winfo_exists():
-                    dlg.after(25, lambda: _safe_grab(tries + 1))
-        _safe_grab()
-        px, py = self._calc_parent_center(parent_win, dlg_w, dlg_h)
+        dlg._parent_ref = parent_win
+        dlg._init_wh = (dlg_w, dlg_h)
+        dlg._fit_flag = False
         dlg.geometry(f"{dlg_w}x{dlg_h}+{px}+{py}")
-        def _recenter_later():
-            try:
-                if dlg.winfo_exists():
-                    dlg.update_idletasks()
-                    rx, ry = self._calc_parent_center(parent_win, dlg.winfo_width(), dlg.winfo_height())
-                    dlg.geometry(f"+{rx}+{ry}")
-            except Exception:
-                pass
-        dlg.after(35, _recenter_later)
         dlg.maxsize(min(m["sw"], int(round(max(w, 760) * k * 1.15))), min(m["sh"], int(round(max(h, 520) * k * 1.15))))
-        try:
-            dlg.lift(parent_win)
-            dlg.attributes("-topmost", True)
-            dlg.update_idletasks()
-            dlg.attributes("-topmost", False)
-            dlg.focus_force()
-        except Exception:
-            pass
-
+        dlg.after_idle(lambda: self._finalize_dialog(dlg))
         if not scrollable:
             return dlg, p, dlg
-
         wrap = tk.Frame(dlg, bg=p["panel"])
         wrap.pack(fill="both", expand=True)
         canvas = tk.Canvas(wrap, bg=p["panel"], highlightthickness=0, bd=0)
@@ -103,36 +188,11 @@ class DialogsMixin:
         canvas.configure(yscrollcommand=vbar.set)
         vbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-
-        def _on_wheel(ev):
-            try:
-                canvas.yview_scroll(int(-1 * (ev.delta / 120)), "units")
-            except Exception:
-                pass
-        dlg.bind("<MouseWheel>", _on_wheel)
+        dlg.bind("<MouseWheel>", lambda ev: canvas.yview_scroll(int(-1 * (ev.delta / 120)), "units"))
         return dlg, p, inner
 
     def _fit_dialog(self, dlg):
-        """Гарантирует, что содержимое диалога не обрезается: растит окно до нужного размера (в пределах экрана)."""
-        try:
-            dlg.update_idletasks()
-            m = self.metrics
-            need_w, need_h = dlg.winfo_reqwidth(), dlg.winfo_reqheight()
-            cur_w, cur_h = dlg.winfo_width(), dlg.winfo_height()
-            new_w = min(max(cur_w, need_w), max(360, m["sw"] - 20))
-            new_h = min(max(cur_h, need_h), max(240, m["sh"] - 60))
-            mx_w, mx_h = dlg.maxsize()
-            dlg.maxsize(max(new_w, mx_w), max(new_h, mx_h))
-            if (new_w, new_h) != (cur_w, cur_h):
-                p_ref = dlg.master if getattr(dlg, "master", None) else self.root
-                x, y = self._calc_parent_center(p_ref, new_w, new_h)
-                dlg.geometry(f"{new_w}x{new_h}+{x}+{y}")
-            dlg.minsize(min(new_w, need_w), min(new_h, need_h))
-            dlg.lift()
-            dlg.focus_force()
-        except Exception:
-            pass
-
+        dlg._fit_flag = True
     def confirm_exit(self):
         fs = self.metrics["font_sz"]
         dlg, p, _ = self._make_dialog("Підтвердження виходу", 460, 185)
@@ -140,12 +200,94 @@ class DialogsMixin:
         bf = tk.Frame(dlg, bg=p["panel"])
         bf.pack(side="bottom", fill="x", padx=16, pady=12)
         tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="right", padx=8)
-        tk.Button(bf, text="Так, вийти", command=lambda: (dlg.destroy(), _force_quit_app(self.engine)), bg=p["red"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=5).pack(side="right", padx=8)
+        def _do_exit(_e=None):
+            self._exit_confirm_open = False
+            try:
+                dlg.destroy()
+            except Exception:
+                pass
+            _force_quit_app(self.engine)
+        def _cancel_exit(_e=None):
+            self._exit_confirm_open = False
+            try:
+                dlg.destroy()
+            except Exception:
+                pass
+        dlg.protocol("WM_DELETE_WINDOW", _cancel_exit)
+        dlg.bind("<Escape>", _cancel_exit)
+        dlg.bind("<Return>", _do_exit)
+        tk.Button(bf, text="Так, вийти", command=_do_exit, bg=p["red"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=5).pack(side="right", padx=8)
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
+        self._fit_dialog(dlg)
 
     def _show_engine_modal(self, m):
+        import json as _js
         fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
+        if m["type"] == "backup_report":
+            d = _js.loads(m["text"]) if isinstance(m.get("text"), str) else {}
+            fam = "Consolas" if self.engine.state.get("lite_mode", False) else self._get_palette().get("font", "Segoe UI")
+            dlg, p, _ = self._make_dialog("Резервне копіювання успішно завершено" if lang == "uk" else "Backup Completed Successfully", 740, 650, min_outer_w=700, min_outer_h=600)
+            def _close_rep(_e=None):
+                try:
+                    dlg.destroy()
+                except Exception:
+                    pass
+                self.engine.submit_modal(True)
+            dlg.protocol("WM_DELETE_WINDOW", _close_rep)
+            tot_s = max(0.1, float(d.get("total_sec", 0.1)))
+            sec_u = "с" if lang == "uk" else "s"
+            fn_s = d.get("file", "backup.zip")
+            sz_s = d.get("size_mb", 0.0)
+            fc_s = d.get("files_cnt", 0)
+            ts_a = d.get("ts_start", "—")
+            ts_b = d.get("ts_end", "—")
+            spd_s = d.get("spd_mbs", 0.0)
+            top_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=10)
+            top_c.pack(fill="x", padx=16, pady=(12, 8))
+            import ipaddress as _ipa
+            from urllib.parse import urlparse as _up
+            srv_raw = str(d.get("srv") or self.engine.state.get("server", "")).strip()
+            _h = (_up(srv_raw).hostname or srv_raw) if srv_raw else ""
+            try:
+                _is_lan = _ipa.ip_address(_h).is_private or _ipa.ip_address(_h).is_loopback
+            except Exception:
+                _is_lan = _h.endswith(".local") or _h in ("localhost",)
+            net_tag = ("Локальна мережа / LAN" if _is_lan else "Інтернет / Зовнішній") if lang == "uk" else ("Local Network / LAN" if _is_lan else "Internet / External")
+            srv_disp = f"{srv_raw}  [{net_tag}]" if srv_raw else "—"
+            tk.Label(top_c, text=(f"Файл архіву:  {fn_s}" if lang == "uk" else f"Archive file:  {fn_s}"), bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
+            tk.Label(top_c, text=(f"Джерело (сервер):  {srv_disp}" if lang == "uk" else f"Source server:  {srv_disp}"), bg=p["card"], fg=p["green"] if _is_lan else p["amber"], font=(fam, fs, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
+            tk.Label(top_c, text=(f"Розмір:  {sz_s} МБ ({fc_s} файлів)   •   CRC32 + SHA-256: Підтверджено" if lang == "uk" else f"Size:  {sz_s} MB ({fc_s} files)   •   CRC32 + SHA-256: Verified"), bg=p["card"], fg=p["text"], font=(fam, fs), anchor="w").pack(fill="x", pady=(0, 6))
+            tk.Label(top_c, text=(f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_s} {sec_u})" if lang == "uk" else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_s} {sec_u})"), bg=p["card"], fg=p["green"], font=(fam, fs, "bold"), anchor="w").pack(fill="x")
+            mid_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=10)
+            mid_c.pack(fill="x", padx=16, pady=(0, 8))
+            mid_c.columnconfigure(0, weight=1)
+            raw_stages = [
+                ("Підготовка та аналіз на сервері:" if lang == "uk" else "Server preparation & scan:", d.get("srv_prep_sec", 0.0), p["text"]),
+                ("Збір та копіювання даних на сервері:" if lang == "uk" else "Server data collection & copy:", d.get("srv_copy_sec", 0.0), p["text"]),
+                ("Стиснення та пакування ZIP на сервері:" if lang == "uk" else "Server ZIP archive packing:", d.get("srv_pack_sec", d.get("srv_sec", 0.0)), p["text"]),
+                ("Перевірка файлів на сервері:" if lang == "uk" else "Server file verification:", d.get("srv_chk_sec", 0.0), p["text"]),
+                (f"Скачування по мережі ({spd_s} {'МБ/с' if lang == 'uk' else 'MB/s'}):" if lang == "uk" else f"Network download ({spd_s} MB/s):", d.get("dl_sec", 0.0), p["cyan"]),
+                ("Перевірка архіву CRC32 (програма):" if lang == "uk" else "Local CRC32 integrity check:", d.get("crc_sec", d.get("ver_sec", 0.0)), p["text"]),
+                ("Розрахунок та звірка SHA-256:" if lang == "uk" else "Local SHA-256 hash verification:", d.get("sha_sec", 0.0), p["text"]),
+            ]
+            if d.get("mir_active"):
+                raw_stages.append(("Дзеркальне копіювання:" if lang == "uk" else "Mirror folder copy:", d.get("mir_sec", 0.0), p["green"]))
+            stages = [(f"{i}. {t}", v, c) for i, (t, v, c) in enumerate(raw_stages, 1)]
+            for idx_r, (lbl_st, val_s, col_st) in enumerate(stages):
+                pct_v = min(100, int(round((float(val_s) / tot_s) * 100)))
+                tk.Label(mid_c, text=lbl_st, bg=p["card"], fg=col_st, font=(fam, fs), anchor="w").grid(row=idx_r, column=0, sticky="w", pady=4)
+                tk.Label(mid_c, text=f"{float(val_s):.1f} {sec_u}  ({pct_v}%)", bg=p["card"], fg=col_st, font=(fam, fs, "bold"), anchor="e").grid(row=idx_r, column=1, sticky="e", padx=(12, 0), pady=4)
+            bot_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=8)
+            bot_c.pack(fill="x", padx=16, pady=(0, 8))
+            tk.Label(bot_c, text=(f"Сховище:  {d.get('z_cnt', 0)} архівів ({d.get('z_mb', 0)} МБ)   •   Вільно:  {d.get('free_gb', 0)} ГБ   •   Застарілих GFS:  {d.get('old_cnt', 0)} шт." if lang == "uk" else f"Storage:  {d.get('z_cnt', 0)} archives ({d.get('z_mb', 0)} MB)   •   Free:  {d.get('free_gb', 0)} GB   •   Outdated GFS:  {d.get('old_cnt', 0)}"), bg=p["card"], fg=p["muted"], font=(fam, fs), anchor="w").pack(fill="x")
+            bf = tk.Frame(dlg, bg=p["panel"])
+            bf.pack(side="bottom", fill="x", padx=16, pady=(4, 12))
+            btn_ok_r = tk.Button(bf, text="ОК" if lang == "uk" else "OK", command=_close_rep, bg=p["green"], fg=p["green_txt"], font=(fam, fs, "bold"), padx=24, pady=5, cursor="hand2")
+            btn_ok_r.pack(side="right")
+            dlg.after(350, lambda: (dlg.bind("<Return>", _close_rep), dlg.bind("<Escape>", _close_rep), btn_ok_r.focus_set()) if dlg.winfo_exists() else None)
+            self._fit_dialog(dlg)
+            return
         is_lan_dlg = (m["type"] == "lan_found")
         dlg, p, _ = self._make_dialog(m["title"], 660 if is_lan_dlg else 590, 340 if is_lan_dlg else 235)
         def _done(val):
@@ -397,31 +539,24 @@ class DialogsMixin:
         cb_lang.set(rev_lang.get(v_lang.get(), "English (Default)"))
         cb_lang.pack(side="left", fill="x", expand=True)
 
-        t_r1 = tk.Frame(f_thm, bg=p["card"])
-        t_r1.pack(fill="x", pady=4)
-        tk.Label(t_r1, text="Тема оформлення:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
-        theme_map = {lbl: code for code, lbl in THEME_LABELS}
-        rev_theme = {code: lbl for code, lbl in THEME_LABELS}
-        cb_theme = ttk.Combobox(t_r1, values=[lbl for _, lbl in THEME_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_theme.set(rev_theme.get(v_theme.get(), THEME_LABELS))
-        cb_theme.pack(side="left", fill="x", expand=True)
 
         t_r2 = tk.Frame(f_thm, bg=p["card"])
         t_r2.pack(fill="x", pady=4)
         tk.Label(t_r2, text="Роздільна здатність:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
-        scale_map = {lbl: code for code, lbl in UI_SCALE_LABELS}
-        rev_scale = {code: lbl for code, lbl in UI_SCALE_LABELS}
-        cb_scale = ttk.Combobox(t_r2, values=[lbl for _, lbl in UI_SCALE_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_scale.set(rev_scale.get(v_scale.get(), UI_SCALE_LABELS))
+        lng_cur = st.get("lang", "en")
+        scale_map = {tr(lbl, lng_cur): code for code, lbl in UI_SCALE_LABELS}
+        rev_scale = {code: tr(lbl, lng_cur) for code, lbl in UI_SCALE_LABELS}
+        cb_scale = ttk.Combobox(t_r2, values=[tr(lbl, lng_cur) for _, lbl in UI_SCALE_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_scale.set(rev_scale.get(v_scale.get(), tr(UI_SCALE_LABELS[0][1], lng_cur)))
         cb_scale.pack(side="left", fill="x", expand=True)
 
         t_r3 = tk.Frame(f_thm, bg=p["card"])
         t_r3.pack(fill="x", pady=4)
         tk.Label(t_r3, text="Розмір шрифту:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
-        font_map = {lbl: code for code, lbl in UI_FONT_LABELS}
-        rev_font = {code: lbl for code, lbl in UI_FONT_LABELS}
-        cb_font = ttk.Combobox(t_r3, values=[lbl for _, lbl in UI_FONT_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_font.set(rev_font.get(v_font.get(), UI_FONT_LABELS))
+        font_map = {tr(lbl, lng_cur): code for code, lbl in UI_FONT_LABELS}
+        rev_font = {code: tr(lbl, lng_cur) for code, lbl in UI_FONT_LABELS}
+        cb_font = ttk.Combobox(t_r3, values=[tr(lbl, lng_cur) for _, lbl in UI_FONT_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_font.set(rev_font.get(v_font.get(), tr(UI_FONT_LABELS[0][1], lng_cur)))
         cb_font.pack(side="left", fill="x", expand=True)
 
         f_sty = tk.LabelFrame(bot_col, text=" 5. Стиль індикатора прогресу (14 стилів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=14, pady=8)
@@ -429,23 +564,21 @@ class DialogsMixin:
         s_r0 = tk.Frame(f_sty, bg=p["card"])
         s_r0.pack(fill="x", pady=(2, 8))
         tk.Label(s_r0, text="Стиль смуги:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
-        style_map = {lbl: code for code, lbl in PBAR_STYLE_LABELS}
-        rev_map = {code: lbl for code, lbl in PBAR_STYLE_LABELS}
-        cb_style = ttk.Combobox(s_r0, values=[lbl for _, lbl in PBAR_STYLE_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_style.set(rev_map.get(v_pstyle.get(), PBAR_STYLE_LABELS))
+        style_map = {tr(lbl, lng_cur): code for code, lbl in PBAR_STYLE_LABELS}
+        rev_map = {code: tr(lbl, lng_cur) for code, lbl in PBAR_STYLE_LABELS}
+        cb_style = ttk.Combobox(s_r0, values=[tr(lbl, lng_cur) for _, lbl in PBAR_STYLE_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_style.set(rev_map.get(v_pstyle.get(), tr(PBAR_STYLE_LABELS[0][1], lng_cur)))
         cb_style.pack(side="left", fill="x", expand=True)
         prev_bar = StyledProgressBar(f_sty, height=max(24, fs + 12))
         prev_bar.pack(fill="x")
 
         def _upd_prev(_e=None):
             code = style_map.get(cb_style.get(), "v8")
-            t_code = theme_map.get(cb_theme.get(), "dark")
+            t_code = st.get("theme", "dark")
             v_pstyle.set(code)
-            v_theme.set(t_code)
             prev_bar.set_state(65, False, code, False, THEMES.get(t_code, THEMES["dark"]))
         cb_style.bind("<<ComboboxSelected>>", _upd_prev)
-        cb_theme.bind("<<ComboboxSelected>>", _upd_prev)
-        dlg.after(60, _upd_prev)
+        _upd_prev()
 
         def _commit_settings(close_after):
             st["daily_days"] = max(1, int(v_daily.get()))
@@ -457,10 +590,6 @@ class DialogsMixin:
             st["delete_mode"] = "trash" if v_trash.get() else "direct"
             st["minimize_to_tray"] = bool(v_tray_min.get())
             st["silent_cleanup"] = bool(v_sclean.get())
-            chosen_theme = theme_map.get(cb_theme.get(), "dark")
-            if chosen_theme != st.get("theme") and st.get("lite_mode", False):
-                st["lite_mode"] = False
-            st["theme"] = chosen_theme
             old_sc = st.get("ui_scale", "auto")
             new_sc = scale_map.get(cb_scale.get(), "auto")
             st["ui_scale"] = new_sc
@@ -482,7 +611,7 @@ class DialogsMixin:
             nb.tab(0, text=tr("  Резервне копіювання та Розклад  ", lng))
             nb.tab(1, text=tr("  Вигляд та Інтерфейс  ", lng))
             apply_widget_i18n(dlg, lng)
-        dlg.after(20, _i18n_settings)
+        _i18n_settings()
 
     def open_analyze(self):
         import threading
@@ -518,8 +647,9 @@ class DialogsMixin:
         from core.files import remove_backup_file
         def remove_file_smart(path_to_del, use_trash=True):
             remove_backup_file(path_to_del, "trash" if use_trash else "direct")
-        buf_options = {"4 КБ": 4096, "16 КБ": 16384, "64 КБ": 65536, "256 КБ": 262144, "1 МБ": 1048576, "4 МБ": 4194304, "8 МБ": 8388608}
-        v_buf = tk.StringVar(value="64 КБ")
+        _lng_a = self.engine.state.get("lang", "en")
+        buf_options = {tr(k, _lng_a): v for k, v in (("4 КБ", 4096), ("16 КБ", 16384), ("64 КБ", 65536), ("256 КБ", 262144), ("1 МБ", 1048576), ("4 МБ", 4194304), ("8 МБ", 8388608))}
+        v_buf = tk.StringVar(value=tr("64 КБ", _lng_a))
         verify_state = {"running": False, "stop": False, "pct": 0, "stage": "", "res": None, "err": None, "status_map": {}}
 
         def _delete_archive_pair(fname):
@@ -845,18 +975,37 @@ class DialogsMixin:
         tk.Button(bf, text=tr("Закрити", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5, cursor="hand2").pack(side="right")
 
     def open_about(self):
+        import webbrowser
         from core.config import BUILD_DATE
         fs = self.metrics["font_sz"]
         k = self.metrics["k"]
+        lang = self.engine.state.get("lang", "en")
         fam = "Consolas" if self.engine.state.get("lite_mode", False) else self._get_palette().get("font", "Segoe UI")
-        dlg, p, _ = self._make_dialog(f"Про програму — HomeGrid Backup v{SCRIPT_VER}", 540, 290)
-        info = f"""HomeGrid Backup  •  Версія v{SCRIPT_VER} (збірка від {BUILD_DATE})
-
-• Нативне резервне копіювання даних та налаштувань інвертора без браузера.
-• Перевірка цілісності архівів за CRC32 + SHA-256 та дзеркалювання.
-• Автоматична GFS-ротація копій та запуск за розкладом.
-
-Репозиторій проєкту: https://github.com"""
-        tk.Label(dlg, text=info, bg=p["panel"], fg=p["text"], justify="left", wraplength=int(490 * k), font=(fam, fs)).pack(padx=18, pady=(16, 8), anchor="w", fill="x")
-        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["green"], fg=p["green_txt"], font=(fam, fs, "bold"), padx=int(22 * k), pady=int(7 * k), cursor="hand2").pack(side="bottom", anchor="e", padx=18, pady=14)
-        apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
+        dlg, p, _ = self._make_dialog(f"{tr('Про програму', lang)} — HomeGrid Backup v{SCRIPT_VER}", 560, 320)
+        if lang == "uk":
+            info = (
+                f"HomeGrid Backup  •  Версія v{SCRIPT_VER} (збірка від {BUILD_DATE})\n\n"
+                "• Нативне резервне копіювання даних та налаштувань інвертора без браузера.\n"
+                "• Перевірка цілісності архівів за CRC32 + SHA-256 та дзеркалювання.\n"
+                "• Автоматична GFS-ротація копій та запуск за розкладом."
+            )
+            repo_lbl = "Репозиторій проєкту:"
+        else:
+            info = (
+                f"HomeGrid Backup  •  Version v{SCRIPT_VER} (build {BUILD_DATE})\n\n"
+                "• Native backup of inverter data and settings without a browser.\n"
+                "• Archive integrity verification via CRC32 + SHA-256 and mirroring.\n"
+                "• Automatic GFS backup rotation and scheduled execution."
+            )
+            repo_lbl = "Project repository:"
+        tk.Label(dlg, text=info, bg=p["panel"], fg=p["text"], justify="left", wraplength=int(510 * k), font=(fam, fs)).pack(padx=18, pady=(16, 8), anchor="w", fill="x")
+        rf = tk.Frame(dlg, bg=p["panel"])
+        rf.pack(fill="x", padx=18, pady=(0, 8))
+        tk.Label(rf, text=repo_lbl, bg=p["panel"], fg=p["muted"], font=(fam, fs)).pack(side="left")
+        lnk = tk.Label(rf, text="https://github.com", bg=p["panel"], fg=p["cyan"], font=(fam, fs, "underline"), cursor="hand2")
+        lnk.pack(side="left", padx=(6, 0))
+        lnk.bind("<Button-1>", lambda _e: webbrowser.open("https://github.com"))
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
+        dlg.bind("<Return>", lambda _e: dlg.destroy())
+        tk.Button(dlg, text=tr("Закрити", lang), command=dlg.destroy, bg=p["green"], fg=p["green_txt"], font=(fam, fs, "bold"), padx=int(22 * k), pady=int(7 * k), cursor="hand2").pack(side="bottom", anchor="e", padx=18, pady=14)
+        self._fit_dialog(dlg)

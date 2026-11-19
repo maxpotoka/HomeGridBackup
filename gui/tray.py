@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.057 | 19.11.2026 15:35) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.074 | 19.11.2026 20:33) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
@@ -95,6 +95,7 @@ def _start_tray_thread(engine):
         engine.tray_icon = None
         return
     from core.backup import run_backup_task
+    from core.i18n import tr
 
     def _on_open(icon, item):
         if engine.app_ref is not None:
@@ -112,11 +113,12 @@ def _start_tray_thread(engine):
     def _on_exit(icon, item):
         _force_quit_app(engine)
 
+    _lng = engine.state.get("lang", "en")
     menu = pystray.Menu(
-        pystray.MenuItem("Відкрити HomeGrid Backup", _on_open, default=True),
-        pystray.MenuItem("▶ Запустити резервне копіювання", _on_backup),
+        pystray.MenuItem(tr("Відкрити HomeGrid Backup", _lng), _on_open, default=True),
+        pystray.MenuItem(tr("▶ Запустити резервне копіювання", _lng), _on_backup),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("✖ Вихід", _on_exit)
+        pystray.MenuItem(tr("✖ Вихід", _lng), _on_exit)
     )
     icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", menu)
     engine.tray_icon = icon
@@ -164,7 +166,7 @@ def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowW
                 srv.bind(("127.0.0.1", 0))
                 srv.listen(2)
                 with open(_port_p, "w") as pf:
-                    pf.write(str(srv.getsockname()))
+                    pf.write(str(srv.getsockname()[1]))
                 while True:
                     conn, _ = srv.accept()
                     data = conn.recv(16)

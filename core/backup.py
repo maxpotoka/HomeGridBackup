@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.064 | 19.11.2026 16:30) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.114 | 19.11.2026 23:12) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -228,21 +228,21 @@ def verify_all_archives(state, progress_callback=None, buf_size=65536, cancel_fl
     return {"total": len(results), "ok_cnt": sum(1 for r in results if r["status"] == "ok"), "warn_cnt": sum(1 for r in results if r["status"] == "warn"), "err_cnt": sum(1 for r in results if r["status"] == "err"), "elapsed": round(elapsed, 2), "speed_mbs": round(speed_mbs, 1), "total_mb": round(total_mb, 1), "cancelled": bool(cancel_flag and cancel_flag.get("stop")), "items": results}
 
 def _copy_to_mirror(engine, out_file, sha_file):
-    if not engine.state.get("mirror_enabled", True):
+    if not bool(engine.state.get("mirror_enabled", False)):
         return
     mirror_dir = (engine.state.get("mirror_dir") or "").strip()
-    if not mirror_dir:
+    if not mirror_dir or mirror_dir in (".", "./", ".\\", "/", "\\"):
         return
     try:
-        if os.path.normcase(os.path.abspath(mirror_dir)) == os.path.normcase(os.path.abspath(os.path.dirname(out_file))):
+        src_real = os.path.normcase(os.path.realpath(os.path.dirname(out_file)))
+        dst_real = os.path.normcase(os.path.realpath(os.path.expanduser(mirror_dir)))
+        if src_real == dst_real:
             return
-        os.makedirs(mirror_dir, exist_ok=True)
-        dst_zip = os.path.join(mirror_dir, os.path.basename(out_file))
-        dst_sha = os.path.join(mirror_dir, os.path.basename(sha_file))
-        shutil.copy2(out_file, dst_zip)
+        os.makedirs(dst_real, exist_ok=True)
+        shutil.copy2(out_file, os.path.join(dst_real, os.path.basename(out_file)))
         if os.path.exists(sha_file):
-            shutil.copy2(sha_file, dst_sha)
-        engine.log(f"Дзеркальну копію збережено у: {mirror_dir}", "ok")
+            shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
+        engine.log(f"Дзеркальну копію збережено у: {dst_real}", "ok")
     except Exception as e:
         engine.log(f"Попередження: не вдалося скопіювати у дзеркальну папку ({mirror_dir}): {e}", "warn")
 
@@ -250,6 +250,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
     engine.log(f"Збірка архіву на сервері {srv_label}...", "info")
     last_phase = ""
     phase_start_t = time.time()
+    srv_times = {"preparing": 0.0, "copying": 0.0, "packing": 0.0, "checking": 0.0}
     tot_b = 0
     job_retries = 0
     bad_json_cnt = 0
@@ -309,6 +310,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
         tot_b = st.get("total_bytes", 0) or 0
         proc_b = st.get("processed_bytes", 0) or 0
         if ph != last_phase:
+            if last_phase:
+                srv_times[last_phase if last_phase in srv_times else "packing"] += max(0.0, time.time() - phase_start_t)
             last_phase = ph
             phase_start_t = time.time()
             engine.log(f"Етап сервера ({srv_label}): {pretty_phase(ph)}", "info")
@@ -330,6 +333,10 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
             engine.set_progress(overall_pct, f"[{srv_label}] {pretty_phase(ph)}: {pct}%{sz_txt}")
 
         if ph == "ready" or st.get("ready") is True:
+            if last_phase and last_phase != "ready":
+                srv_times[last_phase if last_phase in srv_times else "packing"] += max(0.0, time.time() - phase_start_t)
+            engine._last_srv_timings = {k: round(v, 1) for k, v in srv_times.items()}
+            engine._last_srv_timings["dl_t0"] = time.time()
             engine.set_progress(75, f"[{srv_label}] Архів готовий (75%). Завантаження...")
             break
         if st.get("status") == "error" or ph == "error":
@@ -420,10 +427,14 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
     engine.is_running = True
     engine.set_pill("Резервне копіювання...", "work")
     t_total_start = time.time()
+    ts_start_str = datetime.now().strftime("%H:%M:%S")
     try:
         bdir = engine.state["backup_dir"]
+        t_prep0 = time.time()
         srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
+        t_dl0 = time.time()
         out_file = _download_backup_zip(engine, srv, srv_label, job_id, bdir)
+        t_ver0 = time.time()
 
         total_bytes = os.path.getsize(out_file)
         total_mb = total_bytes / 1048576.0
@@ -437,6 +448,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         if cnt < 1:
             os.remove(out_file)
             raise RuntimeError("ZIP-архів порожній!")
+        t_sha0 = time.time()
+        crc_sec = round(max(0.1, t_sha0 - t_ver0), 1)
 
         h = hashlib.sha256()
         processed = 0
@@ -454,33 +467,51 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         sha_file = out_file + ".sha256"
         with open(sha_file, "w", encoding="utf-8") as f_sha:
             f_sha.write(f"{zip_hash.lower()}  {os.path.basename(out_file)}\n")
-        engine.log(f"Цілісність перевірено ({cnt} файлів). Збережено {os.path.basename(sha_file)}", "ok")
+        sha_sec = round(max(0.1, time.time() - t_sha0), 1)
+        ver_sec = round(crc_sec + sha_sec, 1)
+        engine.log(f"Цілісність перевірено ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
 
-        _copy_to_mirror(engine, out_file, sha_file)
+        mir_active = bool(engine.state.get("mirror_enabled", False)) and bool((engine.state.get("mirror_dir") or "").strip())
+        mir_sec = 0.0
+        if mir_active:
+            t_mir0 = time.time()
+            _copy_to_mirror(engine, out_file, sha_file)
+            mir_sec = round(max(0.1, time.time() - t_mir0), 1)
 
         if engine.state["dirty"]:
             commit_state(engine.state)
             engine.log("Налаштування та ключі захищено збережено.", "ok")
 
-        if skip_cleanup or NO_CLEAN:
-            engine.set_progress(98, "Старі копії збережено (авторежим без видалення)...")
-            engine.log("Режим збереження: очищення застарілих архівів пропущено.", "info")
+        from core.gfs import compute_gfs_plan, apply_gfs_cleanup
+        engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
+        if not skip_cleanup and not NO_CLEAN and (auto_quiet or bool(engine.state.get("silent_cleanup", False))):
+            apply_gfs_cleanup(engine, skip_prompt=True)
         else:
-            from core.gfs import apply_gfs_cleanup
-            engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
-            apply_gfs_cleanup(engine, skip_prompt=auto_quiet)
+            apply_gfs_cleanup(engine, skip_prompt=True) if False else None
+        all_it, _, del_it = compute_gfs_plan(engine.state)
 
-        total_sec = round(time.time() - t_total_start, 1)
+        t_end = time.time()
+        ts_end_str = datetime.now().strftime("%H:%M:%S")
+        _st_t = getattr(engine, "_last_srv_timings", {})
+        dl_t0_real = _st_t.get("dl_t0", t_dl0)
+        dl_sec = round(max(0.1, t_ver0 - dl_t0_real), 1)
+        srv_prep_s = round(_st_t.get("preparing", 0.0), 1)
+        srv_copy_s = round(_st_t.get("copying", 0.0), 1)
+        srv_pack_s = round(_st_t.get("packing", 0.0), 1)
+        srv_chk_s = round(_st_t.get("checking", 0.0), 1)
+        total_sec = round(max(0.1, srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s + dl_sec + ver_sec + mir_sec), 1)
+        srv_sec = round(srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s, 1)
+        spd_mbs = round(total_mb / max(0.1, dl_sec), 1)
+        final_name = os.path.basename(out_file)
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
-        engine.log(f"УСПІХ! Резервне копіювання завершено за {total_sec} с.", "ok")
+        engine.log(f"УСПІХ! Резервне копіювання завершено за {total_sec} с ({ts_start_str} → {ts_end_str}).", "ok")
         if hasattr(engine, "record_op_event"):
-            final_name = os.path.basename(out_file)
-            if not os.path.exists(out_file) and os.path.isdir(bdir):
-                cand_zips = [os.path.join(bdir, fn) for fn in os.listdir(bdir) if fn.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, fn))]
-                if cand_zips:
-                    final_name = os.path.basename(max(cand_zips, key=os.path.getmtime))
             engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
+        if not SILENT_MODE and not auto_quiet:
+            z_cnt, z_mb, free_gb = engine.get_storage_stats()
+            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": len(del_it)}
+            engine.ask_modal("backup_report", "Звіт про резервне копіювання", json.dumps(rep, ensure_ascii=False))
     except Exception as exc:
         engine.exit_code = 1
         engine.log(f"ПОМИЛКА: {exc}", "err")

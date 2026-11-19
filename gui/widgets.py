@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v1.006 | 18.11.2026 17:36) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
+# [ФАЙЛ: gui/widgets.py (v1.088 | 19.11.2026 21:33) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
 # ==============================================================================
 import tkinter as tk
 from gui.styles import THEMES
@@ -25,6 +25,10 @@ class StyledProgressBar(tk.Canvas):
         self.theme = theme
         if self.indet:
             self._phase = (self._phase + 1) % 40
+        sig = (self.pct, self.indet, self._phase if self.indet else 0, self.style_name, self.lite_mode, id(theme), self.winfo_width(), self.winfo_height())
+        if sig == getattr(self, "_last_draw_sig", None):
+            return
+        self._last_draw_sig = sig
         self.redraw()
 
     def _draw_gradient(self, x1, y1, x2, y2, c1, c2):

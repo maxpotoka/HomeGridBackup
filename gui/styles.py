@@ -1,24 +1,10 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.062 | 19.11.2026 16:01) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.096 | 19.11.2026 21:53) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import ctypes
 from ctypes import wintypes
 import tkinter as tk
 from core.config import VALID_SCALES
-
-THEME_LABELS = [
-    ("crt", "1970-ті — Термінал CRT"),
-    ("norton", "1980-ті — Norton Commander"),
-    ("mac_classic", "1984 — Macintosh System 1"),
-    ("win95", "1995 — Windows 95 / 98"),
-    ("winxp", "2001 — Windows XP Luna"),
-    ("mac_aqua", "2004 — macOS X Aqua"),
-    ("win7", "2007 — Windows 7 Aero"),
-    ("mac_light", "2014 — macOS Yosemite Light"),
-    ("mac_dark", "2024 — macOS Sonoma Dark"),
-    ("dark", "2026 — Темна (нічна)"),
-    ("light", "2026 — Світла (денна)"),
-]
 
 UI_SCALE_LABELS = [
     ("auto", "Авто (під монітор і DPI)"),
@@ -66,82 +52,12 @@ PBAR_STYLE_LABELS = [
 ]
 
 THEMES = {
-    "mac_classic": {
-        "bg": "#d8d8d8", "panel": "#ffffff", "card": "#f4f4f4", "border": "#000000",
-        "text": "#000000", "muted": "#333333", "blue": "#000000", "green": "#111111",
-        "amber": "#444444", "red": "#000000", "cyan": "#000000",
-        "inp_bg": "#ffffff", "log_bg": "#ffffff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Helvetica Neue", "relief": "solid"
-    },
-    "mac_aqua": {
-        "bg": "#d6dde5", "panel": "#eef2f6", "card": "#ffffff", "border": "#9cb0c4",
-        "text": "#1b2430", "muted": "#4f6075", "blue": "#1b74e4", "green": "#189b49",
-        "amber": "#d97706", "red": "#d63031", "cyan": "#0984e3",
-        "inp_bg": "#ffffff", "log_bg": "#f7f9fc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Helvetica Neue", "relief": "groove"
-    },
-    "mac_light": {
-        "bg": "#d1d1d6", "panel": "#ffffff", "card": "#f2f2f7", "border": "#8e8e93",
-        "text": "#1d1d1f", "muted": "#6e6e73", "blue": "#007aff", "green": "#34c759",
-        "amber": "#ff9500", "red": "#ff3b30", "cyan": "#007aff",
-        "inp_bg": "#ffffff", "log_bg": "#fafafa", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Helvetica Neue", "relief": "solid"
-    },
-    "mac_dark": {
-        "bg": "#1c1c1e", "panel": "#2c2c2e", "card": "#3a3a3c", "border": "#48484a",
-        "text": "#f5f5f7", "muted": "#aeaeb2", "blue": "#0a84ff", "green": "#30d158",
-        "amber": "#ff9f0a", "red": "#ff453a", "cyan": "#64d2ff",
-        "inp_bg": "#161618", "log_bg": "#161618", "btn_txt": "#ffffff", "green_txt": "#042f1a",
-        "font": "Helvetica Neue", "relief": "solid"
-    },
     "dark": {
         "bg": "#0a0f18", "panel": "#111827", "card": "#161f33", "border": "#26324d",
         "text": "#f1f5f9", "muted": "#94a3b8", "blue": "#2b7fff", "green": "#10b981",
         "amber": "#f59e0b", "red": "#ef4444", "cyan": "#38bdf8",
         "inp_bg": "#060911", "log_bg": "#060911", "btn_txt": "#ffffff", "green_txt": "#042f2e",
         "font": "Segoe UI", "relief": "solid"
-    },
-    "light": {
-        "bg": "#cbd5e1", "panel": "#ffffff", "card": "#f1f5f9", "border": "#94a3b8",
-        "text": "#0f172a", "muted": "#475569", "blue": "#2563eb", "green": "#059669",
-        "amber": "#d97706", "red": "#dc2626", "cyan": "#0284c7",
-        "inp_bg": "#ffffff", "log_bg": "#f8fafc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Segoe UI", "relief": "solid"
-    },
-    "norton": {
-        "bg": "#000084", "panel": "#0000a8", "card": "#000084", "border": "#55ffff",
-        "text": "#ffff55", "muted": "#55ffff", "blue": "#008080", "green": "#00a8a8",
-        "amber": "#ffff55", "red": "#ff5555", "cyan": "#ffffff",
-        "inp_bg": "#000055", "log_bg": "#000055", "btn_txt": "#ffffff", "green_txt": "#000000",
-        "font": "Consolas", "relief": "solid"
-    },
-    "win95": {
-        "bg": "#008080", "panel": "#c0c0c0", "card": "#d4d0c8", "border": "#808080",
-        "text": "#000000", "muted": "#404040", "blue": "#000080", "green": "#008000",
-        "amber": "#808000", "red": "#800000", "cyan": "#000080",
-        "inp_bg": "#ffffff", "log_bg": "#ffffff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Tahoma", "relief": "raised"
-    },
-    "winxp": {
-        "bg": "#245edb", "panel": "#ece9d8", "card": "#f5f4ea", "border": "#7f9db9",
-        "text": "#000000", "muted": "#4a5568", "blue": "#225ad8", "green": "#389c28",
-        "amber": "#d97706", "red": "#cc2929", "cyan": "#003399",
-        "inp_bg": "#ffffff", "log_bg": "#ffffff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Tahoma", "relief": "groove"
-    },
-    "win7": {
-        "bg": "#8faed1", "panel": "#f4f8fd", "card": "#e2ecf7", "border": "#5b7da3",
-        "text": "#1e293b", "muted": "#475569", "blue": "#2874c5", "green": "#1e9e35",
-        "amber": "#d97706", "red": "#c92a2a", "cyan": "#0b5cab",
-        "inp_bg": "#ffffff", "log_bg": "#f8fbff", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "font": "Segoe UI", "relief": "groove"
-    },
-    "crt": {
-        "bg": "#020a03", "panel": "#041206", "card": "#071c0a", "border": "#22c55e",
-        "text": "#4ade80", "muted": "#16a34a", "blue": "#15803d", "green": "#22c55e",
-        "amber": "#eab308", "red": "#ef4444", "cyan": "#86efac",
-        "inp_bg": "#010602", "log_bg": "#010602", "btn_txt": "#020a03", "green_txt": "#020a03",
-        "font": "Consolas", "relief": "solid"
     }
 }
 

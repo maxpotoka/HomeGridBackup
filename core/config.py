@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.066 | 19.11.2026 19:03) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.114 | 19.11.2026 23:12) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -35,8 +35,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.066"
-BUILD_DATE = "19.11.2026 19:03"
+SCRIPT_VER = "1.114"
+BUILD_DATE = "19.11.2026 23:12"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -200,6 +200,8 @@ def get_fast_sysinfo():
     return f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}{_get_ram_summary()}"
 
 def _detect_low_end_or_win7():
+    if os.name != "nt":
+        return False, ""
     try:
         v = sys.getwindowsversion()
         if v.major == 6 and v.minor <= 1:
@@ -286,7 +288,7 @@ def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": True, "daily_days": 7, "today_max": 2,
+        "mirror_dir": "", "mirror_enabled": False, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
         "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
@@ -311,7 +313,7 @@ def load_state():
             if data.get("mirror_dir"):
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
-                state["mirror_enabled"] = data["mirror_enabled"]
+                state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
             if data.get("lang") in ("en", "uk"):
                 state["lang"] = data["lang"]
             if data.get("theme") in VALID_THEMES:

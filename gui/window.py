@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.063 | 19.11.2026 16:04) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.112 | 19.11.2026 23:02) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -10,7 +10,7 @@ from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state
 from core.files import open_folder_native, choose_folder_native
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
-from gui.styles import THEME_LABELS, UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip
+from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip
 from gui.widgets import StyledProgressBar
 from gui.tray import HAS_TRAY, _start_tray_thread
 from gui.dialogs import DialogsMixin
@@ -18,6 +18,7 @@ from gui.dialogs import DialogsMixin
 class HomeGridApp(DialogsMixin):
     def __init__(self, root, engine):
         self.root = root
+        self.root.withdraw()
         self.engine = engine
         self.metrics = _calc_screen_metrics(
             root,
@@ -70,12 +71,23 @@ class HomeGridApp(DialogsMixin):
             self.root.bind_class("Entry", "<KeyPress>", _x11_ctrl_key, add="+")
         self._build_ui()
         self.apply_theme_and_mode()
+        self.root.deiconify()
         self.root.after(300, self._poll_ui)
+
+    def _warmup_ttk_styles(self):
+        try:
+            tw = tk.Toplevel(self.root)
+            tw.withdraw()
+            tw.geometry("1x1+-100+-100")
+            tw.update_idletasks()
+            tw.destroy()
+        except Exception:
+            pass
 
     def _on_root_configure(self, event=None):
         if event is None or event.widget is not self.root:
             return
-        if self.root.grab_current() is not None or time.time() < getattr(self, '_ignore_resize_until', 0):
+        if any(isinstance(w, tk.Toplevel) for w in self.root.winfo_children()) or time.time() < getattr(self, '_ignore_resize_until', 0):
             return
         w, h = int(event.width), int(event.height)
         if w < 500 or h < 350:
@@ -107,17 +119,18 @@ class HomeGridApp(DialogsMixin):
         self.apply_theme_and_mode(resize_win=False, live_outer_wh=(ow, oh))
 
     def show_window(self):
+        import sys
         self._ignore_resize_until = time.time() + 0.7
         try:
-            self.root.deiconify()
             if self.root.state() in ("iconic", "withdrawn"):
+                self.root.deiconify()
                 self.root.state("normal")
-            self.root.attributes("-topmost", True)
-            self.root.update()
-            self.root.attributes("-topmost", False)
+            if not sys.platform.startswith("linux"):
+                self.root.attributes("-topmost", True)
+                self.root.update_idletasks()
+                self.root.attributes("-topmost", False)
             self.root.lift()
             self.root.focus_force()
-            self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         except Exception:
             pass
 
@@ -128,6 +141,11 @@ class HomeGridApp(DialogsMixin):
                 self.root.iconify()
                 self.engine.log("Вікно згорнуто у Dock (програма продовжує роботу).", "info")
                 return
+            if getattr(self, "_exit_confirm_open", False):
+                from gui.tray import _force_quit_app
+                _force_quit_app(self.engine)
+                return
+            self._exit_confirm_open = True
             self.confirm_exit()
             return
         keep_tray = bool(self.engine.state.get("minimize_to_tray", True))
@@ -179,10 +197,6 @@ class HomeGridApp(DialogsMixin):
 
         hdr_right = tk.Frame(self.header)
         hdr_right.pack(side="right")
-        self.btn_theme = tk.Button(hdr_right, text="Тема: Темна", command=self.cycle_theme_quick, padx=10, pady=4, cursor="hand2")
-        self.btn_theme.pack(side="left", padx=8)
-        ToolTip(self.btn_theme, "Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)")
-
         self.btn_mode = tk.Button(hdr_right, text="Графіка (1920×1080) ▾", command=self.open_mode_menu, padx=10, pady=4, cursor="hand2")
         self.btn_mode.pack(side="left", padx=(6, 0))
         ToolTip(self.btn_mode, "Оберіть режим (Графіка / LITE) або роздільну здатність вікна")
@@ -232,11 +246,11 @@ class HomeGridApp(DialogsMixin):
 
         self.l_mir = tk.Label(conn_grid, text="Дзеркало:", anchor="w", font=("Segoe UI", fs))
         self.l_mir.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_mir = tk.Entry(conn_grid, width=1, textvariable=self.var_mirror, bd=1, relief="solid", font=("Segoe UI", fs))
+        self.ent_mir = tk.Entry(conn_grid, width=1, textvariable=self.var_mirror, state="disabled", bd=1, relief="solid", font=("Segoe UI", fs))
         self.ent_mir.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
-        self.btn_mir = tk.Button(conn_grid, text="Папка дзеркала...", command=self.choose_mirror, padx=8, pady=2, cursor="hand2")
+        self.btn_mir = tk.Button(conn_grid, text="Папка дзеркала...", command=self.choose_mirror, state="disabled", padx=8, pady=2)
         self.btn_mir.grid(row=2, column=2, columnspan=2, sticky="ew", padx=(0, 4), pady=2)
-        self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", True)))
+        self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", False)) and bool(self.var_mirror.get().strip()))
         self.chk_mir_tog = tk.Checkbutton(conn_grid, text="Увімкнено", variable=self.var_mir_en, command=self.toggle_mirror, cursor="hand2")
         self.chk_mir_tog.grid(row=2, column=4, sticky="w", pady=2)
         self.ent_mir.bind("<FocusOut>", lambda e: self.save_mirror_manual())
@@ -432,9 +446,6 @@ class HomeGridApp(DialogsMixin):
             b.configure(bg=p["card"], fg=p["cyan"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
         self.btn_exit.configure(bg=p["panel"], fg=p["red"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
-        is_dark_now = cur_theme in ("dark", "mac_dark", "crt", "norton")
-        t_lbl = "Світла тема" if is_dark_now else "Темна тема"
-        self.btn_theme.configure(text=t_lbl, bg=p["panel"], fg=p["muted"], relief="flat", bd=0, disabledforeground=dis_fg, font=f_sub, padx=6, pady=2)
         if hasattr(self, "btn_pick_lan"):
             self.btn_pick_lan.configure(bg=p["card"], fg=p["green"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
@@ -446,6 +457,7 @@ class HomeGridApp(DialogsMixin):
         )
         self._update_mirror_btn()
         try:
+            self._ignore_resize_until = time.time() + 0.5
             self.root.update_idletasks()
             self.root.minsize(min(m["win_w"], max(620, self.root.winfo_reqwidth())), min(m["win_h"], max(460, self.root.winfo_reqheight())))
         except Exception:
@@ -455,20 +467,6 @@ class HomeGridApp(DialogsMixin):
         self.root.title(tr(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})", lang))
         apply_widget_i18n(self.root, lang)
 
-    def cycle_theme_quick(self):
-        cur = self.engine.state.get("theme", "dark")
-        pair_map = {
-            "dark": "light", "light": "dark",
-            "mac_dark": "mac_light", "mac_light": "mac_dark",
-            "win7": "dark", "winxp": "norton", "norton": "winxp",
-            "win95": "crt", "crt": "win95",
-            "mac_aqua": "mac_dark", "mac_classic": "crt"
-        }
-        self.engine.state["theme"] = pair_map.get(cur, "light")
-        if self.engine.state.get("lite_mode", False):
-            self.engine.state["lite_mode"] = False
-        commit_state(self.engine.state)
-        self.apply_theme_and_mode()
 
     def open_discovered_menu(self):
         found = getattr(self.engine, "discovered_servers", []) or []
@@ -504,7 +502,7 @@ class HomeGridApp(DialogsMixin):
             mark = "✔ " if code == cur_sc else "    "
             menu.add_command(label=f"{mark}{lbl}", command=lambda c=code: self._set_screen_scale_quick(c))
         menu.add_separator()
-        menu.add_command(label="⚙️ Налаштування екрана, шрифту та тем...", command=self.open_settings)
+        menu.add_command(label="⚙️ Налаштування екрана та шрифту...", command=self.open_settings)
         x = self.btn_mode.winfo_rootx()
         y = self.btn_mode.winfo_rooty() + self.btn_mode.winfo_height()
         menu.tk_popup(x, y)
@@ -537,19 +535,29 @@ class HomeGridApp(DialogsMixin):
     def _update_mirror_btn(self):
         p = self._get_palette()
         fs = self.metrics["font_sz"]
+        lang = self.engine.state.get("lang", "en")
         is_lite = bool(self.engine.state.get("lite_mode", False))
         fam = "Consolas" if is_lite else p.get("font", "Segoe UI")
-        has_dir = bool(self.var_mirror.get().strip())
-        enabled = bool(self.engine.state.get("mirror_enabled", True)) and has_dir
-        self.var_mir_en.set(enabled)
+        is_run = bool(getattr(self.engine, "is_running", False))
+        checked = bool(self.engine.state.get("mirror_enabled", False))
+        self.var_mir_en.set(checked)
+        f_state = "disabled" if (is_run or not checked) else "normal"
         self.chk_mir_tog.configure(
-            state="normal" if has_dir else "disabled",
-            text="Увімкнено" if has_dir else "Не задано",
-            bg=p["panel"], fg=p["green"] if enabled else p["muted"],
+            state="disabled" if is_run else "normal",
+            text=tr("Увімкнено" if checked else "Вимкнено", lang),
+            bg=p["panel"], fg=p["green"] if checked else p["muted"],
             selectcolor=p["inp_bg"], activebackground=p["panel"], activeforeground=p["text"],
-            font=(fam, fs, "bold" if enabled else "normal")
+            font=(fam, fs, "bold" if checked else "normal")
         )
-
+        self.ent_mir.configure(
+            state=f_state,
+            bg=p["inp_bg"], fg=p["text"],
+            disabledbackground=p["panel"], disabledforeground=p["muted"]
+        )
+        self.btn_mir.configure(
+            state=f_state,
+            cursor="hand2" if f_state == "normal" else ""
+        )
     def open_backup_folder(self):
         bdir = self.var_dir.get().strip() or self.engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR
         open_folder_native(bdir)
@@ -593,6 +601,7 @@ class HomeGridApp(DialogsMixin):
 
     def do_backup(self):
         self._apply_srv_autofill()
+        self.save_mirror_manual()
         threading.Thread(target=run_backup_task, args=(self.engine, self.var_srv.get(), False, False, False), daemon=True).start()
 
     def reset_pins(self):
@@ -622,6 +631,8 @@ class HomeGridApp(DialogsMixin):
             commit_state(self.engine.state)
 
     def choose_mirror(self):
+        if not bool(self.var_mir_en.get()):
+            return
         start_d = self.engine.state.get("mirror_dir") or self.engine.state["backup_dir"]
         chosen = choose_folder_native(start_d)
         if chosen:
@@ -633,17 +644,23 @@ class HomeGridApp(DialogsMixin):
             self.engine.log(f"Папку дзеркального копіювання увімкнено: {chosen}", "ok")
 
     def toggle_mirror(self):
-        self.engine.state["mirror_enabled"] = bool(self.var_mir_en.get())
+        en = bool(self.var_mir_en.get())
+        self.engine.state["mirror_enabled"] = en
         commit_state(self.engine.state)
         self._update_mirror_btn()
+        if en:
+            try:
+                self.ent_mir.focus_set()
+                self.ent_mir.icursor("end")
+            except Exception:
+                pass
 
     def save_mirror_manual(self):
         val = self.var_mirror.get().strip()
         self.engine.state["mirror_dir"] = os.path.normpath(os.path.expanduser(val)) if val else ""
-        self.engine.state["mirror_enabled"] = bool(self.engine.state["mirror_dir"])
+        self.engine.state["mirror_enabled"] = bool(self.var_mir_en.get()) and bool(self.engine.state["mirror_dir"])
         commit_state(self.engine.state)
         self._update_mirror_btn()
-
     def _poll_ui(self):
         try:
             st = self.engine.state
@@ -676,7 +693,7 @@ class HomeGridApp(DialogsMixin):
                 self.lbl_pill.configure(text=tr(ptxt, st.get("lang", "en")), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=("Segoe UI", max(8, self.metrics["font_sz"] - 1), "bold"))
 
             self.var_stage.set(self.engine.stage)
-            self.var_pct.set("пошук..." if self.engine.indeterminate else f"{self.engine.progress}%")
+            self.var_pct.set(tr("пошук...", st.get("lang", "en")) if self.engine.indeterminate else f"{self.engine.progress}%")
             self.pbar.set_state(
                 self.engine.progress,
                 self.engine.indeterminate,
@@ -752,7 +769,8 @@ class HomeGridApp(DialogsMixin):
 
             if self.engine.modal and self.engine.modal.get("id") != self.last_modal_id:
                 self.last_modal_id = self.engine.modal["id"]
-                self.show_window()
+                if self.root.state() in ("iconic", "withdrawn"):
+                    self.show_window()
                 self._show_engine_modal(self.engine.modal)
         except Exception:
             pass

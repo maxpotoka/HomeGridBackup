@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v1.065 | 19.11.2026 17:10) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v1.111 | 19.11.2026 22:58) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -23,6 +23,18 @@ EN_EXACT = {
 
     "Готовий до резервного копіювання": "Ready for backup",
     "Очікування": "Idle",
+    "Відкрити HomeGrid Backup": "Open HomeGrid Backup",
+    "▶ Запустити резервне копіювання": "▶ Start Backup",
+    "пошук...": "scanning...",
+    "Зупинити": "Stop",
+    "Зупинка...": "Stopping...",
+    "Сервер підключено": "Server Connected",
+    "Резервне копіювання...": "Backing up...",
+    "Підключення...": "Connecting...",
+    "Пошук в LAN...": "Scanning LAN...",
+    "Помилка бекапу": "Backup error",
+    "Не знайдено": "Not found",
+    "Не вказано адресу": "No address entered",
     "Не перевірено": "Not checked",
     "Перевірка...": "Checking...",
     "Підключення до сервера та папки збереження": "Server connection and backup folders",
@@ -37,6 +49,7 @@ EN_EXACT = {
     "Дзеркало:": "Mirror:",
     "🪞 Папка дзеркала...": "🪞 Mirror folder...",
     "Увімкнено": "Enabled",
+    "Вимкнено": "Disabled",
     "Не задано": "Not set",
     "ЛОКАЛЬНЕ СХОВИЩЕ": "LOCAL STORAGE",
     "ОСТАННІЙ АРХІВ": "LAST ARCHIVE",
@@ -79,6 +92,11 @@ EN_EXACT = {
     "ОСТАННІЙ АРХІВ:": "LAST ARCHIVE:",
     "Архів готовий": "Archive ready",
     "ріст стабільний ✔": "steady growth ✔",
+    "Збережена сесія застаріла. Повторний вхід...": "Saved session expired. Re-login...",
+    "Авторизацію підтверджено сервером!": "Authorization confirmed by server!",
+    "Очищення застарілих архівів пропущено.": "Old archive cleanup skipped.",
+    "Режим збереження: очищення застарілих архівів пропущено.": "Keep mode: old archive cleanup skipped.",
+    "Вікно згорнуто у системний трей (програма продовжує роботу).": "Window minimized to system tray (running in background).",
     "Немає захисту": "No protection",
     "Зведена аналітика за періодами та станом локального сховища:": "Summary analytics by period and local storage status:",
     "ЗА ТИЖДЕНЬ": "THIS WEEK",
@@ -217,7 +235,7 @@ EN_SUBSTR = sorted([
     ("Готово! Архів збережено", "Done! Archive saved"), ("УСПІХ! Резервне копіювання завершено за", "SUCCESS! Backup completed in"),
     ("ПОМИЛКА:", "ERROR:"), ("Помилка:", "Error:"), ("Сканування підмереж:", "Scanning subnets:"),
     ("Сканування", "Scanning"), ("Автоматично обрано сервер:", "Auto-selected server:"),
-    ("Знайдено сервер:", "Server found:"), ("Підключено до HomeGrid Monitor:", "Connected to HomeGrid Monitor:"),
+    ("Знайдено сервер:", "Server found:"), ("Знайдено кілька серверів", "Multiple servers found"), ("Знайдено:", "Found:"), ("ГОТОВО |", "DONE |"), ("ОНЛАЙН |", "ONLINE |"), ("Перезапуск збірки", "Restarting build"), ("Очікування мережі:", "Waiting for network:"), ("Збій завантаження", "Download failed"), ("повтор", "retry"), ("через", "in"), ("Підключено до HomeGrid Monitor:", "Connected to HomeGrid Monitor:"),
     ("Активну сесію підтверджено.", "Active session confirmed."), ("Авторизація успішна!", "Authorization successful!"),
     ("Збірка архіву на сервері", "Building archive on server"), ("Етап сервера", "Server stage"),
     ("Перевірка CRC32", "Verifying CRC32"), ("Розрахунок SHA-256:", "Calculating SHA-256:"),
