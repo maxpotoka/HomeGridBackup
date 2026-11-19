@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.047 | 19.11.2026 14:36) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.064 | 19.11.2026 16:30) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -254,13 +254,13 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
     job_retries = 0
     bad_json_cnt = 0
     while True:
-        time.sleep(0.35)
-        _, sr_code, sr_body, _, sr_err, _ = invoke_http(f"{srv}/api/migration/export/status?job_id={job_id}", engine.state, timeout=12.0)
+        time.sleep(2.5)
+        _, sr_code, sr_body, _, sr_err, _ = invoke_http(f"{srv}/api/migration/export/status?job_id={job_id}", engine.state, timeout=45.0)
         if not sr_body or not sr_body.strip():
             bad_json_cnt += 1
-            if bad_json_cnt >= 15:
+            if bad_json_cnt >= 45:
                 raise RuntimeError(f"Сервер {srv_label} перестав відповідати під час збірки (HTTP {sr_code}): {sr_err}")
-            time.sleep(0.8)
+            time.sleep(1.5)
             continue
         try:
             st = json.loads(sr_body)
@@ -375,7 +375,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                         out_f.write(chunk)
                         cb += len(chunk)
                         now = time.time()
-                        if now - last_ui >= 0.2:
+                        if now - last_ui >= 1.0:
                             last_ui = now
                             cm = cb / 1048576.0
                             sample_sec = max(0.001, now - last_speed_t)
@@ -445,7 +445,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             for blk in iter(lambda: f_in.read(65536), b""):
                 h.update(blk)
                 processed += len(blk)
-                if time.time() - last_ui >= 0.15:
+                if time.time() - last_ui >= 0.8:
                     last_ui = time.time()
                     pct = 92 + int((processed / max(1, total_bytes)) * 5)
                     engine.set_progress(pct, f"Розрахунок SHA-256: {processed / 1048576.0:.1f} / {total_mb:.1f} МБ")
