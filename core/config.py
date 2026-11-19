@@ -1,11 +1,29 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.064 | 19.11.2026 16:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.065 | 19.11.2026 17:10) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
 import sys
 import json
 import platform
+
+if sys.platform.startswith("linux") and (os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
+    try:
+        import time as _t_mod, subprocess as _sp_mod
+        if _t_mod.tzname == ("UTC", "UTC") and not os.environ.get("TZ"):
+            _ps_tz = _sp_mod.check_output(
+                ["powershell.exe", "-NoProfile", "-Command", "[TimeZoneInfo]::Local.BaseUtcOffset.TotalMinutes"],
+                stderr=_sp_mod.DEVNULL, timeout=1.5
+            ).decode("utf-8", errors="ignore").strip()
+            if _ps_tz and _ps_tz.lstrip("-").isdigit():
+                _mins = int(_ps_tz)
+                _sign = "-" if _mins >= 0 else "+"
+                _hh, _mm = divmod(abs(_mins), 60)
+                os.environ["TZ"] = f"UTC{_sign}{_hh:02d}:{_mm:02d}"
+                if hasattr(_t_mod, "tzset"):
+                    _t_mod.tzset()
+    except Exception:
+        pass
 
 try:
     import keyring
@@ -17,8 +35,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.064"
-BUILD_DATE = "19.11.2026 16:30"
+SCRIPT_VER = "1.065"
+BUILD_DATE = "19.11.2026 17:10"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")

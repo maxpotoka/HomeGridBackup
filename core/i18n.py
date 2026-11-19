@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v1.055 | 19.11.2026 14:54) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v1.065 | 19.11.2026 17:10) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -75,6 +75,10 @@ EN_EXACT = {
     "БИТИЙ!": "CORRUPT!",
     "Зняти PIN": "Unpin",
     "🔒 Захист": "🔒 Protected",
+    "ЛОКАЛЬНЕ СХОВИЩЕ:": "LOCAL STORAGE:",
+    "ОСТАННІЙ АРХІВ:": "LAST ARCHIVE:",
+    "Архів готовий": "Archive ready",
+    "ріст стабільний ✔": "steady growth ✔",
     "Немає захисту": "No protection",
     "Зведена аналітика за періодами та станом локального сховища:": "Summary analytics by period and local storage status:",
     "ЗА ТИЖДЕНЬ": "THIS WEEK",
