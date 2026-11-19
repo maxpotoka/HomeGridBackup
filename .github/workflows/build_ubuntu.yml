@@ -2,6 +2,14 @@ name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_ubuntu.yml'
 
 jobs:
   build-ubuntu-x64:
