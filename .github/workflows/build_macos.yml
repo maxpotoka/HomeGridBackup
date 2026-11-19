@@ -2,10 +2,19 @@ name: Build HomeGrid Backup for macOS (Intel x86_64)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_macos.yml'
 
 jobs:
   build-mac-intel:
     runs-on: macos-15-intel
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,6 +44,15 @@ jobs:
           fi
           python3 -m nuitka \
             --standalone \
+            --lto=yes \
+            --jobs=4 \
+            --python-flag=no_site \
+            --python-flag=no_asserts \
+            --python-flag=no_docstrings \
+            --noinclude-pytest-mode=nofollow \
+            --noinclude-setuptools-mode=nofollow \
+            --noinclude-unittest-mode=nofollow \
+            --assume-yes-for-downloads \
             --macos-create-app-bundle \
             --macos-target-arch=x86_64 \
             --enable-plugin=tk-inter \
@@ -46,6 +64,7 @@ jobs:
             --include-package=PIL \
             --include-package=keyring \
             --include-package=send2trash \
+            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=dist_mac \
             --output-filename=HomeGridBackup \
             main.py
