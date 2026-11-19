@@ -11,6 +11,9 @@ on:
       - 'gui/**'
       - '.github/workflows/build_windows10.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-win10-onefile:
     runs-on: windows-latest
@@ -52,8 +55,8 @@ jobs:
             --enable-plugin=tk-inter ^
             --company-name="HomeGrid" ^
             --product-name="HomeGrid Backup" ^
-            --file-version="1.0.23.0" ^
-            --product-version="1.0.23.0" ^
+            --file-version="1.0.55.0" ^
+            --product-version="1.0.55.0" ^
             --file-description="HomeGrid Backup Utility (Windows 10/11 x64)" ^
             %ICON_FLAG% ^
             --include-package=core ^
@@ -70,8 +73,13 @@ jobs:
             --output-filename=HomeGridBackup_Win10_x64.exe ^
             main.py
 
-      - name: Upload Windows 10/11 OneFile Artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish clean .exe to GitHub Releases (no zip wrapper)
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup-Windows10-x64-OneFile
-          path: dist_win10/HomeGridBackup_Win10_x64.exe
+          tag_name: windows10-x64-latest
+          name: HomeGrid Backup — Windows 10 / 11 (OneFile x64)
+          body: |
+            Чистий виконуваний файл **HomeGridBackup_Win10_x64.exe** без обгортки `.zip`.
+            Запускається напряму подвійним кліком без встановлення.
+          files: dist_win10/HomeGridBackup_Win10_x64.exe
+          make_latest: false
