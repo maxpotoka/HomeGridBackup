@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.033 | 19.11.2026 05:29) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.038 | 19.11.2026 06:01) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
@@ -50,8 +50,19 @@ def _force_quit_app(engine):
         pass
     os._exit(0)
 
+def _can_dock_linux_tray():
+    import sys
+    if not sys.platform.startswith("linux"):
+        return True
+    if os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
+        return False
+    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        return False
+    return True
+
 def _start_tray_thread(engine):
-    if not HAS_TRAY:
+    if not HAS_TRAY or not _can_dock_linux_tray():
+        engine.tray_icon = None
         return
     from core.backup import run_backup_task
 
@@ -87,6 +98,8 @@ def _start_tray_thread(engine):
             try:
                 if engine.tray_icon is None:
                     break
+                if not getattr(engine.tray_icon, "visible", True):
+                    continue
                 if engine.is_running:
                     engine.tray_spin_idx = (engine.tray_spin_idx + 1) % 8
                 engine.tray_icon.icon = _get_tray_img_safe(engine.progress, engine.is_running, engine.pill_type, engine.tray_spin_idx)

@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.032 | 19.11.2026 00:44) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.038 | 19.11.2026 06:01) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -116,9 +116,10 @@ class HomeGridApp(DialogsMixin):
             try:
                 if self.engine.tray_icon is None:
                     _start_tray_thread(self.engine)
-                self.root.withdraw()
-                self.engine.log("Вікно згорнуто у системний трей (програма продовжує роботу).", "info")
-                return
+                if self.engine.tray_icon is not None:
+                    self.root.withdraw()
+                    self.engine.log("Вікно згорнуто у системний трей (програма продовжує роботу).", "info")
+                    return
             except Exception:
                 pass
         self.confirm_exit()

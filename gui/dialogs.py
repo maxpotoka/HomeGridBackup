@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.029 | 19.11.2026 00:06) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.037 | 19.11.2026 05:50) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -460,9 +460,33 @@ class DialogsMixin:
         vsb.pack(side="right", fill="y")
         cv.pack(side="left", fill="both", expand=True)
 
+        from core.files import remove_backup_file
+        def remove_file_smart(path_to_del, use_trash=True):
+            remove_backup_file(path_to_del, "trash" if use_trash else "direct")
         buf_options = {"4 КБ": 4096, "16 КБ": 16384, "64 КБ": 65536, "256 КБ": 262144, "1 МБ": 1048576, "4 МБ": 4194304, "8 МБ": 8388608}
         v_buf = tk.StringVar(value="64 КБ")
-        verify_state = {"running": False, "stop": False, "pct": 0, "stage": "", "res": None, "err": None}
+        verify_state = {"running": False, "stop": False, "pct": 0, "stage": "", "res": None, "err": None, "status_map": {}}
+
+        def _delete_archive_pair(fname):
+            bdir = self.engine.state.get("backup_dir", "")
+            if not bdir:
+                return
+            use_trash = (self.engine.state.get("delete_mode", "trash") == "trash")
+            z_path = os.path.join(bdir, fname)
+            if os.path.exists(z_path):
+                remove_file_smart(z_path, use_trash)
+            if os.path.exists(z_path + ".sha256"):
+                remove_file_smart(z_path + ".sha256", use_trash)
+            verify_state["status_map"].pop(fname, None)
+            self.engine.log(f"Видалено пошкоджений архів: {fname}", "warn")
+
+        def _upd_del_bad_btn():
+            bdir = self.engine.state.get("backup_dir", "")
+            bad_names = [fn for fn, st_i in verify_state["status_map"].items() if st_i.get("status") == "err" and os.path.exists(os.path.join(bdir, fn))]
+            if bad_names:
+                btn_del_bad.configure(text=f"🗑 Видалити пошкоджені ({len(bad_names)})", state="normal", bg=p["red"], fg="#ffffff")
+            else:
+                btn_del_bad.configure(text="🗑 Пошкоджених: 0", state="disabled", bg=p["card"], fg=p["muted"])
 
         def _verify_progress(pct, stage):
             verify_state["pct"] = pct
@@ -483,6 +507,7 @@ class DialogsMixin:
                 verify_status.configure(text=f"Помилка перевірки: {verify_state['err']}", fg=p["red"])
             elif verify_state["res"]:
                 res = verify_state["res"]
+                verify_state["status_map"] = {it["name"]: it for it in res.get("items", [])}
                 ok_all = (res["err_cnt"] == 0 and not res.get("cancelled"))
                 perf_txt = f"Час: {res.get('elapsed', 0):.2f} с | Швидкість: {res.get('speed_mbs', 0)} МБ/с (буфер {v_buf.get()})"
                 prefix = "Зупинено! " if res.get("cancelled") else ""
@@ -491,6 +516,7 @@ class DialogsMixin:
                 verify_status.configure(text=f"100% — Усі {res['total']} архівів ({res.get('total_mb', 0)} МБ) | {perf_txt}")
                 verify_bar["value"] = 100
                 self.engine.log(msg, "ok" if ok_all else "warn")
+                _refresh()
 
         def _verify():
             if verify_state["running"]:
@@ -523,33 +549,53 @@ class DialogsMixin:
             del_mb = round(sum(x["size"] for x in del_items) / 1048576.0, 1)
             no_sha = sum(1 for x in all_items if not os.path.exists(x["path"] + ".sha256"))
             lbl_sum.configure(text=f"Всього: {len(all_items)} ({tot_mb} МБ) | Залишиться: {len(keep_items)} | Застарілих: {len(del_items)} ({del_mb} МБ) | Без .sha256: {no_sha}")
+            _upd_del_bad_btn()
             if not all_items:
                 tk.Label(list_box, text="У папці поки немає ZIP-архівів.", bg=p["log_bg"], fg=p["muted"], font=(fam, fs)).pack(pady=16)
                 return
             for it in all_items:
                 row = tk.Frame(list_box, bg=p["card"], bd=1, relief="solid", padx=8, pady=4)
                 row.pack(fill="x", pady=2, padx=4)
+                v_info = verify_state["status_map"].get(it["name"])
+                is_bad = bool(v_info and v_info.get("status") == "err")
                 is_keep = (it["new_tag"] != "DELETE")
                 is_pin = (it["new_tag"] == "KEEP")
-                st_c = p["cyan"] if is_pin else (p["green"] if is_keep else p["red"])
-                st_t = "ЗАХИЩЕНО" if is_pin else ("ЗБЕРЕГТИ" if is_keep else "ВИДАЛИТИ")
+                if is_bad:
+                    st_c, st_t = p["red"], "БИТИЙ!"
+                else:
+                    st_c = p["cyan"] if is_pin else (p["green"] if is_keep else p["red"])
+                    st_t = "ЗАХИЩЕНО" if is_pin else ("ЗБЕРЕГТИ" if is_keep else "ВИДАЛИТИ")
                 tk.Label(row, text=st_t, width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).pack(side="left")
                 sz_m = round(it["size"] / 1048576.0, 1)
-                tk.Label(row, text=f"{it['name']}  ({sz_m} МБ)", bg=p["card"], fg=p["text"], font=(fam, max(8, fs - 1))).pack(side="left", padx=6)
+                det_s = f" — {v_info.get('detail', '')}" if is_bad else ""
+                tk.Label(row, text=f"{it['name']}  ({sz_m} МБ){det_s}", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).pack(side="left", padx=6)
+                if is_bad:
+                    tk.Button(row, text="🗑 Видалити", command=lambda n=it["name"]: (_delete_archive_pair(n), _refresh()), bg=p["red"], fg="#ffffff", font=(fam, max(8, fs - 1), "bold"), padx=8, pady=1, cursor="hand2").pack(side="right", padx=(4, 0))
                 tk.Button(row, text="Зняти PIN" if is_pin else "PIN", command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["panel"], fg=p["cyan"], font=(fam, max(8, fs - 1)), padx=8, pady=1, cursor="hand2").pack(side="right")
 
         def _clean():
             apply_gfs_cleanup(self.engine, skip_prompt=True)
             _refresh()
 
-        _refresh()
+        def _clean_corrupted():
+            bdir = self.engine.state.get("backup_dir", "")
+            bad_names = [fn for fn, st_i in list(verify_state["status_map"].items()) if st_i.get("status") == "err" and os.path.exists(os.path.join(bdir, fn))]
+            for fn in bad_names:
+                _delete_archive_pair(fn)
+            if bad_names:
+                lbl_ver.configure(text=f"✓ Видалено пошкоджених архівів: {len(bad_names)} шт.", fg=p["green"])
+            _refresh()
+
         btn_verify = tk.Button(bf, text="Перевірити SHA-256 + CRC32", command=_verify, bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
         btn_verify.pack(side="left", padx=(0, 6))
         tk.Label(bf, text="Буфер:", bg=p["panel"], fg=p["muted"], font=(fam, fs)).pack(side="left", padx=(4, 4))
         cb_buf = ttk.Combobox(bf, textvariable=v_buf, values=list(buf_options.keys()), width=7, state="readonly", font=(fam, fs))
-        cb_buf.pack(side="left", padx=(0, 10))
-        tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=6)
+        cb_buf.pack(side="left", padx=(0, 8))
+        btn_del_bad = tk.Button(bf, text="🗑 Пошкоджених: 0", command=_clean_corrupted, state="disabled", bg=p["card"], fg=p["muted"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
+        btn_del_bad.pack(side="left", padx=4)
+        tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=4)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
+        _refresh()
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
         self._fit_dialog(dlg)
 
