@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.040 | 19.11.2026 13:00) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.041 | 19.11.2026 13:04) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,8 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.040"
-BUILD_DATE = "19.11.2026 13:00"
+SCRIPT_VER = "1.041"
+BUILD_DATE = "19.11.2026 13:04"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -338,7 +338,11 @@ def load_state():
 
 def commit_state(state):
     _ensure_secure_dir()
-    os.makedirs(state["backup_dir"], exist_ok=True)
+    try:
+        os.makedirs(state["backup_dir"], exist_ok=True)
+    except PermissionError:
+        state["backup_dir"] = os.path.join(os.path.expanduser("~"), "BackupHGM")
+        os.makedirs(state["backup_dir"], exist_ok=True)
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
