@@ -11,9 +11,13 @@ on:
       - 'gui/**'
       - '.github/workflows/build_ubuntu.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-ubuntu-x64:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,6 +43,15 @@ jobs:
           python3 -m nuitka \
             --standalone \
             --onefile \
+            --lto=yes \
+            --jobs=4 \
+            --python-flag=no_site \
+            --python-flag=no_asserts \
+            --python-flag=no_docstrings \
+            --noinclude-pytest-mode=nofollow \
+            --noinclude-setuptools-mode=nofollow \
+            --noinclude-unittest-mode=nofollow \
+            --assume-yes-for-downloads \
             --enable-plugin=tk-inter \
             --include-package=core \
             --include-package=console \
@@ -47,18 +60,24 @@ jobs:
             --include-package=PIL \
             --include-package=keyring \
             --include-package=send2trash \
+            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=dist_ubuntu \
             --output-filename=HomeGridBackup \
             main.py
           chmod +x dist_ubuntu/HomeGridBackup
 
-      - name: Package into .7z archive
+      - name: Package into single .7z archive
         run: |
           cd dist_ubuntu
           7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z HomeGridBackup
 
-      - name: Upload Ubuntu x64 7z Artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish clean .7z to GitHub Releases (no double zip)
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup-Ubuntu-x64-7z
-          path: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
+          tag_name: ubuntu-x64-latest
+          name: HomeGrid Backup — Ubuntu (Linux x86_64)
+          body: |
+            Чистий архів **HomeGridBackup_Ubuntu_x64.7z** без подвійного пакування у `.zip`.
+            Після розпакування запустіть у терміналі: `chmod +x HomeGridBackup && ./HomeGridBackup`
+          files: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
+          make_latest: false
