@@ -38,7 +38,7 @@ jobs:
           python -m nuitka ^
             --standalone ^
             --lto=yes ^
-            --msvc=latest ^
+            --mingw64 ^
             --jobs=4 ^
             --python-flag=no_site ^
             --python-flag=no_asserts ^
