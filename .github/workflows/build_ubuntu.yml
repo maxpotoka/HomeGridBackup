@@ -1,0 +1,56 @@
+name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ubuntu-x64:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11 (64-bit)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc patchelf python3-tk p7zip-full libayatana-appindicator3-dev
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install nuitka ordered-set zstandard pillow pystray keyring send2trash
+
+      - name: Build Ubuntu 64-bit executable with Nuitka
+        run: |
+          python3 -m nuitka \
+            --standalone \
+            --onefile \
+            --enable-plugin=tk-inter \
+            --include-package=core \
+            --include-package=console \
+            --include-package=gui \
+            --include-package=pystray \
+            --include-package=PIL \
+            --include-package=keyring \
+            --include-package=send2trash \
+            --output-dir=dist_ubuntu \
+            --output-filename=HomeGridBackup \
+            main.py
+          chmod +x dist_ubuntu/HomeGridBackup
+
+      - name: Package into .7z archive
+        run: |
+          cd dist_ubuntu
+          7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z HomeGridBackup
+
+      - name: Upload Ubuntu x64 7z Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeGridBackup-Ubuntu-x64-7z
+          path: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
