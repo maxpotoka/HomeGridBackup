@@ -2,10 +2,19 @@ name: Build HomeGrid Backup for Windows 10/11 (OneFile x64)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_windows10.yml'
 
 jobs:
   build-win10-onefile:
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,21 +30,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install nuitka zstandard pillow pystray keyring send2trash
 
-      - name: Build single-file Windows 10/11 executable with Nuitka
+      - name: Build max-optimized single-file Windows 10/11 binary with Nuitka
         shell: cmd
         run: |
           set "ICON_FLAG="
           if exist "icon.ico" set "ICON_FLAG=--windows-icon-from-ico=icon.ico"
           python -m nuitka ^
             --onefile ^
+            --onefile-tempdir-spec="{CACHE_DIR}\HomeGridBackup" ^
             --lto=yes ^
             --msvc=latest ^
+            --jobs=4 ^
             --python-flag=no_site ^
             --python-flag=no_asserts ^
             --python-flag=no_docstrings ^
+            --noinclude-pytest-mode=nofollow ^
+            --noinclude-setuptools-mode=nofollow ^
+            --noinclude-unittest-mode=nofollow ^
+            --noinclude-custom-mode=mobile:nofollow ^
+            --noinclude-custom-mode=kivy:nofollow ^
             --assume-yes-for-downloads ^
             --windows-console-mode=attach ^
             --enable-plugin=tk-inter ^
+            --company-name="HomeGrid" ^
+            --product-name="HomeGrid Backup" ^
+            --file-version="1.0.23.0" ^
+            --product-version="1.0.23.0" ^
+            --file-description="HomeGrid Backup Utility (Windows 10/11 x64)" ^
             %ICON_FLAG% ^
             --include-package=core ^
             --include-package=console ^
