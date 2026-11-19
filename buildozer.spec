@@ -10,8 +10,8 @@ requirements = hostpython3==3.11.9,python3==3.11.9,kivy==2.3.0
 orientation = portrait
 fullscreen = 0
 android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
-android.api = 33
-android.minapi = 21
+android.api = 35
+android.minapi = 26
 android.ndk = 25b
 android.accept_sdk_license = True
 android.archs = arm64-v8a
