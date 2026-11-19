@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.033 | 19.11.2026 05:29) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.039 | 19.11.2026 12:24) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -179,53 +179,92 @@ def test_hgm_stage2(base_url, state, timeout=6.0):
 
     return False, 0.0
 
-def get_main_subnets():
+def _local_ipv4_with_prefix():
+    """Локальные IPv4 с длиной префикса для Linux/macOS."""
+    res = []
+    if os.name == "nt":
+        return res
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show"], stdin=subprocess.DEVNULL, capture_output=True,
+                             text=True, errors="replace", timeout=3).stdout or ""
+        for line in out.splitlines():
+            m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", line)
+            if m:
+                res.append((m.group(1), int(m.group(2))))
+    except Exception:
+        pass
+    if not res:
+        try:
+            out = subprocess.run(["ifconfig"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                 errors="replace", timeout=3).stdout or ""
+            for m in re.finditer(r"inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)\s+(?:netmask|Mask:)\s*(0x[0-9a-fA-F]+|\d+\.\d+\.\d+\.\d+)", out):
+                mask = m.group(2)
+                if mask.startswith("0x"):
+                    mask = str(ipaddress.IPv4Address(int(mask, 16)))
+                res.append((m.group(1), ipaddress.IPv4Network("0.0.0.0/" + mask).prefixlen))
+        except Exception:
+            pass
+    return res
+
+def get_main_subnets(state=None):
     networks = set()
+    has_wsl_nat = False
+
+    def _add_net(ip_str, plen=24):
+        nonlocal has_wsl_nat
+        try:
+            ip_obj = ipaddress.IPv4Address(ip_str)
+            if not ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+                return
+            if ip_str.startswith("172."):
+                has_wsl_nat = True
+            if 22 <= plen < 24:
+                for sub in ipaddress.IPv4Network(f"{ip_str}/{plen}", strict=False).subnets(new_prefix=24):
+                    networks.add(str(sub.network_address).rsplit(".", 1)[0])
+            else:
+                net = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
+                networks.add(str(net.network_address).rsplit(".", 1)[0])
+        except ValueError:
+            pass
+
+    for ip_str, plen in _local_ipv4_with_prefix():
+        _add_net(ip_str, plen)
+
     candidate_ips = []
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             _, _, _, _, sockaddr = info
-            ip_val, _ = sockaddr
-            candidate_ips.append(ip_val)
+            candidate_ips.append(sockaddr[0])
     except Exception:
         pass
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
-        ip_val, _ = s.getsockname()
-        candidate_ips.append(ip_val)
+        candidate_ips.append(s.getsockname()[0])
         s.close()
     except Exception:
         pass
-
-    if sys.platform.startswith("linux"):
-        try:
-            with open("/etc/resolv.conf", "r", encoding="utf-8", errors="ignore") as rf:
-                for line in rf:
-                    if line.strip().startswith("nameserver"):
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            candidate_ips.append(parts[1].strip())
-        except Exception:
-            pass
-
-    has_wsl_nat = False
     for ip_str in candidate_ips:
-        try:
-            ip_obj = ipaddress.IPv4Address(ip_str)
-            if ip_obj.is_private and not ip_obj.is_loopback and not ip_obj.is_link_local:
-                if ip_str.startswith("172."):
-                    has_wsl_nat = True
-                net = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
-                prefix, _ = str(net.network_address).rsplit(".", 1)
-                networks.add(prefix)
-        except ValueError:
-            continue
+        _add_net(ip_str, 24)
 
-    if sys.platform.startswith("linux") and (has_wsl_nat or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
+    if isinstance(state, dict):
+        urls = [state.get("server", "")] + list(state.get("server_history") or [])
+        for u in urls:
+            try:
+                u = (u or "").strip().rstrip("!")
+                if not u:
+                    continue
+                host = urlparse(u if "://" in u else "http://" + u).hostname
+                if host:
+                    _add_net(host, 24)
+            except Exception:
+                continue
+
+    if os.name != "nt" and (has_wsl_nat or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
         if not any(n.startswith("192.168.") for n in networks):
             networks.add("192.168.0")
             networks.add("192.168.1")
+
     return sorted(networks)
 
 def normalize_server_url(raw):
@@ -281,7 +320,7 @@ def verify_host_and_hgm(engine, srv_url):
     return True, "OK", f"{host}:{port}", (ping_ms if ping_ok else tcp_ms), api_ms
 
 def scan_lan_servers(engine):
-    subs = get_main_subnets()
+    subs = get_main_subnets(engine.state)
     if not subs:
         engine.log("Активні мережеві адаптери LAN не знайдено!", "err")
         return []
