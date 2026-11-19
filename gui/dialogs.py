@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.037 | 19.11.2026 05:50) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.040 | 19.11.2026 13:00) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -38,7 +38,16 @@ class DialogsMixin:
         dlg.title(tr(title, self.engine.state.get("lang", "en")))
         dlg.configure(bg=p["panel"])
         dlg.transient(self.root)
-        dlg.grab_set()
+        def _safe_grab(tries=0):
+            try:
+                if dlg.winfo_exists():
+                    dlg.update_idletasks()
+                    dlg.deiconify()
+                    dlg.grab_set()
+            except Exception:
+                if tries < 8 and dlg.winfo_exists():
+                    dlg.after(25, lambda: _safe_grab(tries + 1))
+        _safe_grab()
         px = m["wa_x"] + max(0, (m["sw"] - outer_w) // 2)
         py = m["wa_y"] + max(0, (m["sh"] - outer_h) // 2)
         dlg.geometry(f"{dlg_w}x{dlg_h}+{px}+{py}")
