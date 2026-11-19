@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.002 | 18.11.2026 17:14) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.033 | 19.11.2026 05:29) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
@@ -81,6 +81,7 @@ def _start_tray_thread(engine):
     engine.tray_icon = icon
 
     def _anim_loop():
+        err_streak = 0
         while True:
             time.sleep(1.2 if engine.state.get("lite_mode", False) else 0.7)
             try:
@@ -90,11 +91,24 @@ def _start_tray_thread(engine):
                     engine.tray_spin_idx = (engine.tray_spin_idx + 1) % 8
                 engine.tray_icon.icon = _get_tray_img_safe(engine.progress, engine.is_running, engine.pill_type, engine.tray_spin_idx)
                 engine.tray_icon.title = f"HomeGrid Backup ({engine.progress}%): {(engine.stage or 'Готовий')[:45]}"
+                err_streak = 0
+            except AssertionError:
+                engine.tray_icon = None
+                break
             except Exception:
-                pass
+                err_streak += 1
+                if err_streak >= 3:
+                    engine.tray_icon = None
+                    break
+
+    def _run_icon_safe():
+        try:
+            icon.run()
+        except Exception:
+            engine.tray_icon = None
 
     threading.Thread(target=_anim_loop, daemon=True).start()
-    threading.Thread(target=icon.run, daemon=True).start()
+    threading.Thread(target=_run_icon_safe, daemon=True).start()
 
 def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowWindow_v1"):
     if os.name != "nt":

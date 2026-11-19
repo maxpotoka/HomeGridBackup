@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.028 | 19.11.2026 00:06) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.033 | 19.11.2026 05:29) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -198,15 +198,34 @@ def get_main_subnets():
     except Exception:
         pass
 
+    if sys.platform.startswith("linux"):
+        try:
+            with open("/etc/resolv.conf", "r", encoding="utf-8", errors="ignore") as rf:
+                for line in rf:
+                    if line.strip().startswith("nameserver"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            candidate_ips.append(parts[1].strip())
+        except Exception:
+            pass
+
+    has_wsl_nat = False
     for ip_str in candidate_ips:
         try:
             ip_obj = ipaddress.IPv4Address(ip_str)
             if ip_obj.is_private and not ip_obj.is_loopback and not ip_obj.is_link_local:
+                if ip_str.startswith("172."):
+                    has_wsl_nat = True
                 net = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
                 prefix, _ = str(net.network_address).rsplit(".", 1)
                 networks.add(prefix)
         except ValueError:
             continue
+
+    if sys.platform.startswith("linux") and (has_wsl_nat or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
+        if not any(n.startswith("192.168.") for n in networks):
+            networks.add("192.168.0")
+            networks.add("192.168.1")
     return sorted(networks)
 
 def normalize_server_url(raw):
