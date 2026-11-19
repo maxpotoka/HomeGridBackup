@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.018 | 18.11.2026 20:23) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.032 | 19.11.2026 00:44) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -282,6 +282,7 @@ class HomeGridApp(DialogsMixin):
         self.txt_log.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.txt_log.pack(side="left", fill="both", expand=True)
+        self.txt_log.bind("<Configure>", lambda _e: self._center_log_vertically(), add="+")
 
         self.btn_start = tk.Button(self.footer, text="ЗАПУСТИТИ БЕКАП", command=self.do_backup, font=("Segoe UI", fs, "bold"), padx=16, pady=5, cursor="hand2")
         self.btn_start.pack(side="left", padx=(0, 10))
@@ -510,6 +511,31 @@ class HomeGridApp(DialogsMixin):
         bdir = self.var_dir.get().strip() or self.engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR
         open_folder_native(bdir)
 
+    def _center_log_vertically(self):
+        try:
+            if not hasattr(self, "txt_log") or not self.txt_log.winfo_exists():
+                return
+            box_h = self.txt_log.winfo_height()
+            if box_h <= 24:
+                return
+            raw_txt = self.txt_log.get("1.0", "end-1c")
+            if not raw_txt.strip():
+                self.txt_log.tag_remove("vcenter", "1.0", "end")
+                return
+            lines = raw_txt.splitlines()
+            line_cnt = len(lines)
+            fs = self.metrics.get("font_sz", 10)
+            line_h = max(18, int(fs * 1.9))
+            content_h = line_cnt * line_h
+            self.txt_log.tag_remove("vcenter", "1.0", "end")
+            max_compact_h = int(185 * self.metrics.get('k', 1.0))
+            if 0 < line_cnt <= 5 and content_h + 14 < box_h <= max_compact_h:
+                top_pad = max(2, int((box_h - content_h) // 2) - 4)
+                self.txt_log.tag_configure("vcenter", spacing1=top_pad)
+                self.txt_log.tag_add("vcenter", "1.0", "1.end")
+        except Exception:
+            pass
+
     def clear_log_view(self):
         with self.engine.lock:
             self.engine.logs.clear()
@@ -622,7 +648,7 @@ class HomeGridApp(DialogsMixin):
                 b.configure(state=btn_state)
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
-                if len(disc) > 1 and not self.engine.is_running:
+                if len(disc) >= 1 and not self.engine.is_running:
                     self.btn_pick_lan.configure(text=tr(f"Виявлені ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
                     if not self.btn_pick_lan.winfo_ismapped():
                         self.btn_pick_lan.grid(row=0, column=5, sticky="ew", padx=(4, 0), pady=2)
@@ -664,6 +690,7 @@ class HomeGridApp(DialogsMixin):
                     self.txt_log.delete("1.0", f"{line_cnt - 400}.0")
                 self.txt_log.see("end")
                 self.txt_log.configure(state="disabled")
+                self._center_log_vertically()
                 self.last_log_len = len(logs)
                 self._last_log_item = logs[-1]
 

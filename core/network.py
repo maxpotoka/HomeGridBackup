@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.015 | 18.11.2026 19:17) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.028 | 19.11.2026 00:06) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -348,39 +348,45 @@ def run_scan_task(engine):
         return
     engine.is_running = True
     engine.set_pill("Пошук в LAN...", "work")
-    found_single = False
+    found_list = []
     try:
         servers = scan_lan_servers(engine)
         if not servers:
             engine.log("Сервери HomeGrid Monitor у мережі не знайдено.", "err")
             engine.set_pill("Не знайдено", "err")
             engine.set_progress(0, "Сервер не знайдено")
-        elif len(servers) == 1:
-            (ip, t_ms, a_ms), = servers
-            url = f"http://{ip}:18899"
-            engine.state["server"] = url
-            commit_state(engine.state)
-            engine.diag_net = f"{ip}:18899 (ОНЛАЙН)"
-            engine.diag_ping = f"TCP {t_ms} мс | API {a_ms} мс"
-            engine.set_pill(f"ОНЛАЙН | {a_ms} мс", "ok")
-            engine.discovered_servers = [(url, t_ms, a_ms)]
-            engine.log(f"Знайдено сервер: {url} (TCP: {t_ms} мс, API: {a_ms} мс)", "ok")
-            engine.set_progress(100, "Сервер знайдено та збережено")
-            found_single = True
         else:
-            engine.discovered_servers = [(f"http://{ip}:18899", t_ms, a_ms) for ip, t_ms, a_ms in servers]
-            engine.log(f"Знайдено кілька серверів ({len(servers)} шт.):", "warn")
-            for ip, t_ms, a_ms in servers:
-                engine.log(f"  • http://{ip}:18899 (TCP: {t_ms} мс, API: {a_ms} мс)", "info")
-            first_ip, _, _ = next(iter(servers))
-            engine.state["server"] = f"http://{first_ip}:18899"
-            engine.log("Натисніть «📡 Обрати виявлений», щоб вибрати потрібний сервер зі списку.", "ok")
-            engine.set_pill(f"Знайдено: {len(servers)}", "ok")
-            engine.set_progress(100, f"Знайдено {len(servers)} серверів — натисніть «📡 Обрати виявлений»")
+            found_list = [(f"http://{ip}:18899", t_ms, a_ms) for ip, t_ms, a_ms in servers]
+            engine.discovered_servers = found_list
+            first_ip, first_t, first_a = servers[0]
+            first_url = f"http://{first_ip}:18899"
+            engine.state["server"] = first_url
+            engine.diag_net = f"{first_ip}:18899 (ОНЛАЙН)"
+            engine.diag_ping = f"TCP {first_t} мс | API {first_a} мс"
+            if len(servers) == 1:
+                engine.log(f"Знайдено сервер: {first_url} (TCP: {first_t} мс, API: {first_a} мс)", "ok")
+                engine.set_pill(f"ОНЛАЙН | {first_a} мс", "ok")
+                engine.set_progress(100, f"Знайдено сервер: {first_url}")
+            else:
+                engine.log(f"Знайдено кілька серверів ({len(servers)} шт.):", "warn")
+                for ip, t_ms, a_ms in servers:
+                    engine.log(f"  • http://{ip}:18899 (TCP: {t_ms} мс, API: {a_ms} мс)", "info")
+                engine.set_pill(f"Знайдено: {len(servers)}", "ok")
+                engine.set_progress(100, f"Знайдено {len(servers)} серверів у мережі")
     finally:
         with engine.lock:
             engine.is_running = False
             engine.indeterminate = False
-    if found_single and not SILENT_MODE:
-        if engine.ask_modal("confirm", "Сервер знайдено", f"Знайдено та підключено сервер {engine.state['server']}. Виконати резервне копіювання зараз?"):
-            run_backup_task(engine, engine.state["server"], False)
+
+    if found_list and not SILENT_MODE:
+        choice = engine.ask_modal("lan_found", "Виявлені сервери в мережі", "", default_val=found_list)
+        if isinstance(choice, dict):
+            sel_url = choice.get("url", "")
+            act = choice.get("action", "")
+            if sel_url:
+                engine.state["server"] = sel_url
+                if act in ("save", "backup"):
+                    commit_state(engine.state)
+                    engine.log(f"Сервер {sel_url} збережено у «Історія».", "ok")
+                if act == "backup":
+                    run_backup_task(engine, sel_url, False)

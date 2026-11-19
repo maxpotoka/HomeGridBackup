@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.026 | 18.11.2026 23:20) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.029 | 19.11.2026 00:06) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -98,7 +98,9 @@ class DialogsMixin:
 
     def _show_engine_modal(self, m):
         fs = self.metrics["font_sz"]
-        dlg, p, _ = self._make_dialog(m["title"], 590, 235)
+        lang = self.engine.state.get("lang", "en")
+        is_lan_dlg = (m["type"] == "lan_found")
+        dlg, p, _ = self._make_dialog(m["title"], 660 if is_lan_dlg else 590, 340 if is_lan_dlg else 235)
         def _done(val):
             try:
                 dlg.destroy()
@@ -107,6 +109,29 @@ class DialogsMixin:
             self.engine.submit_modal(val)
 
         dlg.protocol("WM_DELETE_WINDOW", lambda: _done("" if m["type"] == "pin" else False))
+
+        if is_lan_dlg:
+            items = m.get("default") or []
+            hdr_t = "Оберіть дію для виявленого сервера в локальній мережі:" if lang == "uk" else "Choose an action for the discovered LAN server:"
+            tk.Label(dlg, text=hdr_t, bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=16, pady=(14, 8))
+            box = tk.Frame(dlg, bg=p["panel"])
+            box.pack(fill="both", expand=True, padx=16, pady=(0, 6))
+            for url, t_ms, a_ms in items:
+                row = tk.Frame(box, bg=p["card"], bd=1, relief="solid", padx=10, pady=8)
+                row.pack(fill="x", pady=4)
+                info_f = tk.Frame(row, bg=p["card"])
+                info_f.pack(side="left", fill="x", expand=True)
+                tk.Label(info_f, text=url, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs + 1, "bold")).pack(anchor="w")
+                tk.Label(info_f, text=f"TCP: {t_ms} ms  •  API: {a_ms} ms", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
+                btn_bkp_t = "🔌 Підключити та бекап" if lang == "uk" else "🔌 Connect & Backup"
+                btn_sav_t = "⭐ В Історію" if lang == "uk" else "⭐ Save to History"
+                tk.Button(row, text=btn_bkp_t, command=lambda u=url: _done({"action": "backup", "url": u}), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=10, pady=4, cursor="hand2").pack(side="right", padx=(6, 0))
+                tk.Button(row, text=btn_sav_t, command=lambda u=url: _done({"action": "save", "url": u}), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=10, pady=4, cursor="hand2").pack(side="right", padx=6)
+            bf = tk.Frame(dlg, bg=p["panel"])
+            bf.pack(side="bottom", fill="x", padx=16, pady=12)
+            tk.Button(bf, text="Закрити" if lang == "uk" else "Close", command=lambda: _done(False), bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="right")
+            self._fit_dialog(dlg)
+            return
         is_list = ("• " in m["text"])
         if is_list:
             lines = [ln.strip() for ln in m["text"].splitlines() if ln.strip()]
