@@ -11,6 +11,9 @@ on:
       - 'gui/**'
       - '.github/workflows/build_windows7.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-win7-folder:
     runs-on: windows-latest
@@ -51,8 +54,8 @@ jobs:
             --enable-plugin=tk-inter ^
             --company-name="HomeGrid" ^
             --product-name="HomeGrid Backup" ^
-            --file-version="1.0.23.0" ^
-            --product-version="1.0.23.0" ^
+            --file-version="1.0.55.0" ^
+            --product-version="1.0.55.0" ^
             --file-description="HomeGrid Backup Utility (Windows 7 x86)" ^
             %ICON_FLAG% ^
             --include-package=core ^
@@ -84,8 +87,13 @@ jobs:
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
 
-      - name: Upload Windows 7 Folder Artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish clean .7z to GitHub Releases (no double zip)
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup-Windows7-x86-Folder
-          path: dist_win7/HomeGridBackup_Win7_x86.7z
+          tag_name: windows7-x86-latest
+          name: HomeGrid Backup — Windows 7 / 10 / 11 (x86 Folder)
+          body: |
+            Чистий архів **HomeGridBackup_Win7_x86.7z** без подвійного пакування у `.zip`.
+            Розпакуйте у зручну папку та запустіть **HomeGridBackup.exe**.
+          files: dist_win7/HomeGridBackup_Win7_x86.7z
+          make_latest: true
