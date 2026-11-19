@@ -46,8 +46,6 @@ jobs:
             --noinclude-pytest-mode=nofollow ^
             --noinclude-setuptools-mode=nofollow ^
             --noinclude-unittest-mode=nofollow ^
-            --noinclude-custom-mode=mobile:nofollow ^
-            --noinclude-custom-mode=kivy:nofollow ^
             --assume-yes-for-downloads ^
             --windows-console-mode=attach ^
             --enable-plugin=tk-inter ^
