@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.055 | 19.11.2026 14:54) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.063 | 19.11.2026 16:04) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -461,11 +461,13 @@ class DialogsMixin:
             if chosen_theme != st.get("theme") and st.get("lite_mode", False):
                 st["lite_mode"] = False
             st["theme"] = chosen_theme
-            st["ui_scale"] = scale_map.get(cb_scale.get(), "auto")
+            old_sc = st.get("ui_scale", "auto")
+            new_sc = scale_map.get(cb_scale.get(), "auto")
+            st["ui_scale"] = new_sc
             st["ui_font"] = font_map.get(cb_font.get(), 0)
             st["progress_style"] = style_map.get(cb_style.get(), "v8")
             commit_state(st)
-            self.apply_theme_and_mode(resize_win=True)
+            self.apply_theme_and_mode(resize_win=(new_sc != old_sc))
             self.engine.log("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "ok")
             dlg.destroy()
             if not close_after:

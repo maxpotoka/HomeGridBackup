@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.059 | 19.11.2026 15:35) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.063 | 19.11.2026 16:04) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -95,8 +95,15 @@ class HomeGridApp(DialogsMixin):
         self._resize_timer = self.root.after(90, lambda: self._on_live_resize_done(w, h))
 
     def _on_live_resize_done(self, ow, oh):
+        dirty_sz = False
         if self.engine.state.get("ui_font", 0) != 0:
             self.engine.state["ui_font"] = 0
+            dirty_sz = True
+        if self.engine.state.get("ui_scale", "auto") != "auto":
+            self.engine.state["ui_scale"] = "auto"
+            dirty_sz = True
+        if dirty_sz:
+            commit_state(self.engine.state)
         self.apply_theme_and_mode(resize_win=False, live_outer_wh=(ow, oh))
 
     def show_window(self):
@@ -440,7 +447,7 @@ class HomeGridApp(DialogsMixin):
         self._update_mirror_btn()
         try:
             self.root.update_idletasks()
-            self.root.minsize(min(m["win_w"], max(680, self.root.winfo_reqwidth())), min(m["win_h"], max(460, self.root.winfo_reqheight())))
+            self.root.minsize(min(m["win_w"], max(620, self.root.winfo_reqwidth())), min(m["win_h"], max(460, self.root.winfo_reqheight())))
         except Exception:
             pass
         lang = self.engine.state.get("lang", "en")

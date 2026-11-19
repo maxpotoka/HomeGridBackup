@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.046 | 19.11.2026 14:32) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.062 | 19.11.2026 16:01) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import ctypes
 from ctypes import wintypes
@@ -173,7 +173,12 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
         frame_w = max(8, (cx_f + pad_b) * 2)
         frame_h = max(28, cy_cap + (cy_f + pad_b) * 2)
     except Exception:
-        pass
+        try:
+            px_in = float(root.winfo_fpixels("1i"))
+            if 72.0 <= px_in <= 384.0:
+                dpi = int(round(px_in))
+        except Exception:
+            dpi = 96
 
     dpi_mult = max(1.0, dpi / 96.0)
     try:
@@ -204,11 +209,14 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
     win_w = max(620, outer_w - frame_w)
     win_h = max(440, outer_h - frame_h)
     ow_l = outer_w / dpi_mult
-    max_fs_by_w = 10 if ow_l < 920 else (11 if ow_l < 1150 else max(12, min(16, int(ow_l / 65))))
-    font_sz = min(raw_fs, max_fs_by_w)
-    k = max(k_prof, round(font_sz / 10.5, 2))
-    pad_x, pad_y = max(6, int(round(11 * k * dpi_mult))), max(3, int(round(6 * k * dpi_mult)))
-    btn_px, btn_py = max(6, int(round(10 * k * dpi_mult))), max(2, int(round(4 * k * dpi_mult)))
+    oh_l = outer_h / dpi_mult
+    max_fs_by_w = 8 if ow_l < 860 else (9 if ow_l < 1060 else (10 if ow_l < 1260 else max(11, min(15, int(ow_l / 80)))))
+    max_fs_by_h = 8 if oh_l < 620 else (9 if oh_l < 720 else max(10, min(15, int(oh_l / 52))))
+    safe_cap = max(8, min(max_fs_by_w, max_fs_by_h))
+    font_sz = max(8, min(raw_fs, safe_cap))
+    k = round(max(0.76, min(1.45, font_sz / 10.5)), 2)
+    pad_x, pad_y = max(5, int(round(9 * k))), max(2, int(round(4 * k)))
+    btn_px, btn_py = max(5, int(round(8 * k))), max(1, int(round(3 * k)))
     pos_x = wa_x + max(0, (sw - outer_w) // 2)
     pos_y = wa_y + max(0, (sh - outer_h) // 2)
     return {
