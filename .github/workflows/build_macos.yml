@@ -11,6 +11,9 @@ on:
       - 'gui/**'
       - '.github/workflows/build_macos.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-mac-intel:
     runs-on: macos-15-intel
@@ -69,16 +72,24 @@ jobs:
             --output-filename=HomeGridBackup \
             main.py
 
-      - name: Package HomeGridBackup.app into .7z archive
+      - name: Sign and package HomeGridBackup.app into single .7z archive
         run: |
           mkdir -p dist_mac/pack
           APP_BUNDLE=$(find dist_mac -maxdepth 1 -name "*.app" | head -n 1)
           mv "$APP_BUNDLE" dist_mac/pack/HomeGridBackup.app
+          chmod -R u+rwX,go+rX dist_mac/pack/HomeGridBackup.app
+          chmod +x dist_mac/pack/HomeGridBackup.app/Contents/MacOS/HomeGridBackup
+          codesign --force --deep --sign - dist_mac/pack/HomeGridBackup.app
           cd dist_mac/pack
           7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app
 
-      - name: Upload macOS Intel 7z Artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish clean .7z to GitHub Releases (no double zip)
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup-macOS-Intel-7z
-          path: dist_mac/HomeGridBackup_macOS_Intel.7z
+          tag_name: macos-intel-latest
+          name: HomeGrid Backup — macOS Intel (x86_64)
+          body: |
+            Чистий архів **HomeGridBackup_macOS_Intel.7z** без подвійного пакування.
+            Працює без прав `root` (`sudo`). Після розпакування натисніть правою кнопкою по **HomeGridBackup.app** → **Відкрити** (або виконайте в Терміналі: `xattr -cr ~/Downloads/HomeGridBackup.app && open ~/Downloads/HomeGridBackup.app`).
+          files: dist_mac/HomeGridBackup_macOS_Intel.7z
+          make_latest: false
