@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.006 | 18.11.2026 17:36) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.046 | 19.11.2026 14:32) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import ctypes
 from ctypes import wintypes
@@ -221,39 +221,85 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
 
 class ToolTip:
     def __init__(self, widget, text):
+        if getattr(widget, "_has_tooltip", False):
+            return
+        widget._has_tooltip = True
         self.widget = widget
         self.text = text
         self.tipwin = None
-        widget.bind("<Enter>", self.show, add="+")
-        widget.bind("<Leave>", self.hide, add="+")
+        self._after_id = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._on_leave, add="+")
         widget.bind("<ButtonPress>", self.hide, add="+")
 
+    def _schedule(self, _event=None):
+        if self.tipwin or self._after_id or not self.text:
+            return
+        self._after_id = self.widget.after(240, self.show)
+
+    def _on_leave(self, _event=None):
+        try:
+            px, py = self.widget.winfo_pointerxy()
+            wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
+            ww, wh = self.widget.winfo_width(), self.widget.winfo_height()
+            if wx <= px <= wx + ww and wy <= py <= wy + wh:
+                return
+        except Exception:
+            pass
+        self.hide()
+
     def show(self, _event=None):
+        self._after_id = None
         if self.tipwin or not self.text:
             return
+        try:
+            px, py = self.widget.winfo_pointerxy()
+            wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
+            ww, wh = self.widget.winfo_width(), self.widget.winfo_height()
+            if not (wx - 2 <= px <= wx + ww + 2 and wy - 2 <= py <= wy + wh + 2):
+                return
+        except Exception:
+            wx, wy, ww, wh = self.widget.winfo_rootx(), self.widget.winfo_rooty(), self.widget.winfo_width(), self.widget.winfo_height()
+
         top = self.widget.winfo_toplevel()
         cur_fs = getattr(top, "_cur_font_sz", 10)
         tip_fs = max(9, cur_fs - 1)
-        x = self.widget.winfo_rootx() + 10
-        y = self.widget.winfo_rooty() - max(34, tip_fs * 3)
-        if y < 10:
-            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        from core.i18n import tr
+        tip_txt = tr(self.text, getattr(top, "_cur_lang", "en"))
+
         self.tipwin = tw = tk.Toplevel(self.widget)
+        tw.withdraw()
         tw.wm_overrideredirect(True)
+        lbl = tk.Label(
+            tw, text=tip_txt, justify="left",
+            background="#060911", foreground="#f1f5f9",
+            relief="solid", borderwidth=1, padx=max(10, tip_fs), pady=max(5, tip_fs // 2),
+            font=("Segoe UI", tip_fs), wraplength=max(360, tip_fs * 34)
+        )
+        lbl.pack()
+        tw.update_idletasks()
+        tw_w, tw_h = tw.winfo_reqwidth(), tw.winfo_reqheight()
+        sw, sh = top.winfo_screenwidth() or 1280, top.winfo_screenheight() or 720
+        x = max(8, min(wx + 8, sw - tw_w - 8))
+        y = wy - tw_h - 8
+        if y < 8:
+            y = min(sh - tw_h - 8, wy + wh + 8)
         tw.wm_geometry(f"+{x}+{y}")
         try:
+            tw.transient(top)
+            tw.lift()
             tw.attributes("-topmost", True)
         except Exception:
             pass
-        lbl = tk.Label(
-            tw, text=self.text, justify="left",
-            background="#060911", foreground="#f1f5f9",
-            relief="solid", borderwidth=1, padx=max(10, tip_fs), pady=max(5, tip_fs // 2),
-            font=("Segoe UI", tip_fs), wraplength=max(380, tip_fs * 36)
-        )
-        lbl.pack()
+        tw.deiconify()
 
     def hide(self, _event=None):
+        if self._after_id:
+            try:
+                self.widget.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
         if self.tipwin:
             try:
                 self.tipwin.destroy()

@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.038 | 19.11.2026 06:01) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.046 | 19.11.2026 14:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -293,6 +293,26 @@ class HomeGridApp(DialogsMixin):
         self.btn_about.pack(side="left", padx=8)
         self.btn_exit = tk.Button(self.footer, text="Вихід", command=self.confirm_exit, padx=14, pady=5, cursor="hand2")
         self.btn_exit.pack(side="right", padx=(8, 0))
+        for w_tip, t_tip in (
+            (self.ent_srv, "IP-адреса або URL сервера HomeGrid Monitor (додайте ! в кінці, щоб пропустити перевірку)"),
+            (self.btn_hist, "Відкрити список раніше збережених адрес серверів"),
+            (self.btn_conn, "Перевірити зв'язок із вказаним сервером та авторизуватися"),
+            (self.btn_scan, "Автоматичний пошук серверів HomeGrid Monitor у локальній мережі"),
+            (self.ent_dir, "Локальна папка для збереження ZIP-архівів та файлів .sha256"),
+            (self.btn_dir, "Обрати іншу папку для збереження резервних копій"),
+            (self.btn_open_dir, "Відкрити папку з архівами у файловому менеджері"),
+            (self.ent_mir, "Додаткова папка для автоматичного дублювання кожного нового бекапу"),
+            (self.btn_mir, "Обрати папку для дзеркального копіювання архівів"),
+            (self.chk_mir_tog, "Увімкнути або вимкнути автоматичне копіювання у дзеркальну папку"),
+            (self.btn_stats, "Зведена статистика копій за періодами та стан захисту SHA-256"),
+            (self.btn_ops_hist, "Журнал останніх 25 операцій резервного копіювання"),
+            (self.btn_clear_log, "Очистити поточні повідомлення у вікні системного логу"),
+            (self.btn_start, "Запустити створення та перевірку нової резервної копії зараз"),
+            (self.btn_strat, "Налаштування глибини GFS, розкладу, трею, мови та теми"),
+            (self.btn_about, "Інформація про версію та можливості програми"),
+            (self.btn_exit, "Завершити роботу програми та вийти"),
+        ):
+            ToolTip(w_tip, t_tip)
 
     def apply_theme_and_mode(self, resize_win=False, live_outer_wh=None):
         self.metrics = _calc_screen_metrics(
@@ -410,6 +430,7 @@ class HomeGridApp(DialogsMixin):
         except Exception:
             pass
         lang = self.engine.state.get("lang", "en")
+        self.root._cur_lang = lang
         self.root.title(tr(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})", lang))
         apply_widget_i18n(self.root, lang)
 
@@ -646,7 +667,8 @@ class HomeGridApp(DialogsMixin):
 
             btn_state = "disabled" if self.engine.is_running else "normal"
             for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_start, self.btn_strat):
-                b.configure(state=btn_state)
+                if str(b.cget("state")) != btn_state:
+                    b.configure(state=btn_state)
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
                 if len(disc) >= 1 and not self.engine.is_running:

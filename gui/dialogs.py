@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.040 | 19.11.2026 13:00) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.055 | 19.11.2026 14:54) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -16,6 +16,25 @@ from gui.widgets import StyledProgressBar
 from gui.tray import _force_quit_app
 
 class DialogsMixin:
+    def _calc_parent_center(self, parent_win, w_box, h_box):
+        m = self.metrics
+        try:
+            parent_win.update_idletasks()
+            pw, ph = parent_win.winfo_width(), parent_win.winfo_height()
+            if pw > 120 and ph > 120:
+                cx = parent_win.winfo_rootx() + (pw - w_box) // 2
+                cy = parent_win.winfo_rooty() + (ph - h_box) // 2
+                vw = max(m["sw"], parent_win.winfo_vrootwidth() or parent_win.winfo_screenwidth() or m["sw"])
+                vh = max(m["sh"], parent_win.winfo_vrootheight() or parent_win.winfo_screenheight() or m["sh"])
+                vx = parent_win.winfo_vrootx() if hasattr(parent_win, "winfo_vrootx") else 0
+                vy = parent_win.winfo_vrooty() if hasattr(parent_win, "winfo_vrooty") else 0
+                x = max(vx + 6, min(cx, vx + vw - w_box - 6))
+                y = max(vy + 6, min(cy, vy + vh - h_box - 30))
+                return x, y
+        except Exception:
+            pass
+        return m["wa_x"] + max(0, (m["sw"] - w_box) // 2), m["wa_y"] + max(0, (m["sh"] - h_box) // 2)
+
     def _make_dialog(self, title, w=640, h=420, scrollable=False, min_outer_w=0, min_outer_h=0):
         p = self._get_palette()
         m = self.metrics
@@ -37,7 +56,8 @@ class DialogsMixin:
         dlg.bind('<Destroy>', lambda e: setattr(self, '_ignore_resize_until', time.time() + 0.7) if e.widget is dlg else None)
         dlg.title(tr(title, self.engine.state.get("lang", "en")))
         dlg.configure(bg=p["panel"])
-        dlg.transient(self.root)
+        parent_win = self.root.grab_current() or self.root
+        dlg.transient(parent_win)
         def _safe_grab(tries=0):
             try:
                 if dlg.winfo_exists():
@@ -48,10 +68,26 @@ class DialogsMixin:
                 if tries < 8 and dlg.winfo_exists():
                     dlg.after(25, lambda: _safe_grab(tries + 1))
         _safe_grab()
-        px = m["wa_x"] + max(0, (m["sw"] - outer_w) // 2)
-        py = m["wa_y"] + max(0, (m["sh"] - outer_h) // 2)
+        px, py = self._calc_parent_center(parent_win, dlg_w, dlg_h)
         dlg.geometry(f"{dlg_w}x{dlg_h}+{px}+{py}")
+        def _recenter_later():
+            try:
+                if dlg.winfo_exists():
+                    dlg.update_idletasks()
+                    rx, ry = self._calc_parent_center(parent_win, dlg.winfo_width(), dlg.winfo_height())
+                    dlg.geometry(f"+{rx}+{ry}")
+            except Exception:
+                pass
+        dlg.after(35, _recenter_later)
         dlg.maxsize(min(m["sw"], int(round(max(w, 760) * k * 1.15))), min(m["sh"], int(round(max(h, 520) * k * 1.15))))
+        try:
+            dlg.lift(parent_win)
+            dlg.attributes("-topmost", True)
+            dlg.update_idletasks()
+            dlg.attributes("-topmost", False)
+            dlg.focus_force()
+        except Exception:
+            pass
 
         if not scrollable:
             return dlg, p, dlg
@@ -88,10 +124,12 @@ class DialogsMixin:
             mx_w, mx_h = dlg.maxsize()
             dlg.maxsize(max(new_w, mx_w), max(new_h, mx_h))
             if (new_w, new_h) != (cur_w, cur_h):
-                x = m["wa_x"] + max(0, (m["sw"] - new_w) // 2)
-                y = m["wa_y"] + max(0, (m["sh"] - new_h) // 2)
+                p_ref = dlg.master if getattr(dlg, "master", None) else self.root
+                x, y = self._calc_parent_center(p_ref, new_w, new_h)
                 dlg.geometry(f"{new_w}x{new_h}+{x}+{y}")
             dlg.minsize(min(new_w, need_w), min(new_h, need_h))
+            dlg.lift()
+            dlg.focus_force()
         except Exception:
             pass
 
@@ -220,7 +258,7 @@ class DialogsMixin:
         _sync_scheduler_from_windows(self.engine.state)
         st = self.engine.state
         fs = self.metrics["font_sz"]
-        dlg, p, host = self._make_dialog("Налаштування програми, тем, масштабу, GFS та Планувальника", 820, 520, scrollable=False, min_outer_w=760, min_outer_h=480)
+        dlg, p, host = self._make_dialog("Налаштування програми, тем, масштабу, GFS та Планувальника", 940, 620, scrollable=False, min_outer_w=880, min_outer_h=580)
 
         v_daily = tk.IntVar(value=st.get("daily_days", 7))
         v_today = tk.IntVar(value=st.get("today_max", 2))
@@ -344,17 +382,15 @@ class DialogsMixin:
         btn_adv = tk.Button(sr3, text="Додатково ▾", command=_open_adv_sched, bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2")
         btn_adv.pack(side="right")
 
-        bot_grid = tk.Frame(tab_ui, bg=p["panel"])
-        bot_grid.pack(fill="x", padx=12, pady=(2, 4))
-        bot_grid.columnconfigure(0, weight=1)
-        bot_grid.columnconfigure(1, weight=1)
+        bot_col = tk.Frame(tab_ui, bg=p["panel"])
+        bot_col.pack(fill="both", expand=True, padx=14, pady=(6, 4))
 
-        f_thm = tk.LabelFrame(bot_grid, text=" 4. Вигляд (Мова, Тема, Екран, Шрифт) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=8)
-        f_thm.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=4)
+        f_thm = tk.LabelFrame(bot_col, text=" 4. Оформлення, мова та масштаб екрана ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=14, pady=8)
+        f_thm.pack(fill="x", pady=(0, 8))
 
         t_r0 = tk.Frame(f_thm, bg=p["card"])
-        t_r0.pack(fill="x", pady=3)
-        tk.Label(t_r0, text="Мова:", width=7, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        t_r0.pack(fill="x", pady=4)
+        tk.Label(t_r0, text="Мова інтерфейсу:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
         lang_map = {"English (Default)": "en", "Українська": "uk"}
         rev_lang = {"en": "English (Default)", "uk": "Українська"}
         cb_lang = ttk.Combobox(t_r0, values=list(lang_map.keys()), state="readonly", font=("Segoe UI", fs))
@@ -362,40 +398,43 @@ class DialogsMixin:
         cb_lang.pack(side="left", fill="x", expand=True)
 
         t_r1 = tk.Frame(f_thm, bg=p["card"])
-        t_r1.pack(fill="x", pady=3)
-        tk.Label(t_r1, text="Тема:", width=7, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        t_r1.pack(fill="x", pady=4)
+        tk.Label(t_r1, text="Тема оформлення:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
         theme_map = {lbl: code for code, lbl in THEME_LABELS}
         rev_theme = {code: lbl for code, lbl in THEME_LABELS}
         cb_theme = ttk.Combobox(t_r1, values=[lbl for _, lbl in THEME_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_theme.set(rev_theme.get(v_theme.get(), THEME_LABELS[0][1]))
+        cb_theme.set(rev_theme.get(v_theme.get(), THEME_LABELS))
         cb_theme.pack(side="left", fill="x", expand=True)
 
         t_r2 = tk.Frame(f_thm, bg=p["card"])
-        t_r2.pack(fill="x", pady=3)
-        tk.Label(t_r2, text="Екран:", width=7, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        t_r2.pack(fill="x", pady=4)
+        tk.Label(t_r2, text="Роздільна здатність:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
         scale_map = {lbl: code for code, lbl in UI_SCALE_LABELS}
         rev_scale = {code: lbl for code, lbl in UI_SCALE_LABELS}
         cb_scale = ttk.Combobox(t_r2, values=[lbl for _, lbl in UI_SCALE_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_scale.set(rev_scale.get(v_scale.get(), UI_SCALE_LABELS[0][1]))
+        cb_scale.set(rev_scale.get(v_scale.get(), UI_SCALE_LABELS))
         cb_scale.pack(side="left", fill="x", expand=True)
 
         t_r3 = tk.Frame(f_thm, bg=p["card"])
-        t_r3.pack(fill="x", pady=3)
-        tk.Label(t_r3, text="Шрифт:", width=7, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        t_r3.pack(fill="x", pady=4)
+        tk.Label(t_r3, text="Розмір шрифту:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
         font_map = {lbl: code for code, lbl in UI_FONT_LABELS}
         rev_font = {code: lbl for code, lbl in UI_FONT_LABELS}
         cb_font = ttk.Combobox(t_r3, values=[lbl for _, lbl in UI_FONT_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_font.set(rev_font.get(v_font.get(), UI_FONT_LABELS[0][1]))
+        cb_font.set(rev_font.get(v_font.get(), UI_FONT_LABELS))
         cb_font.pack(side="left", fill="x", expand=True)
 
-        f_sty = tk.LabelFrame(bot_grid, text=" 5. Стиль індикатора прогресу (12 стилів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=8)
-        f_sty.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=4)
+        f_sty = tk.LabelFrame(bot_col, text=" 5. Стиль індикатора прогресу (14 стилів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=14, pady=8)
+        f_sty.pack(fill="x", pady=(0, 4))
+        s_r0 = tk.Frame(f_sty, bg=p["card"])
+        s_r0.pack(fill="x", pady=(2, 8))
+        tk.Label(s_r0, text="Стиль смуги:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
         style_map = {lbl: code for code, lbl in PBAR_STYLE_LABELS}
         rev_map = {code: lbl for code, lbl in PBAR_STYLE_LABELS}
-        cb_style = ttk.Combobox(f_sty, values=[lbl for _, lbl in PBAR_STYLE_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_style.set(rev_map.get(v_pstyle.get(), PBAR_STYLE_LABELS[0][1]))
-        cb_style.pack(fill="x", pady=(2, 10))
-        prev_bar = StyledProgressBar(f_sty, height=max(22, fs + 10))
+        cb_style = ttk.Combobox(s_r0, values=[lbl for _, lbl in PBAR_STYLE_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_style.set(rev_map.get(v_pstyle.get(), PBAR_STYLE_LABELS))
+        cb_style.pack(side="left", fill="x", expand=True)
+        prev_bar = StyledProgressBar(f_sty, height=max(24, fs + 12))
         prev_bar.pack(fill="x")
 
         def _upd_prev(_e=None):
@@ -436,7 +475,12 @@ class DialogsMixin:
         tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=6, cursor="hand2").pack(side="right", padx=(6, 6), pady=6)
         tk.Button(bf, text="Зберегти та закрити", command=lambda: _commit_settings(True), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
         tk.Button(bf, text="Застосувати", command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
-        dlg.after(20, lambda: apply_widget_i18n(dlg, st.get("lang", "en")))
+        def _i18n_settings():
+            lng = st.get("lang", "en")
+            nb.tab(0, text=tr("  Резервне копіювання та Розклад  ", lng))
+            nb.tab(1, text=tr("  Вигляд та Інтерфейс  ", lng))
+            apply_widget_i18n(dlg, lng)
+        dlg.after(20, _i18n_settings)
 
     def open_analyze(self):
         import threading
@@ -493,9 +537,9 @@ class DialogsMixin:
             bdir = self.engine.state.get("backup_dir", "")
             bad_names = [fn for fn, st_i in verify_state["status_map"].items() if st_i.get("status") == "err" and os.path.exists(os.path.join(bdir, fn))]
             if bad_names:
-                btn_del_bad.configure(text=f"🗑 Видалити пошкоджені ({len(bad_names)})", state="normal", bg=p["red"], fg="#ffffff")
+                btn_del_bad.configure(text=tr(f"🗑 Видалити пошкоджені ({len(bad_names)})", self.engine.state.get("lang", "en")), state="normal", bg=p["red"], fg="#ffffff")
             else:
-                btn_del_bad.configure(text="🗑 Пошкоджених: 0", state="disabled", bg=p["card"], fg=p["muted"])
+                btn_del_bad.configure(text=tr("🗑 Пошкоджених: 0", self.engine.state.get("lang", "en")), state="disabled", bg=p["card"], fg=p["muted"])
 
         def _verify_progress(pct, stage):
             verify_state["pct"] = pct
@@ -574,13 +618,13 @@ class DialogsMixin:
                 else:
                     st_c = p["cyan"] if is_pin else (p["green"] if is_keep else p["red"])
                     st_t = "ЗАХИЩЕНО" if is_pin else ("ЗБЕРЕГТИ" if is_keep else "ВИДАЛИТИ")
-                tk.Label(row, text=st_t, width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).pack(side="left")
+                tk.Label(row, text=tr(st_t, self.engine.state.get("lang", "en")), width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).pack(side="left")
                 sz_m = round(it["size"] / 1048576.0, 1)
                 det_s = f" — {v_info.get('detail', '')}" if is_bad else ""
                 tk.Label(row, text=f"{it['name']}  ({sz_m} МБ){det_s}", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).pack(side="left", padx=6)
                 if is_bad:
-                    tk.Button(row, text="🗑 Видалити", command=lambda n=it["name"]: (_delete_archive_pair(n), _refresh()), bg=p["red"], fg="#ffffff", font=(fam, max(8, fs - 1), "bold"), padx=8, pady=1, cursor="hand2").pack(side="right", padx=(4, 0))
-                tk.Button(row, text="Зняти PIN" if is_pin else "PIN", command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["panel"], fg=p["cyan"], font=(fam, max(8, fs - 1)), padx=8, pady=1, cursor="hand2").pack(side="right")
+                    tk.Button(row, text=tr("🗑 Видалити", self.engine.state.get("lang", "en")), command=lambda n=it["name"]: (_delete_archive_pair(n), _refresh()), bg=p["red"], fg="#ffffff", font=(fam, max(8, fs - 1), "bold"), padx=8, pady=1, cursor="hand2").pack(side="right", padx=(4, 0))
+                tk.Button(row, text=tr("🔒 Захист" if is_pin else "Немає захисту", self.engine.state.get("lang", "en")), width=14, command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["cyan"] if is_pin else p["panel"], fg="#000000" if is_pin else p["muted"], font=(fam, max(8, fs - 1), "bold" if is_pin else "normal"), padx=8, pady=1, cursor="hand2").pack(side="right")
 
         def _clean():
             apply_gfs_cleanup(self.engine, skip_prompt=True)

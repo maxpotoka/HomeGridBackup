@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.025 | 18.11.2026 23:20) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.047 | 19.11.2026 14:36) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -275,16 +275,31 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
 
         if st.get("ok") is False:
             err_code = st.get("error") or "невідома помилка сервера"
-            if err_code == "backup_job_not_found" and job_retries < 1:
+            if err_code == "backup_job_not_found" and job_retries < 4:
                 job_retries += 1
-                engine.log("Сервер скинув завдання. Повторний запуск збірки...", "warn")
-                _, _, pr_body2, _, pr_err2, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=15.0)
+                wait_sec = 4 * job_retries
+                engine.log(f"Сервер скинув завдання ({srv_label}). Повтор {job_retries}/4 через {wait_sec} с...", "warn")
+                for left_s in range(wait_sec, 0, -1):
+                    engine.set_progress(22, f"[{srv_label}] Перезапуск збірки ({job_retries}/4) через {left_s} с...")
+                    time.sleep(1.0)
+                _, _, pr_body2, _, pr_err2, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=20.0)
+                if pr_body2 and "editor_pin_required" in pr_body2:
+                    pin_ed = engine.state.get("editor_pin") or engine.state.get("login_pin") or ""
+                    if pin_ed:
+                        _, _, _, u_ses2, _, _ = invoke_http(
+                            f"{srv}/api/auth/editor/unlock", engine.state, "POST", json.dumps({"pin": pin_ed}), srv, f"{srv}/service.html", 10.0
+                        )
+                        if u_ses2:
+                            engine.state["session_token"] = u_ses2
+                        _, _, pr_body2, _, pr_err2, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=20.0)
                 if not pr_body2 or not pr_body2.strip():
                     raise RuntimeError(f"Помилка повторної підготовки: {pr_err2}")
                 try:
                     job_id = json.loads(pr_body2).get("job_id")
                 except Exception:
                     raise RuntimeError("Сервер повернув некоректну відповідь під час повторного запуску.")
+                if not job_id:
+                    raise RuntimeError(f"Сервер не створив нове завдання експорту: {pr_body2[:140]}")
                 last_phase = ""
                 continue
             raise RuntimeError(f"Сервер {srv_label} перервав збірку архіву: {err_code}")
