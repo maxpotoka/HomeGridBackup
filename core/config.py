@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.059 | 19.11.2026 15:35) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.061 | 19.11.2026 15:42) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,8 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.059"
-BUILD_DATE = "19.11.2026 15:35"
+SCRIPT_VER = "1.061"
+BUILD_DATE = "19.11.2026 15:42"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -38,6 +38,9 @@ GUI_MODE = any(a in ("--gui", "/gui") for a in ARGS_LOW)
 HIDDEN_MODE = any(a in ("--hidden", "--background", "/hidden", "/h") for a in ARGS_LOW)
 SILENT_MODE = HIDDEN_MODE or any(a in ("--silent", "-s", "/silent", "/s") for a in ARGS_LOW)
 CLI_MODE = any(a in ("--cli", "--console", "-c", "/console") for a in ARGS_LOW)
+if sys.platform.startswith("linux") and not IS_ANDROID and not GUI_MODE and not HIDDEN_MODE:
+    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        CLI_MODE = True
 NO_CLEAN = any(a in ("--no-clean", "/noclean") for a in ARGS_LOW)
 
 SECRET_KEYS = ("client_token", "session_token", "login_pin", "editor_pin")
@@ -51,6 +54,48 @@ VALID_PBAR_STYLES = (
 )
 VALID_THEMES = ("crt", "norton", "mac_classic", "win95", "winxp", "mac_aqua", "win7", "mac_light", "mac_dark", "dark", "light")
 VALID_SCALES = ("auto", "800x600", "1024x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440")
+
+def _get_ram_summary():
+    try:
+        if os.name == "nt":
+            import ctypes
+            class _MEMSTAT(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+            ms = _MEMSTAT()
+            ms.dwLength = ctypes.sizeof(_MEMSTAT)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):
+                return f" | RAM: {round(ms.ullAvailPhys / 1073741824.0, 1)}/{round(ms.ullTotalPhys / 1073741824.0, 1)} GB free"
+        elif sys.platform == "darwin":
+            import subprocess
+            tot_b = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=0.4).decode().strip())
+            vm_out = subprocess.check_output(["vm_stat"], timeout=0.4).decode("utf-8", errors="ignore")
+            m_pg = re.search(r"page size of (\d+) bytes", vm_out)
+            pg_sz = int(m_pg.group(1)) if m_pg else 4096
+            free_pg = 0
+            for key in ("Pages free", "Pages inactive", "Pages speculative"):
+                mk = re.search(rf"{key}:\s+(\d+)", vm_out)
+                if mk:
+                    free_pg += int(mk.group(1))
+            return f" | RAM: {round((free_pg * pg_sz) / 1073741824.0, 1)}/{round(tot_b / 1073741824.0, 1)} GB free"
+        elif os.path.exists("/proc/meminfo"):
+            tot_kb, avail_kb = 0, 0
+            with open("/proc/meminfo", "r", encoding="utf-8") as f_m:
+                for ln in f_m:
+                    if ln.startswith("MemTotal:"):
+                        tot_kb = int(ln.split()[1])
+                    elif ln.startswith("MemAvailable:"):
+                        avail_kb = int(ln.split()[1])
+            if tot_kb > 0:
+                return f" | RAM: {round(avail_kb / 1048576.0, 1)}/{round(tot_kb / 1048576.0, 1)} GB free"
+    except Exception:
+        pass
+    return ""
 
 def get_fast_sysinfo():
     import struct
@@ -123,16 +168,9 @@ def get_fast_sysinfo():
                             break
             de_name = (os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "").strip()
             sess_t = (os.environ.get("XDG_SESSION_TYPE") or ("x11" if os.environ.get("DISPLAY") else "")).strip().upper()
-            ram_gb = ""
-            if os.path.exists("/proc/meminfo"):
-                with open("/proc/meminfo", "r", encoding="utf-8") as f_mem:
-                    for ln in f_mem:
-                        if ln.startswith("MemTotal:"):
-                            kb = int(ln.split()[1])
-                            ram_gb = f", RAM {round(kb / 1048576.0, 1)} GB"
-                            break
             extra_p = [p_it for p_it in (de_name, sess_t, f"Linux {platform.release().split('-')[0]}") if p_it]
-            os_label = f"{os_label} ({', '.join(extra_p)}{ram_gb})"
+            if extra_p:
+                os_label = f"{os_label} ({', '.join(extra_p)})"
         except Exception:
             pass
 
@@ -141,7 +179,7 @@ def get_fast_sysinfo():
     cpu_name = re.sub(r"\s+", " ", cpu_name).replace("(R)", "").replace("(TM)", "").replace("CPU ", "").strip()
     if len(cpu_name) > 42:
         cpu_name = cpu_name[:39] + "..."
-    return f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}"
+    return f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}{_get_ram_summary()}"
 
 def _detect_low_end_or_win7():
     try:

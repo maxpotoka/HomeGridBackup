@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: console/terminal.py (v1.002 | 18.11.2026 17:14) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
+# [ФАЙЛ: console/terminal.py (v1.060 | 19.11.2026 15:38) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
 # ==============================================================================
 import os
 import re
@@ -62,8 +62,24 @@ def _safe_con_write(text):
         except Exception:
             pass
 
+def _print_cli_banner():
+    from core.config import get_fast_sysinfo
+    sys_line = get_fast_sysinfo()
+    title_line = f"  HomeGrid Backup v{SCRIPT_VER} - Inverter Data Backup"
+    os_line = f"  {sys_line}"[:76]
+    _safe_con_write("+" + ("-" * 76) + "+\n")
+    _safe_con_write("|" + title_line.ljust(76) + "|\n")
+    _safe_con_write("|" + os_line.ljust(76) + "|\n")
+    _safe_con_write("+" + ("-" * 76) + "+\n")
+
 def _init_console_for_cli():
     if os.name != "nt":
+        try:
+            if sys.stdout.isatty():
+                _safe_con_write(f"\033]0;HomeGrid Backup v{SCRIPT_VER}\007")
+        except Exception:
+            pass
+        _print_cli_banner()
         return
     try:
         k32 = ctypes.windll.kernel32
@@ -82,10 +98,7 @@ def _init_console_for_cli():
             sys.stdin = open("CONIN$", "r", encoding="utf-8", errors="replace")
         except Exception:
             pass
-        title_line = f"  HomeGrid Backup v{SCRIPT_VER} - Inverter Data Backup"
-        _safe_con_write("+" + ("-" * 76) + "+\n")
-        _safe_con_write("|" + title_line.ljust(76) + "|\n")
-        _safe_con_write("+" + ("-" * 76) + "+\n")
+        _print_cli_banner()
     except Exception:
         pass
 
