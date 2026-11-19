@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v1.018 | 18.11.2026 20:19) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v1.058 | 19.11.2026 15:35) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -109,11 +109,69 @@ def _manage_macos_launchagent(action, time_str="03:00", mode_flag="--hidden"):
     except Exception as e:
         return False, f"Помилка створення LaunchAgent: {e}"
 
+def _manage_linux_scheduler(action, time_str="03:00", mode_flag="--hidden"):
+    autostart_dir = os.path.expanduser("~/.config/autostart")
+    desktop_path = os.path.join(autostart_dir, "homegrid-backup.desktop")
+    tag_mark = "# HomeGridBackup"
+    try:
+        cur_cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=5).stdout or ""
+    except Exception:
+        cur_cron = ""
+    kept_lines = [ln for ln in cur_cron.splitlines() if tag_mark not in ln and ln.strip()]
+
+    if action == "delete":
+        removed_any = False
+        if os.path.exists(desktop_path):
+            try:
+                os.remove(desktop_path)
+                removed_any = True
+            except Exception:
+                pass
+        if len(kept_lines) != len([ln for ln in cur_cron.splitlines() if ln.strip()]):
+            try:
+                new_c = ("\n".join(kept_lines) + "\n") if kept_lines else ""
+                subprocess.run(["crontab", "-"], input=new_c, text=True, capture_output=True, timeout=5)
+                removed_any = True
+            except Exception:
+                pass
+        if removed_any:
+            return True, "Завдання Linux (crontab та автозапуск DE) видалено."
+        return False, "Завдання Linux не знайдено або вже видалено."
+
+    hh, mm = (time_str.split(":") + ["03", "00"])[:2]
+    if is_compiled_app():
+        bin_p = os.path.abspath(sys.argv[0] if sys.argv else sys.executable)
+        cmd_str = f'"{bin_p}" {mode_flag}'
+    else:
+        main_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+        cmd_str = f'"{sys.executable}" "{main_py}" {mode_flag}'
+
+    disp = os.environ.get("DISPLAY", ":0")
+    dbus_addr = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")
+    env_pref = f'DISPLAY={disp} ' + (f'DBUS_SESSION_BUS_ADDRESS="{dbus_addr}" ' if dbus_addr else "")
+    cron_line = f"{int(mm)} {int(hh)} * * * {env_pref}{cmd_str} >/dev/null 2>&1 {tag_mark}"
+    kept_lines.append(cron_line)
+    try:
+        subprocess.run(["crontab", "-"], input="\n".join(kept_lines) + "\n", text=True, check=True, capture_output=True, timeout=6)
+    except Exception as e:
+        return False, f"Помилка запису crontab: {e}"
+
+    try:
+        os.makedirs(autostart_dir, exist_ok=True)
+        with open(desktop_path, "w", encoding="utf-8") as df:
+            df.write(
+                "[Desktop Entry]\nType=Application\nName=HomeGrid Backup\n"
+                f"Exec={cmd_str}\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n"
+            )
+    except Exception:
+        pass
+    return True, f"Завдання Linux (crontab + autostart) створено на {int(hh):02d}:{int(mm):02d} ({mode_flag})."
+
 def _manage_windows_scheduler(action, time_str="03:00", mode_flag="--hidden", start_missed=True, wake_pc=False, prio=6):
     if sys.platform == "darwin":
         return _manage_macos_launchagent(action, time_str, mode_flag)
     if os.name != "nt":
-        return False, "Планувальник завдань підтримується лише у Windows та macOS."
+        return _manage_linux_scheduler(action, time_str, mode_flag)
     if action == "delete":
         try:
             res = subprocess.run(

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/files.py (v1.002 | 18.11.2026 17:14) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v1.057 | 19.11.2026 15:35) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 # ==============================================================================
 import os
 import re
@@ -82,6 +82,24 @@ def open_file_native(file_path):
         return False
 
 def choose_folder_native(initial_dir):
+    import sys, subprocess
+    if sys.platform.startswith("linux"):
+        start_d = (initial_dir.rstrip("/") + "/") if initial_dir and os.path.isdir(initial_dir) else os.path.expanduser("~/")
+        de = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
+        tools = [("kdialog", ["kdialog", "--getexistingdirectory", start_d, "--title", "Оберіть папку"]),
+                 ("zenity", ["zenity", "--file-selection", "--directory", "--title=Оберіть папку", f"--filename={start_d}"])]
+        if not any(k in de for k in ("KDE", "LXQT")):
+            tools.reverse()
+        for bin_name, cmd in tools:
+            if shutil.which(bin_name):
+                try:
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                    if res.returncode == 0 and res.stdout.strip():
+                        return os.path.normpath(res.stdout.strip())
+                    if res.returncode == 1:
+                        return ""
+                except Exception:
+                    pass
     try:
         from tkinter import filedialog
         chosen = filedialog.askdirectory(initialdir=initial_dir, title="Оберіть папку")

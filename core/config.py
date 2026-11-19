@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.055 | 19.11.2026 14:54) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.059 | 19.11.2026 15:35) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -17,8 +17,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.055"
-BUILD_DATE = "19.11.2026 14:54"
+SCRIPT_VER = "1.059"
+BUILD_DATE = "19.11.2026 15:35"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -121,6 +121,18 @@ def get_fast_sysinfo():
                         if ln.lower().startswith("model name") and ":" in ln:
                             cpu_name = ln.split(":", 1)[1].strip()
                             break
+            de_name = (os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "").strip()
+            sess_t = (os.environ.get("XDG_SESSION_TYPE") or ("x11" if os.environ.get("DISPLAY") else "")).strip().upper()
+            ram_gb = ""
+            if os.path.exists("/proc/meminfo"):
+                with open("/proc/meminfo", "r", encoding="utf-8") as f_mem:
+                    for ln in f_mem:
+                        if ln.startswith("MemTotal:"):
+                            kb = int(ln.split()[1])
+                            ram_gb = f", RAM {round(kb / 1048576.0, 1)} GB"
+                            break
+            extra_p = [p_it for p_it in (de_name, sess_t, f"Linux {platform.release().split('-')[0]}") if p_it]
+            os_label = f"{os_label} ({', '.join(extra_p)}{ram_gb})"
         except Exception:
             pass
 

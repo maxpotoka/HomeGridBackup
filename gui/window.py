@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.046 | 19.11.2026 14:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.059 | 19.11.2026 15:35) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -56,6 +56,18 @@ class HomeGridApp(DialogsMixin):
             self.root.bind_class("Entry", "<Command-c>", lambda e: e.widget.event_generate("<<Copy>>"))
             self.root.bind_class("Entry", "<Command-x>", lambda e: e.widget.event_generate("<<Cut>>"))
             self.root.bind_class("Entry", "<Command-a>", lambda e: (e.widget.select_range(0, "end"), "break")[1])
+        elif sys.platform.startswith("linux"):
+            def _x11_ctrl_key(e):
+                if not (e.state & 0x4):
+                    return
+                kc_map = {54: "<<Copy>>", 55: "<<Paste>>", 53: "<<Cut>>"}
+                if e.keycode in kc_map:
+                    e.widget.event_generate(kc_map[e.keycode])
+                    return "break"
+                if e.keycode == 38:
+                    e.widget.select_range(0, "end")
+                    return "break"
+            self.root.bind_class("Entry", "<KeyPress>", _x11_ctrl_key, add="+")
         self._build_ui()
         self.apply_theme_and_mode()
         self.root.after(300, self._poll_ui)
@@ -341,6 +353,8 @@ class HomeGridApp(DialogsMixin):
         import sys
         if sys.platform == "darwin":
             fam = "Menlo" if is_lite else "Helvetica Neue"
+        elif sys.platform.startswith("linux"):
+            fam = "DejaVu Sans Mono" if is_lite else ("Ubuntu" if p.get("font") == "Segoe UI" else p.get("font", "Ubuntu"))
         else:
             fam = "Consolas" if is_lite else p.get("font", "Segoe UI")
         rel = "solid" if is_lite else p.get("relief", "solid")

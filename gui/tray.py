@@ -1,10 +1,44 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.038 | 19.11.2026 06:01) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.057 | 19.11.2026 15:35) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
 import ctypes
 import threading
+
+def _detect_linux_tray_backend():
+    import sys, subprocess
+    if not sys.platform.startswith("linux"):
+        return "native"
+    if os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
+        return ""
+    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        return ""
+    try:
+        out = subprocess.check_output(
+            ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call",
+             "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner",
+             "string:org.kde.StatusNotifierWatcher"],
+            stderr=subprocess.DEVNULL, timeout=0.6
+        ).decode("utf-8", errors="ignore")
+        if "boolean true" in out:
+            return "appindicator"
+    except Exception:
+        pass
+    try:
+        out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], stderr=subprocess.DEVNULL, timeout=0.5).decode("utf-8", errors="ignore")
+        if "window id #" in out_x and "0x0" not in out_x:
+            return "xorg"
+    except Exception:
+        pass
+    de = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
+    if any(k in de for k in ("XFCE", "KDE", "LXQT", "MATE", "CINNAMON")):
+        return "appindicator"
+    return ""
+
+_LNX_TRAY_BE = _detect_linux_tray_backend()
+if _LNX_TRAY_BE in ("appindicator", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
+    os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
 
 try:
     import pystray
@@ -39,7 +73,10 @@ def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
 def _force_quit_app(engine):
     try:
         if engine.tray_icon is not None:
+            engine.tray_icon.visible = False
             engine.tray_icon.stop()
+            engine.tray_icon = None
+            time.sleep(0.12)
     except Exception:
         pass
     try:
@@ -51,14 +88,7 @@ def _force_quit_app(engine):
     os._exit(0)
 
 def _can_dock_linux_tray():
-    import sys
-    if not sys.platform.startswith("linux"):
-        return True
-    if os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
-        return False
-    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-        return False
-    return True
+    return bool(_LNX_TRAY_BE)
 
 def _start_tray_thread(engine):
     if not HAS_TRAY or not _can_dock_linux_tray():
@@ -88,7 +118,7 @@ def _start_tray_thread(engine):
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("✖ Вихід", _on_exit)
     )
-    icon = pystray.Icon("HomeGridBackup", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", menu)
+    icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", menu)
     engine.tray_icon = icon
 
     def _anim_loop():
@@ -125,6 +155,25 @@ def _start_tray_thread(engine):
 
 def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowWindow_v1"):
     if os.name != "nt":
+        def _posix_wait_loop():
+            try:
+                import sys, hashlib, socket, tempfile
+                _inst_id = hashlib.md5(os.path.realpath(sys.argv[0]).encode("utf-8", errors="ignore")).hexdigest()[:10]
+                _port_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.port")
+                srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                srv.bind(("127.0.0.1", 0))
+                srv.listen(2)
+                with open(_port_p, "w") as pf:
+                    pf.write(str(srv.getsockname()))
+                while True:
+                    conn, _ = srv.accept()
+                    data = conn.recv(16)
+                    conn.close()
+                    if b"SHOW" in data and engine.app_ref is not None:
+                        engine.app_ref.root.after(0, engine.app_ref.show_window)
+            except Exception:
+                pass
+        threading.Thread(target=_posix_wait_loop, daemon=True).start()
         return
     def _wait_loop():
         try:
