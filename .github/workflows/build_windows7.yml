@@ -2,10 +2,19 @@ name: Build HomeGrid Backup for Windows 7 (Folder x86)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_windows7.yml'
 
 jobs:
   build-win7-folder:
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nuitka<2.6" "pillow<11.0" pystray keyring send2trash
 
-      - name: Build Windows 7 standalone folder with Nuitka
+      - name: Build max-optimized Windows 7 standalone folder with Nuitka
         shell: cmd
         run: |
           set "ICON_FLAG="
@@ -30,12 +39,23 @@ jobs:
             --standalone ^
             --lto=yes ^
             --msvc=latest ^
+            --jobs=4 ^
             --python-flag=no_site ^
             --python-flag=no_asserts ^
             --python-flag=no_docstrings ^
+            --noinclude-pytest-mode=nofollow ^
+            --noinclude-setuptools-mode=nofollow ^
+            --noinclude-unittest-mode=nofollow ^
+            --noinclude-custom-mode=mobile:nofollow ^
+            --noinclude-custom-mode=kivy:nofollow ^
             --assume-yes-for-downloads ^
             --windows-console-mode=attach ^
             --enable-plugin=tk-inter ^
+            --company-name="HomeGrid" ^
+            --product-name="HomeGrid Backup" ^
+            --file-version="1.0.23.0" ^
+            --product-version="1.0.23.0" ^
+            --file-description="HomeGrid Backup Utility (Windows 7 x86)" ^
             %ICON_FLAG% ^
             --include-package=core ^
             --include-package=console ^
@@ -51,7 +71,7 @@ jobs:
             --output-filename=HomeGridBackup.exe ^
             main.py
 
-      - name: Prepare batch scripts and archive folder
+      - name: Prepare batch scripts and ultra-compress archive
         shell: cmd
         run: |
           ren "dist_win7\main.dist" "HomeGridBackup"
@@ -64,7 +84,7 @@ jobs:
             echo @echo off
             echo start "" "%%~dp0HomeGridBackup.exe" --hidden
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
-          7z a -t7z -mx=9 "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
+          7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
 
       - name: Upload Windows 7 Folder Artifact
         uses: actions/upload-artifact@v4
