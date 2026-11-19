@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.039 | 19.11.2026 12:24) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.066 | 19.11.2026 19:03) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -89,14 +89,14 @@ def invoke_http(url, state, method="GET", body=None, origin="", ref="", timeout=
 
                 for h_name, h_val in resp.headers.items():
                     if h_name.lower() == "set-cookie":
-                        if not new_ses and "homegrid_dash_session=" in h_val:
+                        if "homegrid_dash_session=" in h_val:
                             m = re.search(r"homegrid_dash_session=([^;]+)", h_val)
-                            if m:
+                            if m and m.group(1).strip():
                                 new_ses = m.group(1).strip()
                                 _seed_cookie(jar, url, "homegrid_dash_session", new_ses)
-                        if not new_cli and "hg_client=" in h_val:
+                        if "hg_client=" in h_val:
                             m2 = re.search(r"hg_client=([^;]+)", h_val)
-                            if m2:
+                            if m2 and m2.group(1).strip():
                                 new_cli = m2.group(1).strip()
                                 _seed_cookie(jar, url, "hg_client", new_cli)
 

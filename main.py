@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# [ФАЙЛ: main.py (v1.008 | 18.11.2026 17:48) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v1.056 | 19.11.2026 15:24) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
 import os
 import sys
@@ -28,6 +28,25 @@ if not _IS_PY_CONSOLE_LAUNCHER:
             os._exit(0)
     except Exception:
         pass
+    if os.name != "nt":
+        try:
+            import fcntl, hashlib, socket, tempfile
+            _inst_id = hashlib.md5(os.path.realpath(sys.argv[0]).encode("utf-8", errors="ignore")).hexdigest()[:10]
+            _lock_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.lock")
+            _port_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.port")
+            _APP_MUTEX = open(_lock_p, "w")
+            try:
+                fcntl.flock(_APP_MUTEX.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (IOError, OSError):
+                if os.path.exists(_port_p):
+                    with open(_port_p, "r") as pf:
+                        p_num = int(pf.read().strip() or "0")
+                    if p_num > 0:
+                        with socket.create_connection(("127.0.0.1", p_num), timeout=0.6) as sk:
+                            sk.sendall(b"SHOW")
+                os._exit(0)
+        except Exception:
+            pass
 
 if not is_compiled_app():
     _missing_pkgs = []
@@ -88,6 +107,14 @@ def main():
     from gui.window import HomeGridApp
     from gui.tray import _start_tray_thread, _start_show_window_listener
 
+    # DPI-awareness нужно включать ДО создания первого окна Tk
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
     root = tk.Tk()
     app = HomeGridApp(root, engine)
     engine.app_ref = app
