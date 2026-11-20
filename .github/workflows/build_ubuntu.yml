@@ -55,12 +55,16 @@ jobs:
         run: |
           python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI namespace OK')"
 
-      - name: Build with Nuitka (-O3 + LTO standalone folder)
+      - name: Patch pystray for AyatanaAppIndicator3 and Build with Nuitka
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
           LDFLAGS: "-Wl,-O1,--as-needed"
         run: |
+          PYSTRAY_AI=$(python -c "import pystray._appindicator as m; print(m.__file__)")
+          sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
+          sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
+
           python -m nuitka \
             --standalone \
             --enable-plugin=tk-inter \
@@ -88,7 +92,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
-            --nofollow-import-to=gi.repository.AppIndicator3,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
+            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
