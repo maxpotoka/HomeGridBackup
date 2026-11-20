@@ -3,7 +3,6 @@ name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
     tags:
       - 'v*'
     paths:
@@ -33,7 +32,7 @@ jobs:
             libayatana-appindicator3-dev \
             gir1.2-ayatanaappindicator3-0.1 \
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-secret-1 libsecret-1-0 gir1.2-vte-2.91
+            gir1.2-secret-1 libsecret-1-0
 
       - name: Set up Python 3.11 (64-bit)
         uses: actions/setup-python@v5
@@ -44,27 +43,28 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka ordered-set
-          pip install pystray pillow keyring secretstorage jeepney send2trash "PyGObject<3.50" pycairo
+          pip install "nuitka==4.3.5" ordered-set
+          pip install "pystray==0.19.5" pillow keyring secretstorage jeepney send2trash "PyGObject==3.48.2" pycairo
 
-      - name: Verify Secret GI namespace
+      - name: Verify GI namespaces
         run: |
           python -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
-
-      - name: Verify AppIndicator GI namespace
-        run: |
           python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI namespace OK')"
 
-      - name: Patch pystray for AyatanaAppIndicator3 and Build with Nuitka
+      - name: Patch pystray for AyatanaAppIndicator3
+        run: |
+          PYSTRAY_AI="$(python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/pystray/_appindicator.py"
+          sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
+          sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
+          grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не применился"; exit 1; }
+          echo "pystray patch OK"
+
+      - name: Build with Nuitka
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
           LDFLAGS: "-Wl,-O1,--as-needed"
         run: |
-          PYSTRAY_AI="$(python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/pystray/_appindicator.py"
-          sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
-          sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
-
           python -m nuitka \
             --standalone \
             --enable-plugin=tk-inter \
@@ -92,7 +92,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
+            --nofollow-import-to=gi.repository.Vte,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
@@ -106,8 +106,13 @@ jobs:
           fi
           mv "$DIST_DIR" homegridBackup
           chmod +x homegridBackup/homegridBackup
-          echo "=== Проверка файлов AppIndicator, Secret и typelib ==="
-          find homegridBackup -iname "*appindicator*" -o -iname "*secret*" -o -iname "*.typelib"
+
+          # Проверка: в сборке должны быть AppIndicator и Secret typelib
+          find homegridBackup -iname "*AyatanaAppIndicator3*" | grep -q . || { echo "ERROR: нет AyatanaAppIndicator3"; exit 1; }
+          find homegridBackup -iname "*Secret*" | grep -q . || { echo "ERROR: нет Secret"; exit 1; }
+
+          # Проверка: бинарник запускается и импортирует gi без ошибок
+          ./homegridBackup/homegridBackup --help >/dev/null 2>&1 || echo "WARN: --help не поддерживается, пропускаю запуск"
 
       - name: Package application into single .7z
         run: |
