@@ -63,7 +63,6 @@ jobs:
         run: |
           python -m nuitka \
             --standalone \
-            --enable-plugin=gi \
             --enable-plugin=tk-inter \
             --clang \
             --lto=yes \
@@ -89,7 +88,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
+            --nofollow-import-to=gi.repository.AppIndicator3,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
