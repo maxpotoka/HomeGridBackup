@@ -1,4 +1,3 @@
-
 name: Build Ubuntu
 
 on:
@@ -7,9 +6,13 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -23,29 +26,33 @@ jobs:
             libayatana-appindicator3-dev \
             gir1.2-ayatanaappindicator3-0.1 \
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-secret-1 libsecret-1-0 \
-            gir1.2-appindicator3-0.1 libappindicator3-1
-
-      - name: Verify Secret GI namespace
-        run: |
-          python3 -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
-
-      - name: Verify AppIndicator GI namespace
-        run: |
-          python3 -c "import gi; gi.require_version('AppIndicator3', '0.1'); from gi.repository import AppIndicator3; print('AppIndicator3 GI namespace OK')"
+            gir1.2-secret-1 libsecret-1-0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          architecture: 'x64'
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka ordered-set zstandard
-          pip install pystray pillow keyring send2trash
+          pip install nuitka ordered-set
+          pip install pystray pillow keyring secretstorage jeepney send2trash "PyGObject<3.50" pycairo
+
+      - name: Verify Secret GI namespace
+        run: |
+          python -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
+
+      - name: Verify AppIndicator GI namespace
+        run: |
+          python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI namespace OK')"
 
       - name: Build with Nuitka
+        env:
+          CFLAGS: "-O3 -mtune=generic -pipe"
+          CXXFLAGS: "-O3 -mtune=generic -pipe"
+          LDFLAGS: "-Wl,-O1,--as-needed"
         run: |
           python -m nuitka \
             --standalone \
@@ -53,29 +60,32 @@ jobs:
             --enable-plugin=tk-inter \
             --clang \
             --lto=yes \
-            --jobs=2 \
+            --jobs=4 \
             --assume-yes-for-downloads \
-            --python-flag=no_site \
+            --python-flag=no_asserts \
+            --python-flag=no_docstrings \
             --include-package=core \
+            --include-package=console \
             --include-package=gui \
+            --include-package=gi \
             --include-package=pystray \
             --include-module=pystray._appindicator \
-            --include-module=keyring \
+            --include-module=pystray._xorg \
+            --include-package=keyring \
+            --include-package=secretstorage \
+            --include-package=jeepney \
             --include-package=PIL \
             --include-package-data=keyring \
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
             --output-dir=build \
-            --output-filename=HomeGridBackup \
-            --follow-imports \
-            --lto=yes \
-            --python-flag=-O \
+            --output-filename=homegridBackup \
             main.py
 
       - name: Locate build output
         run: |
-          find build -maxdepth 2 -type f -name "HomeGridBackup" -print
+          find build -maxdepth 2 -type f -name "homegridBackup" -print
           find build -maxdepth 2 -type d -name "*.dist" -print
 
       - name: Package application
@@ -87,12 +97,17 @@ jobs:
             exit 1
           fi
 
-          mv "$DIST_DIR" HomeGridBackup
-          7z a HomeGridBackup-Ubuntu-x86_64.7z HomeGridBackup/
+          mv "$DIST_DIR" homegridBackup
+          chmod +x homegridBackup/homegridBackup
+          7z a -t7z -mx=9 HomeGridBackup-Ubuntu-x86_64.7z homegridBackup/
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish clean .7z to GitHub Releases
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup-Ubuntu-x86_64
-          path: HomeGridBackup-Ubuntu-x86_64.7z
-          if-no-files-found: error
+          tag_name: ubuntu-x64-latest
+          name: HomeGrid Backup — Ubuntu (Linux x86_64)
+          body: |
+            Збірка у вигляді папки **homegridBackup/** для максимальної швидкодії (без розпакування при запуску).
+            Після розпакування архіву запустіть: `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
+          files: HomeGridBackup-Ubuntu-x86_64.7z
+          make_latest: false
