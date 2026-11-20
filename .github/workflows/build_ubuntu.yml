@@ -1,16 +1,23 @@
-name: Build Ubuntu
+name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
 
 on:
   workflow_dispatch:
   push:
+    branches: [ main, master ]
     tags:
       - 'v*'
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_ubuntu.yml'
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-ubuntu-x64:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
@@ -28,7 +35,7 @@ jobs:
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
             gir1.2-secret-1 libsecret-1-0
 
-      - name: Set up Python
+      - name: Set up Python 3.11 (64-bit)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -48,7 +55,7 @@ jobs:
         run: |
           python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI namespace OK')"
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (-O3 + LTO standalone folder)
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
@@ -64,6 +71,9 @@ jobs:
             --assume-yes-for-downloads \
             --python-flag=no_asserts \
             --python-flag=no_docstrings \
+            --noinclude-pytest-mode=nofollow \
+            --noinclude-setuptools-mode=nofollow \
+            --noinclude-unittest-mode=nofollow \
             --include-package=core \
             --include-package=console \
             --include-package=gui \
@@ -79,26 +89,25 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
+            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
 
-      - name: Locate build output
-        run: |
-          find build -maxdepth 2 -type f -name "homegridBackup" -print
-          find build -maxdepth 2 -type d -name "*.dist" -print
-
-      - name: Package application
+      - name: Locate and verify build output
         run: |
           DIST_DIR=$(find build -maxdepth 1 -type d -name "*.dist" -print -quit)
-
           if [ -z "$DIST_DIR" ]; then
             echo "ERROR: Nuitka distribution directory not found"
             exit 1
           fi
-
           mv "$DIST_DIR" homegridBackup
           chmod +x homegridBackup/homegridBackup
+          echo "=== Проверка файлов AppIndicator, Secret и typelib ==="
+          find homegridBackup -iname "*appindicator*" -o -iname "*secret*" -o -iname "*.typelib"
+
+      - name: Package application into single .7z
+        run: |
           7z a -t7z -mx=9 HomeGridBackup-Ubuntu-x86_64.7z homegridBackup/
 
       - name: Publish clean .7z to GitHub Releases
