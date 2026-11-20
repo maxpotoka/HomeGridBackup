@@ -1,3 +1,4 @@
+
 name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
 
 on:
@@ -18,6 +19,7 @@ jobs:
   build-ubuntu-x64:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,12 +36,17 @@ jobs:
           sudo apt-get install -y \
             clang lld patchelf python3-tk p7zip-full \
             libayatana-appindicator3-dev gir1.2-ayatanaappindicator3-0.1 \
-            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev
+            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
+            gir1.2-secret-1 libsecret-1-0
 
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install nuitka ordered-set pillow pystray keyring secretstorage jeepney send2trash "PyGObject<3.50" pycairo
+          pip3 install nuitka ordered-set pillow pystray keyring send2trash "PyGObject<3.50" pycairo
+
+      - name: Verify Secret GI namespace
+        run: |
+          python3 -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
 
       - name: Build Ubuntu 64-bit standalone folder with Nuitka (-O3 + LTO)
         env:
@@ -52,6 +59,7 @@ jobs:
             --clang \
             --lto=yes \
             --jobs=4 \
+            --python-flag=no_site \
             --python-flag=no_asserts \
             --python-flag=no_docstrings \
             --noinclude-pytest-mode=nofollow \
@@ -63,24 +71,27 @@ jobs:
             --include-package=core \
             --include-package=console \
             --include-package=gui \
-            --include-package=gi \
             --include-package=pystray \
             --include-module=pystray._appindicator \
             --include-module=pystray._xorg \
             --include-package=PIL \
             --include-package=keyring \
-            --include-package=secretstorage \
-            --include-package=jeepney \
             --include-package=send2trash \
             --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=dist_ubuntu \
             --output-filename=homegridBackup \
             main.py
+
           DIST_SRC=$(find dist_ubuntu -maxdepth 1 -type d -name "*.dist" | head -n 1)
+
+          if [ -z "$DIST_SRC" ]; then
+            echo "ERROR: Nuitka output directory (*.dist) not found"
+            exit 1
+          fi
+
           mv "$DIST_SRC" dist_ubuntu/homegridBackup
+
           chmod +x dist_ubuntu/homegridBackup/homegridBackup
-          echo "=== Проверка файлов AppIndicator и typelib в сборке ==="
-          find dist_ubuntu/homegridBackup -iname "*appindicator*" -o -iname "*.typelib"
 
       - name: Package folder into single .7z archive
         run: |
@@ -94,6 +105,9 @@ jobs:
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
             Збірка у вигляді папки **homegridBackup/** для максимальної швидкодії (без розпакування при запуску).
-            Після розпакування архіву запустіть: `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
+
+            Після розпакування архіву запустіть:
+
+            `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
           files: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
           make_latest: false
