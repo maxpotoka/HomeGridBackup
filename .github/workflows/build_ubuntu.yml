@@ -72,15 +72,16 @@ jobs:
             --include-package=send2trash \
             --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=dist_ubuntu \
-            --output-filename=HomeGridBackup \
+            --output-filename=homegridBackup \
             main.py
-          mv dist_ubuntu/main.dist dist_ubuntu/HomeGridBackup
-          chmod +x dist_ubuntu/HomeGridBackup/HomeGridBackup
+          DIST_SRC=$(find dist_ubuntu -maxdepth 1 -type d -name "*.dist" | head -n 1)
+          mv "$DIST_SRC" dist_ubuntu/homegridBackup
+          chmod +x dist_ubuntu/homegridBackup/homegridBackup
 
       - name: Package folder into single .7z archive
         run: |
           cd dist_ubuntu
-          7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z HomeGridBackup
+          7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z homegridBackup
 
       - name: Publish clean .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -88,7 +89,7 @@ jobs:
           tag_name: ubuntu-x64-latest
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
-            Збірка у вигляді папки **HomeGridBackup/** для максимальної швидкодії (без розпакування при запуску).
-            Після розпакування архіву запустіть: `cd HomeGridBackup && chmod +x HomeGridBackup && ./HomeGridBackup`
+            Збірка у вигляді папки **homegridBackup/** для максимальної швидкодії (без розпакування при запуску).
+            Після розпакування архіву запустіть: `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
           files: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
           make_latest: false
