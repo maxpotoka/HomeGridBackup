@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.114 | 19.11.2026 23:12) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.133 | 20.11.2026 15:48) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -23,7 +23,7 @@ class _EmbeddedDialog(tk.Frame):
         super().__init__(root, bg=palette["panel"], bd=2, relief="solid", highlightbackground=palette["blue"], highlightthickness=2)
         hdr = tk.Frame(self, bg=palette["card"], padx=10, pady=6)
         hdr.pack(side="top", fill="x")
-        self._lbl_t = tk.Label(hdr, text=title_txt, bg=palette["card"], fg=palette["text"], font=("Segoe UI", 10, "bold"))
+        import sys as _s; _fam = "Ubuntu" if _s.platform.startswith("linux") else "Segoe UI"; self._lbl_t = tk.Label(hdr, text=title_txt, bg=palette["card"], fg=palette["text"], font=(_fam, 10, "bold"))
         self._lbl_t.pack(side="left")
         tk.Button(hdr, text="✖", command=self._handle_wm_delete, bg=palette["card"], fg=palette["red"], bd=0, padx=6, cursor="hand2").pack(side="right")
         self.place(relx=0.5, rely=0.5, anchor="center", width=w, height=h)
@@ -96,9 +96,9 @@ class DialogsMixin:
                 dlg.deiconify()
                 dlg.grab_set()
             else:
-                iw, ih = getattr(dlg, "_init_wh", (w_box, h_box))
-                if abs(w_box - iw) > 20 or abs(h_box - ih) > 20:
-                    dlg.geometry(f"{w_box}x{h_box}+{x}+{y}")
+                rw = max(420, self.root.winfo_width() - 24)
+                rh = max(220, self.root.winfo_height() - 24)
+                dlg.place_configure(width=min(max(w_box, req_w + 16), rw), height=min(max(h_box, req_h + 16), rh))
             if not sys.platform.startswith("linux"):
                 dlg.focus_force()
         except Exception:
@@ -194,12 +194,15 @@ class DialogsMixin:
     def _fit_dialog(self, dlg):
         dlg._fit_flag = True
     def confirm_exit(self):
-        fs = self.metrics["font_sz"]
-        dlg, p, _ = self._make_dialog("Підтвердження виходу", 460, 185)
-        tk.Label(dlg, text="Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?", bg=p["panel"], fg=p["text"], wraplength=int(410 * self.metrics["k"]), font=("Segoe UI", fs)).pack(pady=22, padx=16)
+        import sys
+        fs = max(10, self.metrics["font_sz"])
+        fam = "Ubuntu" if sys.platform.startswith("linux") else "Segoe UI"
+        lang = self.engine.state.get("lang", "en")
+        dlg, p, _ = self._make_dialog(tr("Підтвердження виходу", lang), 520, 225)
         bf = tk.Frame(dlg, bg=p["panel"])
-        bf.pack(side="bottom", fill="x", padx=16, pady=12)
-        tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="right", padx=8)
+        bf.pack(side="bottom", fill="x", padx=16, pady=(6, 14))
+        tk.Label(dlg, text=tr("Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?", lang), bg=p["panel"], fg=p["text"], wraplength=int(460 * self.metrics["k"]), font=(fam, fs)).pack(pady=(18, 10), padx=18, expand=True)
+        tk.Button(bf, text=tr("Скасувати", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=16, pady=6, cursor="hand2").pack(side="right", padx=6)
         def _do_exit(_e=None):
             self._exit_confirm_open = False
             try:
@@ -216,7 +219,7 @@ class DialogsMixin:
         dlg.protocol("WM_DELETE_WINDOW", _cancel_exit)
         dlg.bind("<Escape>", _cancel_exit)
         dlg.bind("<Return>", _do_exit)
-        tk.Button(bf, text="Так, вийти", command=_do_exit, bg=p["red"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=5).pack(side="right", padx=8)
+        tk.Button(bf, text=tr("Так, вийти", lang), command=_do_exit, bg=p["red"], fg="#ffffff", font=(fam, fs, "bold"), padx=16, pady=6, cursor="hand2").pack(side="right", padx=6)
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
         self._fit_dialog(dlg)
 
@@ -512,14 +515,15 @@ class DialogsMixin:
             cmd = f'"{_resolve_exe_path()}" {flag}'
             self.root.clipboard_clear()
             self.root.clipboard_append(cmd)
-            lbl_sch_msg.configure(text=f"✓ Скопійовано у буфер: {cmd}", fg=p["cyan"])
+            lbl_sch_msg.configure(text=tr(f"✓ Скопійовано у буфер: {cmd}", st.get("lang", "en")), fg=p["cyan"])
 
         tk.Button(sr3, text="Додати в Планувальник", command=_create_task, bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2").pack(side="left", padx=(0, 10))
         tk.Button(sr3, text="Видалити задачу", command=_del_task, bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=4, cursor="hand2").pack(side="left", padx=6)
         def _open_adv_sched():
+            lng_m = st.get("lang", "en")
             m_adv = tk.Menu(dlg, tearoff=0, bg=p["panel"], fg=p["text"], font=("Segoe UI", fs))
-            m_adv.add_command(label="Копіювати команду фонового запуску", command=lambda: _copy_cmd("--hidden"))
-            m_adv.add_command(label="Копіювати команду консольного запуску", command=lambda: _copy_cmd("--silent"))
+            m_adv.add_command(label=tr("Копіювати команду фонового запуску", lng_m), command=lambda: _copy_cmd("--hidden"))
+            m_adv.add_command(label=tr("Копіювати команду консольного запуску", lng_m), command=lambda: _copy_cmd("--silent"))
             m_adv.tk_popup(btn_adv.winfo_rootx(), btn_adv.winfo_rooty() + btn_adv.winfo_height())
         btn_adv = tk.Button(sr3, text="Додатково ▾", command=_open_adv_sched, bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2")
         btn_adv.pack(side="right")
@@ -688,31 +692,33 @@ class DialogsMixin:
                 return
             btn_verify.configure(text=tr("Перевірити SHA-256 + CRC32", self.engine.state.get("lang", "en")), state="normal")
             cb_buf.configure(state="readonly")
+            lng_v = self.engine.state.get("lang", "en")
             if verify_state["err"]:
-                verify_status.configure(text=f"Помилка перевірки: {verify_state['err']}", fg=p["red"])
+                verify_status.configure(text=tr(f"Помилка перевірки: {verify_state['err']}", lng_v), fg=p["red"])
             elif verify_state["res"]:
                 res = verify_state["res"]
                 verify_state["status_map"] = {it["name"]: it for it in res.get("items", [])}
                 ok_all = (res["err_cnt"] == 0 and not res.get("cancelled"))
                 perf_txt = f"Час: {res.get('elapsed', 0):.2f} с | Швидкість: {res.get('speed_mbs', 0)} МБ/с (буфер {v_buf.get()})"
                 prefix = "Зупинено! " if res.get("cancelled") else ""
-                msg = f"{prefix}SHA-256 + CRC32: справних {res['ok_cnt']} | без .sha256: {res['warn_cnt']} | пошкоджених: {res['err_cnt']} | {perf_txt}"
+                msg = tr(f"{prefix}SHA-256 + CRC32: справних {res['ok_cnt']} | без .sha256: {res['warn_cnt']} | пошкоджених: {res['err_cnt']} | {perf_txt}", lng_v)
                 lbl_ver.configure(text=msg, fg=p["green"] if ok_all else p["amber"])
-                verify_status.configure(text=f"100% — Усі {res['total']} архівів ({res.get('total_mb', 0)} МБ) | {perf_txt}")
+                verify_status.configure(text=tr(f"100% — Усі {res['total']} архівів ({res.get('total_mb', 0)} МБ) | {perf_txt}", lng_v))
                 verify_bar["value"] = 100
                 self.engine.log(msg, "ok" if ok_all else "warn")
                 _refresh()
 
         def _verify():
+            lng_v = self.engine.state.get("lang", "en")
             if verify_state["running"]:
                 verify_state["stop"] = True
-                btn_verify.configure(text="Зупинка...", state="disabled")
+                btn_verify.configure(text=tr("Зупинка...", lng_v), state="disabled")
                 return
-            verify_state.update({"running": True, "stop": False, "pct": 0, "stage": "Запуск...", "res": None, "err": None})
-            btn_verify.configure(text="Зупинити")
+            verify_state.update({"running": True, "stop": False, "pct": 0, "stage": tr("Запуск...", lng_v), "res": None, "err": None})
+            btn_verify.configure(text=tr("Зупинити", lng_v))
             cb_buf.configure(state="disabled")
             chosen_buf = buf_options.get(v_buf.get(), 65536)
-            lbl_ver.configure(text=f"Перевірка архівів (буфер {v_buf.get()})…", fg=p["cyan"])
+            lbl_ver.configure(text=tr(f"Перевірка архівів (буфер {v_buf.get()})…", lng_v), fg=p["cyan"])
             verify_bar["value"] = 0
 
             def _worker():
@@ -768,7 +774,7 @@ class DialogsMixin:
             for fn in bad_names:
                 _delete_archive_pair(fn)
             if bad_names:
-                lbl_ver.configure(text=f"✓ Видалено пошкоджених архівів: {len(bad_names)} шт.", fg=p["green"])
+                lbl_ver.configure(text=tr(f"✓ Видалено пошкоджених архівів: {len(bad_names)} шт.", self.engine.state.get("lang", "en")), fg=p["green"])
             _refresh()
 
         btn_verify = tk.Button(bf, text="Перевірити SHA-256 + CRC32", command=_verify, bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")

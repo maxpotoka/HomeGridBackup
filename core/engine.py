@@ -1,6 +1,6 @@
 from core.i18n import tr
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.107 | 19.11.2026 22:39) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.138 | 20.11.2026 16:20) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from core.config import (
     SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN,
-    load_state, write_file_log, get_fast_sysinfo
+    IS_WSL, WSL_DISTRO, load_state, write_file_log, get_fast_sysinfo
 )
 
 _CON_TR_MAP = (
@@ -111,6 +111,14 @@ class BackupEngine:
         sec_lbl = "Keyring" if self.state["storage_backend"] == "keyring" else ".env"
         self.log(f"Систему запущено (v{SCRIPT_VER} від {BUILD_DATE}, {mode_lbl}, сховище: {sec_lbl}). Каталог: {self.state['backup_dir']}", "info")
         self.log(f"ОС та залізо: {self.sys_summary}", "info")
+        from core.config import AUTO_CLI_FALLBACK
+        if AUTO_CLI_FALLBACK:
+            self.log("Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).", "warn")
+        if IS_WSL:
+            d_lbl = WSL_DISTRO or "Linux"
+            self.log(f"Робота в WSL (дистрибутив: {d_lbl}), режим: {mode_lbl}", "info")
+            if os.path.abspath(self.state["backup_dir"]).startswith("/mnt/"):
+                self.log("Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.", "warn")
 
     def log(self, msg, level="info"):
         msg = tr(msg, self.state.get("lang", "en"))
@@ -313,9 +321,9 @@ class BackupEngine:
                     if mt >= month_start:
                         res["month_cnt"] += 1
                         res["month_mb"] += sz_mb
-                    if "KEEP_MONTHLY" in name:
+                    if "_MONTHLY_" in name:
                         res["gfs_monthly"] += 1
-                    elif "KEEP_WEEKLY" in name:
+                    elif "_WEEKLY_" in name:
                         res["gfs_weekly"] += 1
                     else:
                         res["gfs_daily"] += 1

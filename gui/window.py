@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.112 | 19.11.2026 23:02) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.136 | 20.11.2026 16:06) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -37,9 +37,19 @@ class HomeGridApp(DialogsMixin):
         self.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})")
         m = self.metrics
         self.root.geometry(f"{m['win_w']}x{m['win_h']}+{m['pos_x']}+{m['pos_y']}")
-        self.root.minsize(620, 420)
+        self.root.minsize(min(620, m['win_w']), min(420, m['win_h']))
+        import sys
+        import tkinter.font as _tkf
+        _fams = set(_tkf.families(self.root)) if sys.platform.startswith("linux") else set()
+        self._base_fam = "Helvetica Neue" if sys.platform == "darwin" else (next((fn for fn in ("Ubuntu", "DejaVu Sans", "Liberation Sans", "Noto Sans") if fn in _fams), "Sans") if sys.platform.startswith("linux") else "Segoe UI")
+        self._mono_fam = "Menlo" if sys.platform == "darwin" else ("DejaVu Sans Mono" if sys.platform.startswith("linux") else "Consolas")
+        self.F_MAIN = _tkf.Font(root=self.root, family=self._base_fam, size=m["font_sz"])
+        self.F_BOLD = _tkf.Font(root=self.root, family=self._base_fam, size=m["font_sz"], weight="bold")
+        self.F_SUB = _tkf.Font(root=self.root, family=self._base_fam, size=max(8, m["font_sz"] - 1))
+        self.F_CAP = _tkf.Font(root=self.root, family=self._base_fam, size=max(8, m["font_sz"] - 2), weight="bold")
+        self.F_TITLE = _tkf.Font(root=self.root, family=self._base_fam, size=m["font_sz"] + 4, weight="bold")
+        self._watch_pending = None
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
-        self.root.bind("<Configure>", self._on_root_configure)
 
         self.var_srv = tk.StringVar(value=self.engine.state.get("server", ""))
         self.var_dir = tk.StringVar(value=self.engine.state.get("backup_dir", ""))
@@ -51,7 +61,6 @@ class HomeGridApp(DialogsMixin):
         self.var_stage = tk.StringVar(value=self.engine.stage)
         self.var_pct = tk.StringVar(value="0%")
 
-        import sys
         if sys.platform == "darwin":
             self.root.bind_class("Entry", "<Command-v>", lambda e: e.widget.event_generate("<<Paste>>"))
             self.root.bind_class("Entry", "<Command-c>", lambda e: e.widget.event_generate("<<Copy>>"))
@@ -72,6 +81,11 @@ class HomeGridApp(DialogsMixin):
         self._build_ui()
         self.apply_theme_and_mode()
         self.root.deiconify()
+        self.root.resizable(True, True)
+        self.root.minsize(620, 420)
+        self.root.update_idletasks()
+        self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
+        self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
 
     def _warmup_ttk_styles(self):
@@ -84,39 +98,36 @@ class HomeGridApp(DialogsMixin):
         except Exception:
             pass
 
-    def _on_root_configure(self, event=None):
-        if event is None or event.widget is not self.root:
-            return
-        if any(isinstance(w, tk.Toplevel) for w in self.root.winfo_children()) or time.time() < getattr(self, '_ignore_resize_until', 0):
-            return
-        w, h = int(event.width), int(event.height)
-        if w < 500 or h < 350:
-            return
-        pw, ph = self._last_live_wh
-        if pw == 0 and ph == 0:
-            self._last_live_wh = (w, h)
-            return
-        if abs(w - pw) < 12 and abs(h - ph) < 12:
-            return
-        self._last_live_wh = (w, h)
-        if self._resize_timer:
-            try:
-                self.root.after_cancel(self._resize_timer)
-            except Exception:
-                pass
-        self._resize_timer = self.root.after(90, lambda: self._on_live_resize_done(w, h))
+    def _watch_size(self):
+        try:
+            if not self.root.winfo_exists():
+                return
+            if time.time() >= getattr(self, "_ignore_resize_until", 0) and self.root.state() != "iconic":
+                w, h = self.root.winfo_width(), self.root.winfo_height()
+                if w >= 500 and h >= 350:
+                    if (w, h) != self._last_live_wh:
+                        self._last_live_wh = (w, h)
+                        self._watch_pending = (w, h)
+                    elif self._watch_pending is not None:
+                        pw, ph = self._watch_pending
+                        self._watch_pending = None
+                        self._on_live_resize_done(pw, ph)
+        except Exception:
+            pass
+        self.root.after(200, self._watch_size)
 
-    def _on_live_resize_done(self, ow, oh):
-        dirty_sz = False
-        if self.engine.state.get("ui_font", 0) != 0:
-            self.engine.state["ui_font"] = 0
-            dirty_sz = True
-        if self.engine.state.get("ui_scale", "auto") != "auto":
-            self.engine.state["ui_scale"] = "auto"
-            dirty_sz = True
-        if dirty_sz:
-            commit_state(self.engine.state)
+    def _on_live_resize_done(self, cw, ch):
+        m = self.metrics
+        ow = cw + (m["outer_w"] - m["win_w"])
+        oh = ch + (m["outer_h"] - m["win_h"])
+        st = self.engine.state
+        if st.get("ui_font", 0) != 0 or st.get("ui_scale", "auto") != "auto":
+            st["ui_font"] = 0
+            st["ui_scale"] = "auto"
+            commit_state(st)
         self.apply_theme_and_mode(resize_win=False, live_outer_wh=(ow, oh))
+        self.root.update_idletasks()
+        self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
 
     def show_window(self):
         import sys
@@ -375,16 +386,18 @@ class HomeGridApp(DialogsMixin):
         if sys.platform == "darwin":
             fam = "Menlo" if is_lite else "Helvetica Neue"
         elif sys.platform.startswith("linux"):
-            fam = "DejaVu Sans Mono" if is_lite else ("Ubuntu" if p.get("font") == "Segoe UI" else p.get("font", "Ubuntu"))
+            import tkinter.font as _tkf; _fams = set(_tkf.families(self.root)) if not hasattr(self, "_lnx_f") else self._lnx_f; self._lnx_f = _fams; fam = "DejaVu Sans Mono" if is_lite else next((fn for fn in ("Ubuntu", "DejaVu Sans", "Liberation Sans", "Noto Sans") if fn in _fams), "Sans")
         else:
             fam = "Consolas" if is_lite else p.get("font", "Segoe UI")
         rel = "solid" if is_lite else p.get("relief", "solid")
         bd_w = 2 if rel in ("raised", "groove") else 1
 
-        f_main = (fam, fs)
-        f_bold = (fam, fs, "bold")
-        f_sub = (fam, max(8, fs - 1))
-        f_cap = (fam, max(8, fs - 2), "bold")
+        self.F_MAIN.configure(family=fam, size=fs)
+        self.F_BOLD.configure(family=fam, size=fs)
+        self.F_SUB.configure(family=fam, size=max(8, fs - 1))
+        self.F_CAP.configure(family=fam, size=max(8, fs - 2))
+        self.F_TITLE.configure(family=fam, size=fs + 4)
+        f_main, f_bold, f_sub, f_cap = self.F_MAIN, self.F_BOLD, self.F_SUB, self.F_CAP
 
         try:
             self.root.option_add("*TCombobox*Listbox.font", f_main)
@@ -457,9 +470,10 @@ class HomeGridApp(DialogsMixin):
         )
         self._update_mirror_btn()
         try:
-            self._ignore_resize_until = time.time() + 0.5
+            if resize_win:
+                self._ignore_resize_until = time.time() + 0.5
             self.root.update_idletasks()
-            self.root.minsize(min(m["win_w"], max(620, self.root.winfo_reqwidth())), min(m["win_h"], max(460, self.root.winfo_reqheight())))
+            self.root.minsize(620, 420)
         except Exception:
             pass
         lang = self.engine.state.get("lang", "en")
@@ -494,15 +508,16 @@ class HomeGridApp(DialogsMixin):
         p = self._get_palette()
         fs = self.metrics["font_sz"]
         menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=("Segoe UI", fs))
-        menu.add_command(label="✨ Повна графіка (стандартний режим)", command=lambda: self._set_graphic_mode(False))
-        menu.add_command(label="⚡ Ультралегкий LITE-режим (швидкий текст)", command=lambda: self._set_graphic_mode(True))
+        lng = self.engine.state.get("lang", "en")
+        menu.add_command(label=tr("✨ Повна графіка (стандартний режим)", lng), command=lambda: self._set_graphic_mode(False))
+        menu.add_command(label=tr("⚡ Ультралегкий LITE-режим (швидкий текст)", lng), command=lambda: self._set_graphic_mode(True))
         menu.add_separator()
         cur_sc = self.engine.state.get("ui_scale", "auto")
         for code, lbl in UI_SCALE_LABELS:
             mark = "✔ " if code == cur_sc else "    "
-            menu.add_command(label=f"{mark}{lbl}", command=lambda c=code: self._set_screen_scale_quick(c))
+            menu.add_command(label=f"{mark}{tr(lbl, lng)}", command=lambda c=code: self._set_screen_scale_quick(c))
         menu.add_separator()
-        menu.add_command(label="⚙️ Налаштування екрана та шрифту...", command=self.open_settings)
+        menu.add_command(label=tr("⚙️ Налаштування екрана та шрифту...", lng), command=self.open_settings)
         x = self.btn_mode.winfo_rootx()
         y = self.btn_mode.winfo_rooty() + self.btn_mode.winfo_height()
         menu.tk_popup(x, y)
@@ -700,13 +715,15 @@ class HomeGridApp(DialogsMixin):
                 st.get("progress_style", "v8"),
                 bool(st.get("lite_mode", False)),
                 self._get_palette(),
-                self.engine.stage
+                self.engine.stage,
+                st.get("lang", "en")
             )
 
             btn_state = "disabled" if self.engine.is_running else "normal"
-            for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_start, self.btn_strat):
+            for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
                 if str(b.cget("state")) != btn_state:
                     b.configure(state=btn_state)
+            self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
                 if len(disc) >= 1 and not self.engine.is_running:

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v1.088 | 19.11.2026 21:33) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
+# [ФАЙЛ: gui/widgets.py (v1.131 | 20.11.2026 15:35) — КАСТОМНЫЙ ИНДИКАТОР ПРОГРЕССА (12 СТИЛЕЙ + LITE)]
 # ==============================================================================
 import tkinter as tk
 from gui.styles import THEMES
@@ -14,9 +14,11 @@ class StyledProgressBar(tk.Canvas):
         self.theme = THEMES["dark"]
         self._phase = 0
         self.status_lbl = ""
+        self.lang = "en"
         self.bind("<Configure>", lambda e: self.redraw())
 
-    def set_state(self, pct, indet, style_name, lite_mode, theme, status_lbl=""):
+    def set_state(self, pct, indet, style_name, lite_mode, theme, status_lbl="", lang="en"):
+        self.lang = lang or "en"
         self.status_lbl = str(status_lbl or "")
         self.pct = max(0, min(100, int(pct or 0)))
         self.indet = bool(indet)
@@ -59,7 +61,8 @@ class StyledProgressBar(tk.Canvas):
                 bar = ["-"] * chars
                 for k in range(4):
                     bar[pos + k] = "#"
-                txt = f"[{''.join(bar)}] пошук..."
+                from core.i18n import tr
+                txt = f"[{''.join(bar)}] {tr('пошук...', self.lang)}"
             else:
                 filled = int(round((self.pct / 100.0) * chars))
                 txt = f"[{'#' * filled}{'-' * (chars - filled)}] {self.pct:3d}%"

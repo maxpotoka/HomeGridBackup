@@ -1,8 +1,40 @@
-# [ФАЙЛ: core/i18n.py (v1.111 | 19.11.2026 22:58) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v1.139 | 20.11.2026 16:26) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
     "Автопошук": "Auto-scan",
+    "Виявлені сервери в мережі": "Discovered Servers on Network",
+    "Сервер не знайдено": "Server not found",
+    "Збережено (!)": "Saved (!)",
+    "Очищення старих бекапів": "Old Backups Cleanup",
+    "Збережені PIN-коди та токен сесії очищено (Keyring / .env).": "Saved PIN codes and session token cleared (Keyring / .env).",
+    "Сервер повідомив про помилку під час створення архіву!": "Server reported an error while creating archive!",
+    "Введіть IP-адресу або домен сайту перед підключенням!": "Enter server IP or domain before connecting!",
+    "Сервер збережено": "Server saved",
+    "Підключення успішне": "Connection successful",
+    "Не є сервером HGM": "Not an HGM server",
+    "Сайт недоступний": "Host unreachable",
+    "ZIP-архів порожній!": "ZIP archive is empty!",
+    "Збережений LOGIN PIN відхилено сервером.": "Saved LOGIN PIN rejected by server.",
+    "Збережений EDITOR PIN відхилено.": "Saved EDITOR PIN rejected.",
+    "Авторизація HomeGrid": "HomeGrid Authorization",
+    "Введіть LOGIN PIN:": "Enter LOGIN PIN:",
+    "Права редактора": "Editor Rights",
+    "Для експорту потрібен EDITOR PIN:": "EDITOR PIN is required for export:",
+    "Невірний LOGIN PIN!": "Invalid LOGIN PIN!",
+    "Вхід скасовано (не введено LOGIN PIN).": "Login cancelled (LOGIN PIN not entered).",
+    "Експорт скасовано (не введено EDITOR PIN).": "Export cancelled (EDITOR PIN not entered).",
+    "Сервери HomeGrid Monitor у мережі не знайдено.": "No HomeGrid Monitor servers found on the network.",
+    "Оберіть папку": "Select folder",
+    "Запуск...": "Starting...",
+    "✨ Повна графіка (стандартний режим)": "✨ Full Graphics (standard mode)",
+    "⚡ Ультралегкий LITE-режим (швидкий текст)": "⚡ Ultra-light LITE mode (fast text)",
+    "⚙️ Налаштування екрана та шрифту...": "⚙️ Screen and font settings...",
+    "✓ Збережені PIN-коди очищено": "✓ Saved PIN codes cleared",
+    "Авто (під монітор і DPI)": "Auto (by monitor and DPI)",
+    "Авто (за розміром вікна)": "Auto (by window size)",
+    "Цифровий лічильник (тільки відсотки)": "Digital counter (percentages only)",
+    "Оберіть виявлений": "Select found",
     "Виявлені (0)": "Found (0)",
     "Виявлені": "Found",
     "Історія": "History",
@@ -211,6 +243,45 @@ EN_EXACT = {
 
 EN_SUBSTR = sorted([
     ("Обрати виявлений", "Select found"),
+    ("Виявлені (", "Found ("),
+    ("1980-ті", "1980s"), ("1970-ті", "1970s"), ("1960-ті", "1960s"),
+    ("Обрано виявлений у мережі сервер:", "Selected discovered LAN server:"),
+    ("Папку збереження змінено на:", "Backup folder changed to:"),
+    ("Папку збереження встановлено:", "Backup folder set to:"),
+    ("Папку дзеркального копіювання увімкнено:", "Mirror backup folder enabled:"),
+    ("Попередження: не вдалося скопіювати у дзеркальну папку", "Warning: failed to copy to mirror folder"),
+    ("Сервер скинув завдання", "Server reset the job"),
+    ("перервав збірку архіву:", "aborted archive build:"),
+    ("збережено у «Історія».", "saved to History."),
+    ("Видалити назавжди з диска", "Permanently delete from disk"),
+    ("Перемістити у Кошик", "Move to Recycle Bin"),
+    ("застарілих копій", "expired backups"),
+    ("Зупинено! ", "Stopped! "),
+    ("фірмовий синій", "signature blue"), ("глянцеві смуги", "glossy stripes"),
+    ("зелені блоки", "green blocks"), ("ч/б штрих", "b/w stripe"),
+    ("Термінал мейнфрейму CRT", "Mainframe CRT terminal"), ("Телетайп / Перфострічка", "Teletype / Punch tape"),
+    ("Нетбук", "Netbook"), ("Усі ", "All "), ("Швидкість:", "Speed:"),
+    ("Адресу збережено без перевірки:", "Address saved without check:"),
+    ("Завдання не знайдено або вже видалено", "Task not found or already deleted"),
+    ("Помилка Планувальника:", "Scheduler error:"), ("Помилка завантаження після", "Download failed after"),
+    ("Мережева помилка під час входу:", "Network error during login:"),
+    ("Успішно підключено до", "Successfully connected to"),
+    ("Виконати резервне копіювання зараз?", "Run backup now?"),
+    ("Пошкоджений файл в архіві:", "Corrupted file in archive:"),
+    ("Перевірка архівів (буфер", "Verifying archives (buffer"),
+    ("Помилка перевірки:", "Verification error:"),
+    ("Видалено пошкоджених архівів:", "Corrupted archives deleted:"),
+    ("Скопійовано у буфер:", "Copied to clipboard:"),
+    ("створено на", "created at"),
+    ("видалено з Планувальника.", "removed from Task Scheduler."),
+    ("Неоновий кібер-градієнт", "Neon cyber gradient"),
+    ("Бурштиново-жовтий градієнт", "Amber-yellow gradient"),
+    ("Смарагдовий градієнт", "Emerald gradient"),
+    ("Сучасний плоский синій", "Modern flat blue"),
+    ("Дуже дрібний", "Extra small"), ("Дрібний", "Small"), ("Стандартний", "Standard"),
+    ("Середній", "Medium"), ("Великий", "Large"), ("Дуже великий", "Extra large"),
+    ("Підвищений", "Increased"), ("Крупний", "Big"), ("Дуже крупний", "Extra big"),
+    ("Суперкрупний", "Super big"), ("Гігантський", "Giant"), ("Максимальний", "Maximum"),
     ("Графіка", "Graphics"),
     ("Готовий до резервного копіювання", "Ready for backup"),
     (" від ", " from "),
@@ -256,15 +327,21 @@ EN_SUBSTR = sorted([
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}
 
+def _clean_linux_emoji(txt):
+    import sys
+    if not sys.platform.startswith("linux"):
+        return txt
+    return re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]+\s*", "", txt)
+
 def tr(text, lang="en"):
     if not text:
         return text
-    s = str(text)
+    s = _clean_linux_emoji(str(text))
     if lang == "uk":
         if s in UK_EXACT:
             return UK_EXACT[s]
-        for uk, en in EN_SUBSTR:
-            if len(en) > 3 and en in s:
+        for uk, en in sorted(EN_SUBSTR, key=lambda x: len(x[1]), reverse=True):
+            if len(en) >= 3 and en in s:
                 s = s.replace(en, uk)
         return s
     if s in EN_EXACT:
@@ -281,8 +358,9 @@ def tr(text, lang="en"):
 def apply_widget_i18n(widget, lang="en"):
     try:
         if "text" in widget.keys():
-            cur = widget.cget("text")
-            if isinstance(cur, str) and cur.strip():
+            raw_cur = widget.cget("text")
+            cur = str(raw_cur) if raw_cur is not None else ""
+            if cur.strip():
                 t_val = tr(cur, lang)
                 if t_val != cur:
                     widget.configure(text=t_val)

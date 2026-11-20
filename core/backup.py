@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.114 | 19.11.2026 23:12) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.138 | 20.11.2026 16:20) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -359,6 +359,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
         d0 = time.time()
         dl_ok = False
         dl_err = ""
+        net_h = None
         for no_proxy in (True, False):
             try:
                 jar = engine.state.get("_jar") or http.cookiejar.CookieJar()
@@ -370,6 +371,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                 opener = urllib.request.build_opener(*handlers)
                 req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
                 with opener.open(req, timeout=300) as resp, open(out_file, "wb") as out_f:
+                    srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
+                    net_h = hashlib.sha256()
                     cb = 0
                     last_ui = time.time()
                     last_speed_t = d0
@@ -380,6 +383,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                         if not chunk:
                             break
                         out_f.write(chunk)
+                        net_h.update(chunk)
                         cb += len(chunk)
                         now = time.time()
                         if now - last_ui >= 1.0:
@@ -405,9 +409,15 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     os.remove(out_file)
         actual_sz = os.path.getsize(out_file) if os.path.exists(out_file) else 0
         size_valid = (actual_sz >= int(tot_b * 0.99)) if tot_b > 0 else (actual_sz >= 1024)
+        net_sha_hex = net_h.hexdigest().lower() if (dl_ok and net_h is not None) else ""
+        if dl_ok and size_valid and srv_sha and len(srv_sha) == 64 and net_sha_hex != srv_sha:
+            dl_ok = False
+            dl_err = "SHA-256 не збігається з контрольним хешем сервера"
+            if os.path.exists(out_file):
+                os.remove(out_file)
         if dl_ok and size_valid:
             engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(time.time() - d0, 1)} с", "ok")
-            return out_file
+            return out_file, net_sha_hex
         if dl_ok and not size_valid:
             dl_err = f"завантажено лише {actual_sz/1048576.0:.1f} із {tot_b/1048576.0:.1f} МБ (обрив потоку)"
             if os.path.exists(out_file):
@@ -433,21 +443,26 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         t_prep0 = time.time()
         srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
         t_dl0 = time.time()
-        out_file = _download_backup_zip(engine, srv, srv_label, job_id, bdir)
+        out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir)
         t_ver0 = time.time()
 
         total_bytes = os.path.getsize(out_file)
         total_mb = total_bytes / 1048576.0
         engine.set_progress(None, f"Перевірка CRC32 ({total_mb:.1f} МБ)...")
         with zipfile.ZipFile(out_file, "r") as zf:
-            bad_file = zf.testzip()
-            if bad_file is not None:
+            infos = zf.infolist()
+            cnt = len(infos)
+            if cnt < 1:
                 os.remove(out_file)
-                raise RuntimeError(f"Пошкоджений файл в архіві: {bad_file}")
-            cnt = len(zf.namelist())
-        if cnt < 1:
-            os.remove(out_file)
-            raise RuntimeError("ZIP-архів порожній!")
+                raise RuntimeError("ZIP-архів порожній!")
+            for info in infos:
+                crc = 0
+                with zf.open(info, "r") as member:
+                    for chunk in iter(lambda: member.read(1048576), b""):
+                        crc = zlib.crc32(chunk, crc)
+                if (crc & 0xFFFFFFFF) != info.CRC:
+                    os.remove(out_file)
+                    raise RuntimeError(f"Пошкоджений файл в архіві: {info.filename}")
         t_sha0 = time.time()
         crc_sec = round(max(0.1, t_sha0 - t_ver0), 1)
 
@@ -455,7 +470,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         processed = 0
         last_ui = time.time()
         with open(out_file, "rb") as f_in:
-            for blk in iter(lambda: f_in.read(65536), b""):
+            for blk in iter(lambda: f_in.read(1048576), b""):
                 h.update(blk)
                 processed += len(blk)
                 if time.time() - last_ui >= 0.8:
@@ -463,7 +478,11 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
                     pct = 92 + int((processed / max(1, total_bytes)) * 5)
                     engine.set_progress(pct, f"Розрахунок SHA-256: {processed / 1048576.0:.1f} / {total_mb:.1f} МБ")
 
-        zip_hash = h.hexdigest().upper()
+        disk_sha_low = h.hexdigest().lower()
+        if net_sha_hex and disk_sha_low != net_sha_hex:
+            os.remove(out_file)
+            raise RuntimeError("Помилка запису на диск: SHA-256 файлу на носії не збігається зі завантаженим потоком!")
+        zip_hash = disk_sha_low.upper()
         sha_file = out_file + ".sha256"
         with open(sha_file, "w", encoding="utf-8") as f_sha:
             f_sha.write(f"{zip_hash.lower()}  {os.path.basename(out_file)}\n")
@@ -484,11 +503,10 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
 
         from core.gfs import compute_gfs_plan, apply_gfs_cleanup
         engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
+        _, _, del_it = compute_gfs_plan(engine.state)
+        old_cnt_before = len(del_it)
         if not skip_cleanup and not NO_CLEAN and (auto_quiet or bool(engine.state.get("silent_cleanup", False))):
             apply_gfs_cleanup(engine, skip_prompt=True)
-        else:
-            apply_gfs_cleanup(engine, skip_prompt=True) if False else None
-        all_it, _, del_it = compute_gfs_plan(engine.state)
 
         t_end = time.time()
         ts_end_str = datetime.now().strftime("%H:%M:%S")
@@ -510,7 +528,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
         if not SILENT_MODE and not auto_quiet:
             z_cnt, z_mb, free_gb = engine.get_storage_stats()
-            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": len(del_it)}
+            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
             engine.ask_modal("backup_report", "Звіт про резервне копіювання", json.dumps(rep, ensure_ascii=False))
     except Exception as exc:
         engine.exit_code = 1

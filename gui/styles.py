@@ -1,6 +1,7 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.096 | 19.11.2026 21:53) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.132 | 20.11.2026 15:38) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
+import os
 import ctypes
 from ctypes import wintypes
 import tkinter as tk
@@ -95,6 +96,16 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
                 dpi = int(round(px_in))
         except Exception:
             dpi = 96
+    if os.name != "nt":
+        try:
+            dpi_tk = float(root.tk.call("tk", "scaling")) * 72.0
+            dpi = int(round(dpi_tk)) if 72 <= dpi_tk <= 288 else 96
+        except Exception:
+            dpi = 96
+        wa_x, wa_y = 0, 0
+        sw = root.winfo_screenwidth() or 1024
+        sh = int((root.winfo_screenheight() or 768) * 0.93)
+        frame_w, frame_h = 8, 34
 
     dpi_mult = max(1.0, dpi / 96.0)
     try:
@@ -116,8 +127,11 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
             rw_s, rh_s = sc.split("x", 1)
             outer_w = min(sw, int(rw_s))
             outer_h = min(sh, int(rh_s))
-        else:
+        elif os.name == "nt":
             outer_w, outer_h = sw, sh
+        else:
+            outer_w = min(sw, max(900, int(sw * 0.72)))
+            outer_h = min(sh, max(600, int(sh * 0.75)))
         k_prof = round(max(0.80, min(1.60, (outer_w / dpi_mult) / 1280.0)), 2)
         base_fs = max(9, min(16, int(round(10.0 * k_prof))))
         raw_fs = int(font_pref) if (isinstance(font_pref, int) and 8 <= font_pref <= 28) else base_fs
@@ -152,44 +166,73 @@ class ToolTip:
         self.text = text
         self.tipwin = None
         self._after_id = None
+        self._watch_id = None
         widget.bind("<Enter>", self._schedule, add="+")
-        widget.bind("<Leave>", self._on_leave, add="+")
+        widget.bind("<Leave>", self.hide, add="+")
         widget.bind("<ButtonPress>", self.hide, add="+")
 
     def _schedule(self, _event=None):
         if self.tipwin or self._after_id or not self.text:
             return
-        self._after_id = self.widget.after(240, self.show)
+        self._after_id = self.widget.after(260, self.show)
 
-    def _on_leave(self, _event=None):
+    def _pointer_inside(self):
         try:
             px, py = self.widget.winfo_pointerxy()
             wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
             ww, wh = self.widget.winfo_width(), self.widget.winfo_height()
-            if wx <= px <= wx + ww and wy <= py <= wy + wh:
-                return
+            return (wx <= px <= wx + ww) and (wy <= py <= wy + wh)
         except Exception:
-            pass
-        self.hide()
+            return False
+
+    def _watchdog(self):
+        self._watch_id = None
+        if not self.tipwin:
+            return
+        if not self.widget.winfo_exists() or not self._pointer_inside():
+            self.hide()
+            return
+        self._watch_id = self.widget.after(250, self._watchdog)
 
     def show(self, _event=None):
+        import sys
         self._after_id = None
-        if self.tipwin or not self.text:
+        if self.tipwin or not self.text or not self._pointer_inside():
             return
-        try:
-            px, py = self.widget.winfo_pointerxy()
-            wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
-            ww, wh = self.widget.winfo_width(), self.widget.winfo_height()
-            if not (wx - 2 <= px <= wx + ww + 2 and wy - 2 <= py <= wy + wh + 2):
-                return
-        except Exception:
-            wx, wy, ww, wh = self.widget.winfo_rootx(), self.widget.winfo_rooty(), self.widget.winfo_width(), self.widget.winfo_height()
-
         top = self.widget.winfo_toplevel()
+        prev = getattr(top, "_active_tooltip", None)
+        if prev and prev is not self:
+            prev.hide()
+        top._active_tooltip = self
         cur_fs = getattr(top, "_cur_font_sz", 10)
         tip_fs = max(9, cur_fs - 1)
+        fam = "Ubuntu" if sys.platform.startswith("linux") else "Segoe UI"
         from core.i18n import tr
         tip_txt = tr(self.text, getattr(top, "_cur_lang", "en"))
+        wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
+        ww, wh = self.widget.winfo_width(), self.widget.winfo_height()
+
+        if sys.platform.startswith("linux"):
+            lbl = tk.Label(
+                top, text=tip_txt, justify="left",
+                background="#060911", foreground="#f1f5f9",
+                relief="solid", borderwidth=1, padx=max(10, tip_fs), pady=max(5, tip_fs // 2),
+                font=(fam, tip_fs), wraplength=max(320, min(520, top.winfo_width() - 32))
+            )
+            lbl.update_idletasks()
+            tw_w, tw_h = lbl.winfo_reqwidth(), lbl.winfo_reqheight()
+            rx, ry = top.winfo_rootx(), top.winfo_rooty()
+            rw, rh = max(200, top.winfo_width()), max(150, top.winfo_height())
+            x = max(6, min((wx - rx) + 8, rw - tw_w - 6))
+            y = (wy - ry) - tw_h - 6
+            if y < 6:
+                y = min(rh - tw_h - 6, (wy - ry) + wh + 6)
+            lbl.place(x=x, y=y)
+            lbl.lift()
+            lbl.bind("<Enter>", lambda _e: self.hide())
+            self.tipwin = lbl
+            self._watch_id = self.widget.after(250, self._watchdog)
+            return
 
         self.tipwin = tw = tk.Toplevel(self.widget)
         tw.withdraw()
@@ -198,7 +241,7 @@ class ToolTip:
             tw, text=tip_txt, justify="left",
             background="#060911", foreground="#f1f5f9",
             relief="solid", borderwidth=1, padx=max(10, tip_fs), pady=max(5, tip_fs // 2),
-            font=("Segoe UI", tip_fs), wraplength=max(360, tip_fs * 34)
+            font=(fam, tip_fs), wraplength=max(360, tip_fs * 34)
         )
         lbl.pack()
         tw.update_idletasks()
@@ -218,12 +261,14 @@ class ToolTip:
         tw.deiconify()
 
     def hide(self, _event=None):
-        if self._after_id:
-            try:
-                self.widget.after_cancel(self._after_id)
-            except Exception:
-                pass
-            self._after_id = None
+        for attr in ("_after_id", "_watch_id"):
+            tid = getattr(self, attr, None)
+            if tid:
+                try:
+                    self.widget.after_cancel(tid)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
         if self.tipwin:
             try:
                 self.tipwin.destroy()

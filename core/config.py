@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.114 | 19.11.2026 23:12) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.139 | 20.11.2026 16:26) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -7,7 +7,24 @@ import sys
 import json
 import platform
 
-if sys.platform.startswith("linux") and (os.environ.get("WSL_DISTRO_NAME") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
+def is_wsl():
+    if not sys.platform.startswith("linux"):
+        return False
+    if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP") or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop"):
+        return True
+    try:
+        with open("/proc/version", "r", encoding="utf-8") as f:
+            return "microsoft" in f.read().lower()
+    except Exception:
+        return False
+
+IS_WINDOWS = (os.name == "nt")
+IS_MAC = (sys.platform == "darwin")
+IS_WSL = is_wsl()
+WSL_DISTRO = os.environ.get("WSL_DISTRO_NAME", "")
+WIN_VER = (sys.getwindowsversion().major, sys.getwindowsversion().minor) if IS_WINDOWS else (0, 0)
+
+if IS_WSL:
     try:
         import time as _t_mod, subprocess as _sp_mod
         if _t_mod.tzname == ("UTC", "UTC") and not os.environ.get("TZ"):
@@ -35,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.114"
-BUILD_DATE = "19.11.2026 23:12"
+SCRIPT_VER = "1.139"
+BUILD_DATE = "20.11.2026 16:26"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -56,9 +73,14 @@ GUI_MODE = any(a in ("--gui", "/gui") for a in ARGS_LOW)
 HIDDEN_MODE = any(a in ("--hidden", "--background", "/hidden", "/h") for a in ARGS_LOW)
 SILENT_MODE = HIDDEN_MODE or any(a in ("--silent", "-s", "/silent", "/s") for a in ARGS_LOW)
 CLI_MODE = any(a in ("--cli", "--console", "-c", "/console") for a in ARGS_LOW)
-if sys.platform.startswith("linux") and not IS_ANDROID and not GUI_MODE and not HIDDEN_MODE:
-    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-        CLI_MODE = True
+IS_LINUX_NATIVE = sys.platform.startswith("linux") and not IS_WSL and not IS_ANDROID
+HAS_DISPLAY = IS_WINDOWS or IS_MAC or IS_ANDROID or bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+AUTO_CLI_FALLBACK = False
+if not HAS_DISPLAY and not HIDDEN_MODE:
+    if GUI_MODE or not (SILENT_MODE or CLI_MODE):
+        AUTO_CLI_FALLBACK = True
+    GUI_MODE = False
+    CLI_MODE = True
 NO_CLEAN = any(a in ("--no-clean", "/noclean") for a in ARGS_LOW)
 
 SECRET_KEYS = ("client_token", "session_token", "login_pin", "editor_pin")
@@ -250,6 +272,11 @@ def _write_env_secrets(state):
     ]
     with open(tmp_env, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+    if os.name != "nt":
+        try:
+            os.chmod(tmp_env, 0o600)
+        except Exception:
+            pass
     os.replace(tmp_env, ENV_FILE)
 
 def write_file_log(text, target_dir=None):
@@ -356,30 +383,7 @@ def load_state():
         state["lite_mode"] = True
     if not state["hw_checked"]:
         state["hw_checked"] = True
-        if sys.platform == "darwin":
-            try:
-                import subprocess
-                res_m = subprocess.run(["defaults", "read", "-g", "AppleInterfaceStyle"], capture_output=True, text=True, timeout=0.5)
-                is_mac_dark = ("dark" in (res_m.stdout or "").lower())
-                state["theme"] = "mac_dark" if is_mac_dark else "mac_light"
-                state["hw_auto_notice"] = (
-                    f"Виявлено macOS ({'темний' if is_mac_dark else 'світлий'} системний режим).\n\n"
-                    f"Автоматично встановлено тему оформлення «{'macOS Sonoma Dark' if is_mac_dark else 'macOS Yosemite Light'}».\n"
-                    f"Ви можете змінити її у будь-який момент кнопкою «🎨 Тема» або в налаштуваннях."
-                )
-            except Exception:
-                state["theme"] = "mac_light"
-        is_low, reason = _detect_low_end_or_win7()
-        if is_low:
-            auto_theme = "win7" if "Windows 7" in reason else "win95"
-            auto_theme_lbl = "Windows 7 Aero" if auto_theme == "win7" else "Windows 95 / 98 Classic"
-            state["theme"] = auto_theme
-            state["lite_mode"] = False
-            state["hw_auto_notice"] = (
-                f"Виявлено старий комп'ютер або {reason}.\n\n"
-                f"Для оптимальної швидкодії та читабельності автоматично обрано тему «{auto_theme_lbl}».\n"
-                f"Надалі ви можете вільно змінити тему оформлення у налаштуваннях або кнопкою «🎨 Тема» у верхній панелі."
-            )
+        state["theme"] = "dark"
         state["dirty"] = True
 
     loaded_from_keyring = False

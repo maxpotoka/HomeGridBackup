@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/files.py (v1.057 | 19.11.2026 15:35) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v1.123 | 20.11.2026 15:06) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 # ==============================================================================
 import os
 import re
@@ -81,13 +81,15 @@ def open_file_native(file_path):
     except Exception:
         return False
 
-def choose_folder_native(initial_dir):
+def choose_folder_native(initial_dir, lang="en"):
     import sys, subprocess
+    from core.i18n import tr
+    dlg_t = tr("Оберіть папку", lang)
     if sys.platform.startswith("linux"):
         start_d = (initial_dir.rstrip("/") + "/") if initial_dir and os.path.isdir(initial_dir) else os.path.expanduser("~/")
         de = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
-        tools = [("kdialog", ["kdialog", "--getexistingdirectory", start_d, "--title", "Оберіть папку"]),
-                 ("zenity", ["zenity", "--file-selection", "--directory", "--title=Оберіть папку", f"--filename={start_d}"])]
+        tools = [("kdialog", ["kdialog", "--getexistingdirectory", start_d, "--title", dlg_t]),
+                 ("zenity", ["zenity", "--file-selection", "--directory", f"--title={dlg_t}", f"--filename={start_d}"])]
         if not any(k in de for k in ("KDE", "LXQT")):
             tools.reverse()
         for bin_name, cmd in tools:
@@ -102,7 +104,7 @@ def choose_folder_native(initial_dir):
                     pass
     try:
         from tkinter import filedialog
-        chosen = filedialog.askdirectory(initialdir=initial_dir, title="Оберіть папку")
+        chosen = filedialog.askdirectory(initialdir=initial_dir, title=dlg_t)
         return os.path.normpath(chosen) if chosen else ""
     except Exception:
         return ""

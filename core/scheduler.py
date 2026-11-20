@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v1.058 | 19.11.2026 15:35) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v1.128 | 20.11.2026 15:40) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -167,10 +167,27 @@ def _manage_linux_scheduler(action, time_str="03:00", mode_flag="--hidden"):
         pass
     return True, f"Завдання Linux (crontab + autostart) створено на {int(hh):02d}:{int(mm):02d} ({mode_flag})."
 
+def _manage_wsl_scheduler(action, time_str="03:00", mode_flag="--silent"):
+    from core.config import WSL_DISTRO
+    sch_bin = "/mnt/c/Windows/System32/schtasks.exe" if os.path.exists("/mnt/c/Windows/System32/schtasks.exe") else "schtasks.exe"
+    if action == "delete":
+        res = subprocess.run([sch_bin, "/Delete", "/TN", SCHED_TASK_NAME, "/F"], capture_output=True, text=True, errors="replace", timeout=8)
+        return (True, f"Завдання Windows '{SCHED_TASK_NAME}' (WSL) видалено.") if res.returncode == 0 else (False, "Завдання не знайдено або вже видалено.")
+    hh, mm = (time_str.split(":") + ["03", "00"])[:2]
+    main_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+    eff_flag = "--silent" if mode_flag == "--hidden" else mode_flag
+    d_arg = f"-d {WSL_DISTRO} " if WSL_DISTRO else ""
+    tr_cmd = f'wsl.exe {d_arg}-- python3 "{main_py}" {eff_flag}'
+    res = subprocess.run([sch_bin, "/Create", "/TN", SCHED_TASK_NAME, "/TR", tr_cmd, "/SC", "DAILY", "/ST", f"{int(hh):02d}:{int(mm):02d}", "/F"], capture_output=True, text=True, errors="replace", timeout=10)
+    return (True, f"Завдання Windows '{SCHED_TASK_NAME}' створено на {int(hh):02d}:{int(mm):02d} (WSL {eff_flag}).") if res.returncode == 0 else (False, f"Помилка schtasks.exe: {(res.stderr or res.stdout or '').strip()}")
+
 def _manage_windows_scheduler(action, time_str="03:00", mode_flag="--hidden", start_missed=True, wake_pc=False, prio=6):
-    if sys.platform == "darwin":
+    from core.config import IS_WSL, IS_MAC, IS_WINDOWS
+    if IS_WSL:
+        return _manage_wsl_scheduler(action, time_str, mode_flag)
+    if IS_MAC:
         return _manage_macos_launchagent(action, time_str, mode_flag)
-    if os.name != "nt":
+    if not IS_WINDOWS:
         return _manage_linux_scheduler(action, time_str, mode_flag)
     if action == "delete":
         try:

@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.066 | 19.11.2026 19:03) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.137 | 20.11.2026 16:18) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -260,12 +260,45 @@ def get_main_subnets(state=None):
             except Exception:
                 continue
 
-    if os.name != "nt" and (has_wsl_nat or os.path.exists("/proc/sys/fs/binfmt_misc/WSLInterop")):
-        if not any(n.startswith("192.168.") for n in networks):
-            networks.add("192.168.0")
-            networks.add("192.168.1")
+    primary_prefs = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        p_ip = s.getsockname()[0]
+        s.close()
+        if not p_ip.startswith("172."):
+            primary_prefs.append(p_ip.rsplit(".", 1)[0])
+    except Exception:
+        pass
 
-    return sorted(networks)
+    from core.config import IS_WSL
+    if IS_WSL:
+        try:
+            ps_out = subprocess.check_output(
+                ["powershell.exe", "-NoProfile", "-Command",
+                 "(Get-NetIPConfiguration | Where-Object {$_.IPv4DefaultGateway -ne $null}).IPv4Address.IPAddress"],
+                stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.5
+            ).decode("utf-8", errors="ignore")
+            for m_ip in re.findall(r"\b(\d+\.\d+\.\d+)\.\d+\b", ps_out):
+                if not m_ip.startswith("172."):
+                    networks.add(m_ip)
+                    if m_ip not in primary_prefs:
+                        primary_prefs.append(m_ip)
+        except Exception:
+            pass
+        if not any(n.startswith("192.168.") for n in networks):
+            networks.update(("192.168.0", "192.168.1"))
+
+    def _net_rank(pref):
+        if pref in primary_prefs:
+            return (0, primary_prefs.index(pref), pref)
+        if pref.startswith("192.168."):
+            return (1, 0, pref)
+        if pref.startswith("10."):
+            return (2, 0, pref)
+        return (3, 0, pref)
+
+    return sorted(networks, key=_net_rank)
 
 def normalize_server_url(raw):
     s = (raw or "").strip()
@@ -326,23 +359,36 @@ def scan_lan_servers(engine):
         return []
     engine.log("Сканування підмереж: " + ", ".join(f"{s}.0/24" for s in subs), "info")
     found = []
+    with engine.lock:
+        base_state = dict(engine.state)
     for pref in subs:
         engine.set_progress(None, f"Сканування {pref}.1-254...")
         ips = [f"{pref}.{i}" for i in range(1, 255)]
         def check_ip(ip_addr):
-            ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=0.65)
-            if ok_tcp:
-                temp_state = dict(engine.state)
-                ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=3.5)
-                if ok_api:
-                    return ip_addr, temp_state.get("client_token", ""), tcp_ms, api_ms
+            try:
+                ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=0.55)
+                if not ok_tcp:
+                    time.sleep(0.15)
+                    ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=1.15)
+                if ok_tcp:
+                    temp_state = dict(base_state)
+                    temp_state["_jar"] = None
+                    ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=3.5)
+                    if ok_api:
+                        return ip_addr, temp_state.get("client_token", ""), tcp_ms, api_ms
+            except Exception:
+                return None
             return None
-        with ThreadPoolExecutor(max_workers=64) as ex:
+        with ThreadPoolExecutor(max_workers=48) as ex:
             for res in ex.map(check_ip, ips):
                 if res:
                     f_ip, f_tok, t_ms, a_ms = res
                     if not any(ip_item == f_ip for ip_item, _, _ in found):
                         found.append((f_ip, t_ms, a_ms))
+                        f_url = f"http://{f_ip}:18899"
+                        engine.discovered_servers = [(f"http://{x}:18899", tm, am) for x, tm, am in found]
+                        engine.log(f"Знайдено сервер: {f_url} (TCP: {t_ms} мс, API: {a_ms} мс)", "ok")
+                        engine.set_pill(f"Знайдено: {len(found)}", "work")
                         if f_tok and f_tok != engine.state["client_token"]:
                             engine.state["client_token"] = f_tok
                             engine.state["dirty"] = True
@@ -422,13 +468,10 @@ def run_scan_task(engine):
             engine.diag_net = f"{first_ip}:18899 (ОНЛАЙН)"
             engine.diag_ping = f"TCP {first_t} мс | API {first_a} мс"
             if len(servers) == 1:
-                engine.log(f"Знайдено сервер: {first_url} (TCP: {first_t} мс, API: {first_a} мс)", "ok")
                 engine.set_pill(f"ОНЛАЙН | {first_a} мс", "ok")
                 engine.set_progress(100, f"Знайдено сервер: {first_url}")
             else:
-                engine.log(f"Знайдено кілька серверів ({len(servers)} шт.):", "warn")
-                for ip, t_ms, a_ms in servers:
-                    engine.log(f"  • http://{ip}:18899 (TCP: {t_ms} мс, API: {a_ms} мс)", "info")
+                engine.log(f"Сканування завершено. Всього знайдено серверів: {len(servers)} шт.", "info")
                 engine.set_pill(f"Знайдено: {len(servers)}", "ok")
                 engine.set_progress(100, f"Знайдено {len(servers)} серверів у мережі")
     finally:
