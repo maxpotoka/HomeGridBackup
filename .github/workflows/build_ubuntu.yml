@@ -83,8 +83,6 @@ jobs:
             --include-package=console \
             --include-package=gui \
             --include-module=gi._gi \
-            --include-module=gi.repository.Secret \
-            --include-module=gi.repository.AyatanaAppIndicator3 \
             --include-module=pystray \
             --include-module=pystray._appindicator \
             --include-module=pystray._xorg \
