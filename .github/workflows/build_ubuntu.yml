@@ -31,18 +31,25 @@ jobs:
       - name: Install system build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc patchelf python3-tk p7zip-full libayatana-appindicator3-dev
+          sudo apt-get install -y \
+            clang lld patchelf python3-tk p7zip-full \
+            libayatana-appindicator3-dev gir1.2-ayatanaappindicator3-0.1 \
+            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev
 
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install nuitka ordered-set zstandard pillow pystray keyring send2trash
+          pip3 install nuitka ordered-set pillow pystray keyring send2trash PyGObject pycairo
 
-      - name: Build Ubuntu 64-bit executable with Nuitka
+      - name: Build Ubuntu 64-bit standalone folder with Nuitka (-O3 + LTO)
+        env:
+          CFLAGS: "-O3 -mtune=generic -pipe"
+          CXXFLAGS: "-O3 -mtune=generic -pipe"
+          LDFLAGS: "-Wl,-O1,--as-needed"
         run: |
           python3 -m nuitka \
             --standalone \
-            --onefile \
+            --clang \
             --lto=yes \
             --jobs=4 \
             --python-flag=no_site \
@@ -53,10 +60,13 @@ jobs:
             --noinclude-unittest-mode=nofollow \
             --assume-yes-for-downloads \
             --enable-plugin=tk-inter \
+            --enable-plugin=gi \
             --include-package=core \
             --include-package=console \
             --include-package=gui \
             --include-package=pystray \
+            --include-module=pystray._appindicator \
+            --include-module=pystray._xorg \
             --include-package=PIL \
             --include-package=keyring \
             --include-package=send2trash \
@@ -64,20 +74,21 @@ jobs:
             --output-dir=dist_ubuntu \
             --output-filename=HomeGridBackup \
             main.py
-          chmod +x dist_ubuntu/HomeGridBackup
+          mv dist_ubuntu/main.dist dist_ubuntu/HomeGridBackup
+          chmod +x dist_ubuntu/HomeGridBackup/HomeGridBackup
 
-      - name: Package into single .7z archive
+      - name: Package folder into single .7z archive
         run: |
           cd dist_ubuntu
           7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z HomeGridBackup
 
-      - name: Publish clean .7z to GitHub Releases (no double zip)
+      - name: Publish clean .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ubuntu-x64-latest
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
-            Чистий архів **HomeGridBackup_Ubuntu_x64.7z** без подвійного пакування у `.zip`.
-            Після розпакування запустіть у терміналі: `chmod +x HomeGridBackup && ./HomeGridBackup`
+            Збірка у вигляді папки **HomeGridBackup/** для максимальної швидкодії (без розпакування при запуску).
+            Після розпакування архіву запустіть: `cd HomeGridBackup && chmod +x HomeGridBackup && ./HomeGridBackup`
           files: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
           make_latest: false
