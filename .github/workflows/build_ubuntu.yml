@@ -1,113 +1,98 @@
 
-name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
+name: Build Ubuntu
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
-    paths:
-      - 'main.py'
-      - 'core/**'
-      - 'console/**'
-      - 'gui/**'
-      - '.github/workflows/build_ubuntu.yml'
-
-permissions:
-  contents: write
+    tags:
+      - 'v*'
 
 jobs:
-  build-ubuntu-x64:
+  build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Python 3.11 (64-bit)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          architecture: "x64"
 
       - name: Install system build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             clang lld patchelf python3-tk p7zip-full \
-            libayatana-appindicator3-dev gir1.2-ayatanaappindicator3-0.1 \
+            libayatana-appindicator3-dev \
+            gir1.2-ayatanaappindicator3-0.1 \
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-secret-1 libsecret-1-0
-
-      - name: Install Python dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install nuitka ordered-set pillow pystray keyring send2trash "PyGObject<3.50" pycairo
+            gir1.2-secret-1 libsecret-1-0 \
+            gir1.2-appindicator3-0.1 libappindicator3-1
 
       - name: Verify Secret GI namespace
         run: |
           python3 -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
 
-      - name: Build Ubuntu 64-bit standalone folder with Nuitka (-O3 + LTO)
-        env:
-          CFLAGS: "-O3 -mtune=generic -pipe"
-          CXXFLAGS: "-O3 -mtune=generic -pipe"
-          LDFLAGS: "-Wl,-O1,--as-needed"
+      - name: Verify AppIndicator GI namespace
         run: |
-          python3 -m nuitka \
+          python3 -c "import gi; gi.require_version('AppIndicator3', '0.1'); from gi.repository import AppIndicator3; print('AppIndicator3 GI namespace OK')"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nuitka ordered-set zstandard
+          pip install pystray pillow keyring send2trash
+
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka \
             --standalone \
+            --enable-plugin=gi \
+            --enable-plugin=tk-inter \
             --clang \
             --lto=yes \
-            --jobs=4 \
-            --python-flag=no_site \
-            --python-flag=no_asserts \
-            --python-flag=no_docstrings \
-            --noinclude-pytest-mode=nofollow \
-            --noinclude-setuptools-mode=nofollow \
-            --noinclude-unittest-mode=nofollow \
+            --jobs=2 \
             --assume-yes-for-downloads \
-            --enable-plugin=tk-inter \
-            --enable-plugin=gi \
+            --python-flag=no_site \
             --include-package=core \
-            --include-package=console \
             --include-package=gui \
             --include-package=pystray \
             --include-module=pystray._appindicator \
-            --include-module=pystray._xorg \
+            --include-module=keyring \
             --include-package=PIL \
-            --include-package=keyring \
-            --include-package=send2trash \
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
-            --output-dir=dist_ubuntu \
-            --output-filename=homegridBackup \
+            --include-package-data=keyring \
+            --include-package-data=pystray \
+            --include-package-data=PIL \
+            --include-module=send2trash \
+            --output-dir=build \
+            --output-filename=HomeGridBackup \
+            --follow-imports \
+            --lto=yes \
+            --python-flag=-O \
             main.py
 
-          DIST_SRC=$(find dist_ubuntu -maxdepth 1 -type d -name "*.dist" | head -n 1)
+      - name: Locate build output
+        run: |
+          find build -maxdepth 2 -type f -name "HomeGridBackup" -print
+          find build -maxdepth 2 -type d -name "*.dist" -print
 
-          if [ -z "$DIST_SRC" ]; then
-            echo "ERROR: Nuitka output directory (*.dist) not found"
+      - name: Package application
+        run: |
+          DIST_DIR=$(find build -maxdepth 1 -type d -name "*.dist" -print -quit)
+
+          if [ -z "$DIST_DIR" ]; then
+            echo "ERROR: Nuitka distribution directory not found"
             exit 1
           fi
 
-          mv "$DIST_SRC" dist_ubuntu/homegridBackup
+          mv "$DIST_DIR" HomeGridBackup
+          7z a HomeGridBackup-Ubuntu-x86_64.7z HomeGridBackup/
 
-          chmod +x dist_ubuntu/homegridBackup/homegridBackup
-
-      - name: Package folder into single .7z archive
-        run: |
-          cd dist_ubuntu
-          7z a -t7z -mx=9 HomeGridBackup_Ubuntu_x64.7z homegridBackup
-
-      - name: Publish clean .7z to GitHub Releases
-        uses: softprops/action-gh-release@v2
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ubuntu-x64-latest
-          name: HomeGrid Backup — Ubuntu (Linux x86_64)
-          body: |
-            Збірка у вигляді папки **homegridBackup/** для максимальної швидкодії (без розпакування при запуску).
-
-            Після розпакування архіву запустіть:
-
-            `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
-          files: dist_ubuntu/HomeGridBackup_Ubuntu_x64.7z
-          make_latest: false
+          name: HomeGridBackup-Ubuntu-x86_64
+          path: HomeGridBackup-Ubuntu-x86_64.7z
+          if-no-files-found: error
