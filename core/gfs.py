@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/gfs.py (v1.007 | 18.11.2026 17:42) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
+# [ФАЙЛ: core/gfs.py (v1.146 | 20.11.2026 23:29) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
 # ==============================================================================
 import os
 import re
@@ -18,64 +18,14 @@ def compute_gfs_plan(state):
             all_items.append({"path": full, "name": name, "size": sz, "dt_str": dt.strftime("%Y-%m-%d %H:%M"), "dt": dt})
     all_items.sort(key=lambda x: x["dt"], reverse=True)
 
-    today = datetime.now().date()
-    epoch_mon = datetime(2000, 1, 3)
-    daily_days = max(1, int(state.get("daily_days", 7)))
-    today_max = max(1, int(state.get("today_max", 2)))
-    weekly_cnt = max(0, int(state.get("weekly_count", 4)))
-    monthly_cnt = max(0, int(state.get("monthly_count", 12)))
-    yearly_cnt = max(0, int(state.get("yearly_count", 3)))
-
+    keep_n = max(1, int(state.get("keep_last_count", 5)))
     tags = {}
     for it in all_items:
         if re.search(r"(^|_)KEEP(_|\.)", it["name"]):
             tags[it["path"]] = "KEEP"
-
-    if yearly_cnt > 0:
-        seen_years = list(dict.fromkeys(it["dt"].strftime("%Y") for it in all_items))
-        for yr in seen_years[:yearly_cnt]:
-            grp = [it for it in all_items if it["dt"].strftime("%Y") == yr]
-            x = next((it for it in grp if re.search(r"(^|_)YEARLY(_|\.)", it["name"]) and it["path"] not in tags), None)
-            if not x and (len(grp) >= 4 or any(re.search(r"(^|_)MONTHLY(_|\.)", it["name"]) for it in grp)):
-                x = next((it for it in grp if it["path"] not in tags), None)
-            if x:
-                tags[x["path"]] = "YEARLY"
-
-    if monthly_cnt > 0:
-        seen_months = list(dict.fromkeys(it["dt"].strftime("%Y-%m") for it in all_items))
-        for ym in seen_months[:monthly_cnt]:
-            grp = [it for it in all_items if it["dt"].strftime("%Y-%m") == ym]
-            x = next((it for it in grp if re.search(r"(^|_)MONTHLY(_|\.)", it["name"]) and it["path"] not in tags), None)
-            if not x and (len(grp) >= 3 or any(re.search(r"(^|_)WEEKLY(_|\.)", it["name"]) for it in grp)):
-                x = next((it for it in grp if it["path"] not in tags), None)
-            if x:
-                tags[x["path"]] = "MONTHLY"
-
-    if weekly_cnt > 0:
-        seen_weeks = list(dict.fromkeys((it["dt"] - epoch_mon).days // 7 for it in all_items))
-        for wk in seen_weeks[:weekly_cnt]:
-            grp = [it for it in all_items if ((it["dt"] - epoch_mon).days // 7) == wk]
-            x = next((it for it in grp if re.search(r"(^|_)WEEKLY(_|\.)", it["name"]) and it["path"] not in tags), None)
-            if not x and len(grp) >= 2:
-                x = next((it for it in grp if it["path"] not in tags), None)
-            if x:
-                tags[x["path"]] = "WEEKLY"
-
-    cutoff_date = today - timedelta(days=daily_days - 1)
-    past_recent = [it for it in all_items if cutoff_date <= it["dt"].date() < today]
-    for ymd in list(dict.fromkeys(it["dt"].strftime("%Y-%m-%d") for it in past_recent)):
-        grp = [it for it in past_recent if it["dt"].strftime("%Y-%m-%d") == ymd]
-        x = next((it for it in grp if it["path"] not in tags), None)
-        if x:
-            tags[x["path"]] = "DAILY"
-
-    for it in [it for it in all_items if it["dt"].date() == today and it["path"] not in tags][:today_max]:
+    unpinned = [it for it in all_items if it["path"] not in tags]
+    for it in unpinned[:keep_n]:
         tags[it["path"]] = "DAILY"
-
-    if all_items:
-        newest = next(iter(all_items))
-        if newest["path"] not in tags:
-            tags[newest["path"]] = "DAILY"
 
     keep_items, del_items = [], []
     for it in all_items:

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.141 | 20.11.2026 22:09) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.154 | 20.11.2026 23:46) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -524,6 +524,9 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
         engine.log(f"УСПІХ! Резервне копіювання завершено за {total_sec} с ({ts_start_str} → {ts_end_str}).", "ok")
+        engine.state["all_time_cnt"] = max(int(engine.state.get("all_time_cnt", 0)), 0) + 1
+        engine.state["all_time_mb"] = round(max(float(engine.state.get("all_time_mb", 0.0)), 0.0) + total_mb, 1)
+        commit_state(engine.state)
         if hasattr(engine, "record_op_event"):
             engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
         if not SILENT_MODE and not auto_quiet:

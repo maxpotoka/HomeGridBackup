@@ -52,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.142"
-BUILD_DATE = "20.11.2026 22:11"
+SCRIPT_VER = "1.154"
+BUILD_DATE = "20.11.2026 23:46"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -313,9 +313,9 @@ def record_server_history(state, srv_url):
 
 def load_state():
     state = {
-        "server": "", "server_history": [], "op_history": [], "client_token": "", "session_token": "",
+        "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "daily_days": 7, "today_max": 2,
+        "mirror_dir": "", "mirror_enabled": False, "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
         "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
@@ -333,6 +333,10 @@ def load_state():
                 state["server"] = str(data["server"]).strip()
             if isinstance(data.get("op_history"), list):
                 state["op_history"] = data["op_history"][:25]
+            if isinstance(data.get("all_time_cnt"), int) and data["all_time_cnt"] >= 0:
+                state["all_time_cnt"] = data["all_time_cnt"]
+            if isinstance(data.get("all_time_mb"), (int, float)) and data["all_time_mb"] >= 0:
+                state["all_time_mb"] = round(float(data["all_time_mb"]), 1)
             if isinstance(data.get("server_history"), list):
                 state["server_history"] = [str(x).strip() for x in data["server_history"] if str(x).strip()][:15]
             if data.get("backup_dir"):
@@ -367,7 +371,7 @@ def load_state():
                 state["sched_mode"] = data["sched_mode"]
             if data.get("sched_prio") in (2, 4, 5, 6, 7, 8, 9):
                 state["sched_prio"] = data["sched_prio"]
-            for ik in ("daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count"):
+            for ik in ("keep_last_count", "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count"):
                 if ik in data and isinstance(data[ik], int) and data[ik] >= 0:
                     state[ik] = data[ik]
             for sk in SECRET_KEYS:
@@ -420,7 +424,7 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "op_history", "backup_dir", "mirror_dir", "mirror_enabled",
+        "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",

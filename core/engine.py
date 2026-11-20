@@ -1,6 +1,6 @@
 from core.i18n import tr
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.138 | 20.11.2026 16:20) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.154 | 20.11.2026 23:46) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -338,6 +338,13 @@ class BackupEngine:
             res[k] = round(res[k], 1)
         if res["total_cnt"] > 0:
             res["avg_mb"] = round(res["total_mb"] / res["total_cnt"], 1)
+        st_cnt = int(self.state.get("all_time_cnt", 0) or 0)
+        st_mb = round(float(self.state.get("all_time_mb", 0.0) or 0.0), 1)
+        if res["total_cnt"] > st_cnt:
+            self.state["all_time_cnt"] = res["total_cnt"]
+            self.state["all_time_mb"] = max(st_mb, res["total_mb"])
+        res["total_cnt"] = max(res["total_cnt"], int(self.state.get("all_time_cnt", 0)))
+        res["total_mb"] = max(res["total_mb"], round(float(self.state.get("all_time_mb", 0.0)), 1))
         if len(mtimes) >= 2:
             res["span_days"] = max(1, int((max(mtimes) - min(mtimes)) // 86400))
         ops = getattr(self, "op_history", []) or []

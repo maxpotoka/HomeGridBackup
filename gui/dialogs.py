@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.133 | 20.11.2026 15:48) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.153 | 20.11.2026 23:42) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -405,6 +405,7 @@ class DialogsMixin:
         fs = self.metrics["font_sz"]
         dlg, p, host = self._make_dialog("Налаштування програми, тем, масштабу, GFS та Планувальника", 940, 620, scrollable=False, min_outer_w=880, min_outer_h=580)
 
+        v_keep_n = tk.IntVar(value=st.get("keep_last_count", 5))
         v_daily = tk.IntVar(value=st.get("daily_days", 7))
         v_today = tk.IntVar(value=st.get("today_max", 2))
         v_week = tk.IntVar(value=st.get("weekly_count", 4))
@@ -445,26 +446,13 @@ class DialogsMixin:
         top_grid.columnconfigure(0, weight=1)
         top_grid.columnconfigure(1, weight=1)
 
-        f_gfs = tk.LabelFrame(top_grid, text=" 1. Стратегія збереження файлів (GFS) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=10, pady=3)
+        f_gfs = tk.LabelFrame(top_grid, text=" 1. Кільцева стратегія (останні N архівів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=8)
         f_gfs.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=2)
-        for ci in (0, 1, 2, 3):
-            f_gfs.columnconfigure(ci, weight=1 if ci in (0, 2) else 0)
+        tk.Label(f_gfs, text="Зберігати останніх архівів (шт.):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=0, column=0, sticky="w", pady=6)
+        tk.Spinbox(f_gfs, from_=1, to=50, textvariable=v_keep_n, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs, "bold")).grid(row=0, column=1, sticky="w", padx=(8, 0), pady=6)
+        tk.Checkbutton(f_gfs, text="У Кошик (замість видалення)", variable=v_trash, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
 
-        tk.Label(f_gfs, text="Щоденні (дн.):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=0, column=0, sticky="w", pady=3)
-        tk.Spinbox(f_gfs, from_=1, to=90, textvariable=v_daily, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs)).grid(row=0, column=1, sticky="w", padx=(4, 14), pady=3)
-        tk.Label(f_gfs, text="Копій за день:", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=0, column=2, sticky="w", pady=3)
-        tk.Spinbox(f_gfs, from_=1, to=15, textvariable=v_today, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs)).grid(row=0, column=3, sticky="w", padx=(4, 0), pady=3)
-
-        tk.Label(f_gfs, text="Тижневі (шт.):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=1, column=0, sticky="w", pady=3)
-        tk.Spinbox(f_gfs, from_=0, to=52, textvariable=v_week, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs)).grid(row=1, column=1, sticky="w", padx=(4, 14), pady=3)
-        tk.Label(f_gfs, text="Місячні (шт.):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=1, column=2, sticky="w", pady=3)
-        tk.Spinbox(f_gfs, from_=0, to=60, textvariable=v_month, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs)).grid(row=1, column=3, sticky="w", padx=(4, 0), pady=3)
-
-        tk.Label(f_gfs, text="Річні (архів):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=2, column=0, sticky="w", pady=3)
-        tk.Spinbox(f_gfs, from_=0, to=25, textvariable=v_year, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs)).grid(row=2, column=1, sticky="w", padx=(4, 14), pady=3)
-        tk.Checkbutton(f_gfs, text="У Кошик (замість видалення)", variable=v_trash, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).grid(row=2, column=2, columnspan=2, sticky="w", pady=3)
-
-        f_del = tk.LabelFrame(top_grid, text=" 2. Системний трей та тихий режим ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=6)
+        f_del = tk.LabelFrame(top_grid, text=" 2. Трей та тихий режим ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=6)
         f_del.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=2)
         tk.Checkbutton(f_del, text="Згортати у трей при закритті", variable=v_tray_min, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=6)
         tk.Checkbutton(f_del, text="Автоочищення у фоні (GFS)", variable=v_sclean, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=4)
@@ -585,6 +573,7 @@ class DialogsMixin:
         _upd_prev()
 
         def _commit_settings(close_after):
+            st["keep_last_count"] = max(1, int(v_keep_n.get()))
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))
             st["weekly_count"] = max(0, int(v_week.get()))
@@ -741,6 +730,8 @@ class DialogsMixin:
             no_sha = sum(1 for x in all_items if not os.path.exists(x["path"] + ".sha256"))
             lbl_sum.configure(text=f"Всього: {len(all_items)} ({tot_mb} МБ) | Залишиться: {len(keep_items)} | Застарілих: {len(del_items)} ({del_mb} МБ) | Без .sha256: {no_sha}")
             _upd_del_bad_btn()
+            if "btn_clean_exp" in locals():
+                btn_clean_exp.configure(state="normal" if del_items else "disabled", bg=p["amber"] if del_items else p["card"], fg="#000000" if del_items else p["muted"])
             if not all_items:
                 tk.Label(list_box, text="У папці поки немає ZIP-архівів.", bg=p["log_bg"], fg=p["muted"], font=(fam, fs)).pack(pady=16)
                 return
@@ -756,13 +747,25 @@ class DialogsMixin:
                 else:
                     st_c = p["cyan"] if is_pin else (p["green"] if is_keep else p["red"])
                     st_t = "ЗАХИЩЕНО" if is_pin else ("ЗБЕРЕГТИ" if is_keep else "ВИДАЛИТИ")
-                tk.Label(row, text=tr(st_t, self.engine.state.get("lang", "en")), width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).pack(side="left")
+                row.columnconfigure(1, weight=1)
+                tk.Label(row, text=tr(st_t, self.engine.state.get("lang", "en")), width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).grid(row=0, column=0, sticky="w")
                 sz_m = round(it["size"] / 1048576.0, 1)
                 det_s = f" — {v_info.get('detail', '')}" if is_bad else ""
-                tk.Label(row, text=f"{it['name']}  ({sz_m} МБ){det_s}", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).pack(side="left", padx=6)
-                if is_bad:
-                    tk.Button(row, text=tr("🗑 Видалити", self.engine.state.get("lang", "en")), command=lambda n=it["name"]: (_delete_archive_pair(n), _refresh()), bg=p["red"], fg="#ffffff", font=(fam, max(8, fs - 1), "bold"), padx=8, pady=1, cursor="hand2").pack(side="right", padx=(4, 0))
-                tk.Button(row, text=tr("🔒 Захист" if is_pin else "Немає захисту", self.engine.state.get("lang", "en")), width=14, command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["cyan"] if is_pin else p["panel"], fg="#000000" if is_pin else p["muted"], font=(fam, max(8, fs - 1), "bold" if is_pin else "normal"), padx=8, pady=1, cursor="hand2").pack(side="right")
+                disp_n = it["name"] if len(it["name"]) <= 52 else (it["name"][:49] + "...")
+                tk.Label(row, text=f"{disp_n}  ({sz_m} МБ){det_s}", anchor="w", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).grid(row=0, column=1, sticky="ew", padx=6)
+                def _ask_del_arc(n=it['name']):
+                    lng_d = self.engine.state.get('lang', 'en')
+                    t_c = 'Видалення архіву' if lng_d == 'uk' else 'Delete Archive'
+                    q_c = f'Видалити архів та .sha256?\n\n{n}' if lng_d == 'uk' else f'Delete archive and .sha256?\n\n{n}'
+                    cdlg, cp, _ = self._make_dialog(t_c, 500, 210)
+                    cbf = tk.Frame(cdlg, bg=cp['panel'])
+                    cbf.pack(side='bottom', fill='x', padx=14, pady=10)
+                    tk.Label(cdlg, text=q_c, bg=cp['panel'], fg=cp['text'], wraplength=450, font=(fam, fs)).pack(pady=(16, 8), padx=16, expand=True)
+                    tk.Button(cbf, text=tr('Скасувати', lng_d), command=cdlg.destroy, bg=cp['card'], fg=cp['text'], font=(fam, fs), padx=12, pady=4).pack(side='right', padx=6)
+                    tk.Button(cbf, text=tr('Видалити', lng_d), command=lambda: (cdlg.destroy(), _delete_archive_pair(n), _refresh()), bg=cp['red'], fg='#ffffff', font=(fam, fs, 'bold'), padx=12, pady=4).pack(side='right', padx=6)
+                    self._fit_dialog(cdlg)
+                tk.Button(row, text=tr("🔒 Захист" if is_pin else "Немає захисту", self.engine.state.get("lang", "en")), width=15, command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["cyan"] if is_pin else p["panel"], fg="#000000" if is_pin else p["muted"], font=(fam, max(8, fs - 1), "bold" if is_pin else "normal"), padx=8, pady=1, cursor="hand2").grid(row=0, column=2, sticky="e")
+                tk.Button(row, text='🗑', command=_ask_del_arc, bg=p['red'] if is_bad else p['panel'], fg='#ffffff' if is_bad else p['red'], font=(fam, max(8, fs - 1), 'bold'), padx=8, pady=1, cursor='hand2').grid(row=0, column=3, sticky='e', padx=(6, 0))
 
         def _clean():
             apply_gfs_cleanup(self.engine, skip_prompt=True)
@@ -784,7 +787,8 @@ class DialogsMixin:
         cb_buf.pack(side="left", padx=(0, 8))
         btn_del_bad = tk.Button(bf, text="🗑 Пошкоджених: 0", command=_clean_corrupted, state="disabled", bg=p["card"], fg=p["muted"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
         btn_del_bad.pack(side="left", padx=4)
-        tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2").pack(side="left", padx=4)
+        btn_clean_exp = tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
+        btn_clean_exp.pack(side="left", padx=4)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
         _refresh()
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
@@ -816,7 +820,7 @@ class DialogsMixin:
             ("СЕР. РОЗМІР", f"{st.get('avg_mb', 0.0)} МБ", "на один архів", p["text"], None),
             ("ЗАХИСТ SHA-256", f"{sha_c} / {tot_c} ({sha_pct}%)", "натисніть для списку" if sha_c < tot_c else "усі захищені", sha_col, "sha"),
             ("УСПІШНІСТЬ", f"{st.get('success_rate', 100)}%", "останніх запусків", p["text"], None),
-            ("ГЛИБИНА", f"{st.get('span_days', 0)} дн.", "діапазон копій", p["text"], None),
+            ("ГЛИБИНА", ("1 день" if (self.engine.state.get("lang") == "uk" and st.get("span_days", 0) == 1) else ("1 day" if (self.engine.state.get("lang") != "uk" and st.get("span_days", 0) == 1) else (f"{st.get('span_days', 0)} дн." if self.engine.state.get("lang") == "uk" else f"{st.get('span_days', 0)} days"))), "діапазон копій", p["text"], None),
         ]
 
         def _show_missing_sha():
@@ -889,26 +893,35 @@ class DialogsMixin:
     def open_ops_history(self):
         fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
-        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 900, 500)
+        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 940, 540)
         hdr_txt = "Останні 25 операцій створення резервних копій (подвійний клік по рядку — деталі):" if lang == "uk" else "Last 25 backup operations (double-click a row for details):"
         tk.Label(dlg, text=hdr_txt, bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
 
+        bf = tk.Frame(dlg, bg=p["panel"])
+        bf.pack(side="bottom", fill="x", padx=14, pady=(6, 12))
+
         wrap = tk.Frame(dlg, bg=p["panel"])
-        wrap.pack(fill="both", expand=True, padx=14, pady=(0, 6))
+        wrap.pack(fill="both", expand=True, padx=14, pady=(0, 4))
 
         style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.map("HGB.Treeview", background=[("selected", p["blue"])], foreground=[("selected", "#ffffff")])
+        style.map("HGB.Treeview.Heading", background=[("active", p["panel"])])
         style.configure("HGB.Treeview", background=p["log_bg"], foreground=p["text"], fieldbackground=p["log_bg"], rowheight=max(26, int((fs + 16) * self.metrics["k"])), font=("Segoe UI", max(8, fs - 1)))
         style.configure("HGB.Treeview.Heading", background=p["card"], foreground=p["cyan"], font=("Segoe UI", max(8, fs - 1), "bold"))
 
         cols = ("date", "status", "file", "size", "dur", "sha")
         tree = ttk.Treeview(wrap, columns=cols, show="headings", style="HGB.Treeview")
         heads = [
-            ("date", "Дата" if lang == "uk" else "Date", 150, "center"),
-            ("status", "Статус" if lang == "uk" else "Status", 95, "center"),
-            ("file", "Файл / Подія" if lang == "uk" else "File / Event", 330, "w"),
-            ("size", "Розмір" if lang == "uk" else "Size", 90, "e"),
-            ("dur", "Час" if lang == "uk" else "Duration", 78, "center"),
-            ("sha", "SHA", 52, "center")
+            ("date", "Дата" if lang == "uk" else "Date", 174, "center"),
+            ("status", "Статус" if lang == "uk" else "Status", 98, "center"),
+            ("file", "Файл / Подія" if lang == "uk" else "File / Event", 350, "w"),
+            ("size", "Розмір" if lang == "uk" else "Size", 94, "e"),
+            ("dur", "Час" if lang == "uk" else "Duration", 98, "center"),
+            ("sha", "SHA", 54, "center")
         ]
         for cid, title_h, w_col, anc in heads:
             tree.heading(cid, text=title_h)
@@ -975,8 +988,7 @@ class DialogsMixin:
             commit_state(self.engine.state)
             _populate()
 
-        bf = tk.Frame(dlg, bg=p["panel"])
-        bf.pack(side="bottom", fill="x", padx=14, pady=(4, 12))
+
         tk.Button(bf, text="🗑 Очистити журнал" if lang == "uk" else "🗑 Clear History", command=_clear_ops, bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=5, cursor="hand2").pack(side="left")
         tk.Button(bf, text=tr("Закрити", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5, cursor="hand2").pack(side="right")
 
