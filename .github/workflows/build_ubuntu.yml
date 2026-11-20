@@ -39,7 +39,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install nuitka ordered-set pillow pystray keyring send2trash "PyGObject<3.50" pycairo
+          pip3 install nuitka ordered-set pillow pystray keyring secretstorage jeepney send2trash "PyGObject<3.50" pycairo
 
       - name: Build Ubuntu 64-bit standalone folder with Nuitka (-O3 + LTO)
         env:
@@ -52,7 +52,6 @@ jobs:
             --clang \
             --lto=yes \
             --jobs=4 \
-            --python-flag=no_site \
             --python-flag=no_asserts \
             --python-flag=no_docstrings \
             --noinclude-pytest-mode=nofollow \
@@ -64,11 +63,14 @@ jobs:
             --include-package=core \
             --include-package=console \
             --include-package=gui \
+            --include-package=gi \
             --include-package=pystray \
             --include-module=pystray._appindicator \
             --include-module=pystray._xorg \
             --include-package=PIL \
             --include-package=keyring \
+            --include-package=secretstorage \
+            --include-package=jeepney \
             --include-package=send2trash \
             --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
             --output-dir=dist_ubuntu \
@@ -77,6 +79,8 @@ jobs:
           DIST_SRC=$(find dist_ubuntu -maxdepth 1 -type d -name "*.dist" | head -n 1)
           mv "$DIST_SRC" dist_ubuntu/homegridBackup
           chmod +x dist_ubuntu/homegridBackup/homegridBackup
+          echo "=== Проверка файлов AppIndicator и typelib в сборке ==="
+          find dist_ubuntu/homegridBackup -iname "*appindicator*" -o -iname "*.typelib"
 
       - name: Package folder into single .7z archive
         run: |
