@@ -1,12 +1,22 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.137 | 20.11.2026 16:18) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.140 | 20.11.2026 22:08) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
 import time
 import socket
+_ORIG_CREATE_CONN = socket.create_connection
+def _fast_conn(addr, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kw):
+    s = _ORIG_CREATE_CONN(addr, timeout=timeout, source_address=source_address, **kw)
+    try:
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2097152)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2097152)
+    except Exception: pass
+    return s
+socket.create_connection = _fast_conn
 import ipaddress
 import subprocess
 import urllib.request

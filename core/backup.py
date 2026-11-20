@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.138 | 20.11.2026 16:20) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.141 | 20.11.2026 22:09) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -370,7 +370,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     handlers.append(urllib.request.ProxyHandler({}))
                 opener = urllib.request.build_opener(*handlers)
                 req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
-                with opener.open(req, timeout=300) as resp, open(out_file, "wb") as out_f:
+                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=4194304) as out_f:
                     srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
                     net_h = hashlib.sha256()
                     cb = 0
@@ -379,7 +379,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     last_speed_bytes = 0
                     smooth_speed = None
                     while True:
-                        chunk = resp.read(65536)
+                        chunk = resp.read(1048576)
                         if not chunk:
                             break
                         out_f.write(chunk)
@@ -458,7 +458,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             for info in infos:
                 crc = 0
                 with zf.open(info, "r") as member:
-                    for chunk in iter(lambda: member.read(1048576), b""):
+                    for chunk in iter(lambda: member.read(4194304), b""):
                         crc = zlib.crc32(chunk, crc)
                 if (crc & 0xFFFFFFFF) != info.CRC:
                     os.remove(out_file)
@@ -470,7 +470,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         processed = 0
         last_ui = time.time()
         with open(out_file, "rb") as f_in:
-            for blk in iter(lambda: f_in.read(1048576), b""):
+            for blk in iter(lambda: f_in.read(4194304), b""):
                 h.update(blk)
                 processed += len(blk)
                 if time.time() - last_ui >= 0.8:

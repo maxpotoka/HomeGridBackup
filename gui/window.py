@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.136 | 20.11.2026 16:06) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.140 | 20.11.2026 22:08) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -686,7 +686,11 @@ class HomeGridApp(DialogsMixin):
                 if self.root.focus_get() != self.ent_srv:
                     self.var_srv.set(srv_in_state)
 
-            z_cnt, z_mb, free_gb = self.engine.get_storage_stats()
+            now_m = time.monotonic()
+            if now_m - getattr(self, '_last_disk_t', 0.0) >= 3.5 or not self.engine.is_running:
+                self._last_disk_t = now_m
+                self._cached_disk = self.engine.get_storage_stats()
+            z_cnt, z_mb, free_gb = getattr(self, '_cached_disk', (0, 0.0, -1))
             free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
             self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", st.get("lang", "en")))
 
@@ -709,15 +713,18 @@ class HomeGridApp(DialogsMixin):
 
             self.var_stage.set(self.engine.stage)
             self.var_pct.set(tr("пошук...", st.get("lang", "en")) if self.engine.indeterminate else f"{self.engine.progress}%")
-            self.pbar.set_state(
+            _psig = (self.engine.progress, self.engine.indeterminate, self.engine.stage, st.get('progress_style', 'v8'), bool(st.get('lite_mode', False)))
+            if getattr(self, '_last_psig', None) != _psig or self.engine.indeterminate:
+                self._last_psig = _psig
+                self.pbar.set_state(
                 self.engine.progress,
                 self.engine.indeterminate,
                 st.get("progress_style", "v8"),
                 bool(st.get("lite_mode", False)),
                 self._get_palette(),
                 self.engine.stage,
-                st.get("lang", "en")
-            )
+                    st.get("lang", "en")
+                )
 
             btn_state = "disabled" if self.engine.is_running else "normal"
             for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):

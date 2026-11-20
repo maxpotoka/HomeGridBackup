@@ -1,10 +1,24 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.130 | 20.11.2026 15:52) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.142 | 20.11.2026 22:11) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
 import ctypes
 import threading
+
+def _clean_sys_env():
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    if "LD_LIBRARY_PATH_ORIG" in env:
+        env["LD_LIBRARY_PATH"] = env["LD_LIBRARY_PATH_ORIG"]
+    else:
+        env.pop("LD_LIBRARY_PATH", None)
+    if not env.get("DBUS_SESSION_BUS_ADDRESS") and hasattr(os, "getuid"):
+        bus_p = f"/run/user/{os.getuid()}/bus"
+        if os.path.exists(bus_p):
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus_p}"
+            os.environ["DBUS_SESSION_BUS_ADDRESS"] = env["DBUS_SESSION_BUS_ADDRESS"]
+    return env
 
 def _detect_linux_tray_backend():
     import sys, subprocess
@@ -15,25 +29,29 @@ def _detect_linux_tray_backend():
         return ""
     if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
         return ""
+    for gp in ("/usr/lib/x86_64-linux-gnu/girepository-1.0", "/usr/lib/girepository-1.0"):
+        if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
+            os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
+    sys_env = _clean_sys_env()
     try:
         out = subprocess.check_output(
             ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call",
              "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner",
              "string:org.kde.StatusNotifierWatcher"],
-            stderr=subprocess.DEVNULL, timeout=0.6
+            env=sys_env, stderr=subprocess.DEVNULL, timeout=0.8
         ).decode("utf-8", errors="ignore")
         if "boolean true" in out:
             return "appindicator"
     except Exception:
         pass
     try:
-        out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], stderr=subprocess.DEVNULL, timeout=0.5).decode("utf-8", errors="ignore")
+        out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], env=sys_env, stderr=subprocess.DEVNULL, timeout=0.6).decode("utf-8", errors="ignore")
         if "window id #" in out_x and "0x0" not in out_x:
             return "xorg"
     except Exception:
         pass
-    de = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
-    if any(k in de for k in ("XFCE", "KDE", "LXQT", "MATE", "CINNAMON")):
+    de = f"{os.environ.get('XDG_CURRENT_DESKTOP', '')} {os.environ.get('DESKTOP_SESSION', '')}".upper()
+    if any(k in de for k in ("XFCE", "KDE", "LXQT", "MATE", "CINNAMON", "UNITY")):
         return "appindicator"
     return ""
 
