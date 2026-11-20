@@ -39,7 +39,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install nuitka ordered-set pillow pystray keyring send2trash PyGObject pycairo
+          pip3 install nuitka ordered-set pillow pystray keyring send2trash "PyGObject<3.50" pycairo
 
       - name: Build Ubuntu 64-bit standalone folder with Nuitka (-O3 + LTO)
         env:
