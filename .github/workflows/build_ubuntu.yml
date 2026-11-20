@@ -33,7 +33,7 @@ jobs:
             libayatana-appindicator3-dev \
             gir1.2-ayatanaappindicator3-0.1 \
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-secret-1 libsecret-1-0
+            gir1.2-secret-1 libsecret-1-0 gir1.2-vte-2.91
 
       - name: Set up Python 3.11 (64-bit)
         uses: actions/setup-python@v5
@@ -92,7 +92,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
+            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
