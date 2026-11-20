@@ -61,7 +61,7 @@ jobs:
           CXXFLAGS: "-O3 -mtune=generic -pipe"
           LDFLAGS: "-Wl,-O1,--as-needed"
         run: |
-          PYSTRAY_AI=$(python -c "import importlib.util; print(importlib.util.find_spec('pystray._appindicator').origin)")
+          PYSTRAY_AI="$(python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/pystray/_appindicator.py"
           sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
           sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
 
