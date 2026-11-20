@@ -32,7 +32,7 @@ jobs:
             libayatana-appindicator3-dev \
             gir1.2-ayatanaappindicator3-0.1 \
             libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-secret-1 libsecret-1-0 gir1.2-vte-2.91
+            gir1.2-secret-1 libsecret-1-0
 
       - name: Set up Python 3.11 (64-bit)
         uses: actions/setup-python@v5
@@ -80,8 +80,10 @@ jobs:
             --include-package=core \
             --include-package=console \
             --include-package=gui \
-            --include-package=gi \
-            --include-package=pystray \
+            --include-module=gi._gi \
+            --include-module=gi.repository.Secret \
+            --include-module=gi.repository.AyatanaAppIndicator3 \
+            --include-module=pystray \
             --include-module=pystray._appindicator \
             --include-module=pystray._xorg \
             --include-package=keyring \
@@ -92,7 +94,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin \
+            --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build \
             --output-filename=homegridBackup \
             main.py
@@ -106,8 +108,6 @@ jobs:
           fi
           mv "$DIST_DIR" homegridBackup
           chmod +x homegridBackup/homegridBackup
-
-          # Проверка: в сборке должны быть AppIndicator и Secret
           find homegridBackup -iname "*AyatanaAppIndicator3*" | grep -q . || { echo "ERROR: нет AyatanaAppIndicator3"; exit 1; }
           find homegridBackup -iname "*Secret*" | grep -q . || { echo "ERROR: нет Secret"; exit 1; }
 
