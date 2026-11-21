@@ -50,7 +50,8 @@ jobs:
               python3.8 -m venv /opt/venv32
               /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
               /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
-              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "pycairo==1.20.1" "PyGObject==3.40.1"
+              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "pycairo==1.20.1"
+              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "PyGObject==3.40.1"
               /opt/venv32/bin/python -m pip install --no-cache-dir \
                 "secretstorage==3.3.1" "keyring==23.13.1" \
                 "nuitka==2.5.9" ordered-set "pystray==0.19.5" "pillow<10.5" send2trash
