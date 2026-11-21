@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/files.py (v2.00 | 21.11.2026 03:24) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v2.06 | 21.11.2026 07:34) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 # ==============================================================================
 import os
 import re
@@ -109,17 +109,30 @@ def choose_folder_native(initial_dir, lang="en"):
     except Exception:
         return ""
 
+_ENG_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_ENG_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+
+def format_backup_dt(dt):
+    wday = _ENG_WEEKDAYS[dt.weekday()]
+    return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}_{wday}_{dt.hour:02d}-{dt.minute:02d}"
+
 def parse_backup_dt(filename, fallback_ts):
-    for pattern, fmt in (
-        (r"(\d{4}-\d{2}-\d{2}_[A-Za-z]+_\d{2}-\d{2})", "%Y-%m-%d_%A_%H-%M"),
-        (r"(\d{4}-[A-Za-z]+-\d{2}_[A-Za-z]+_\d{2}-\d{2})", "%Y-%B-%d_%A_%H-%M"),
-    ):
-        m = re.search(pattern, filename)
-        if m:
-            try:
-                return datetime.strptime(m.group(1), fmt)
-            except Exception:
-                pass
+    m_num = re.search(r"(\d{4})-(\d{2})-(\d{2})_[^_]+_(\d{2})-(\d{2})", filename)
+    if m_num:
+        try:
+            y, mo, d, hh, mm = (int(x) for x in m_num.groups())
+            return datetime(y, mo, d, hh, mm)
+        except Exception:
+            pass
+    m_mon = re.search(r"(\d{4})-([A-Za-z]+)-(\d{2})_[^_]+_(\d{2})-(\d{2})", filename)
+    if m_mon:
+        try:
+            y_s, mon_s, d_s, hh_s, mm_s = m_mon.groups()
+            mon_idx = next((i + 1 for i, nm in enumerate(_ENG_MONTHS) if nm.lower() == mon_s.lower()), 0)
+            if mon_idx:
+                return datetime(int(y_s), mon_idx, int(d_s), int(hh_s), int(mm_s))
+        except Exception:
+            pass
     return datetime.fromtimestamp(fallback_ts)
 
 def format_duration(sec, lang="uk"):

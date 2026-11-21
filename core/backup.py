@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v2.02 | 21.11.2026 05:32) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.06 | 21.11.2026 07:34) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -14,7 +14,7 @@ import http.cookiejar
 from urllib.parse import urlparse
 from datetime import datetime
 from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state
-from core.files import pretty_phase, format_duration
+from core.files import pretty_phase, format_duration, format_backup_dt
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
 
 def _desktop_notify(title, text):
@@ -377,7 +377,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
         if st.get("status") == "error" or ph == "error":
             raise RuntimeError(f"Сервер {srv_label} повідомив про помилку під час створення архіву!")
 
-    date_eng = datetime.now().strftime("%Y-%m-%d_%A_%H-%M")
+    date_eng = format_backup_dt(datetime.now())
     out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}.zip")
     cli_tok = engine.state["client_token"] or DEFAULT_TOK
     ses_tok = engine.state["session_token"]

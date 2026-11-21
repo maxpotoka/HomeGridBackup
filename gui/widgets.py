@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v2.00 | 21.11.2026 03:24) — ЕДИНЫЙ ОПТИМАЛЬНЫЙ ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
+# [ФАЙЛ: gui/widgets.py (v2.06 | 21.11.2026 07:34) — ЕДИНЫЙ ОПТИМАЛЬНЫЙ ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
 # ==============================================================================
 import tkinter as tk
 from gui.styles import THEMES
@@ -64,7 +64,9 @@ class StyledProgressBar(tk.Canvas):
             else:
                 filled = int(round((self.pct / 100.0) * chars))
                 txt = f"[{'#' * filled}{'-' * (chars - filled)}] {self.pct:3d}%"
-            self.create_text(4, h // 2, anchor="w", text=txt, fill=self.theme["cyan"], font=("Consolas", 11, "bold"))
+            import sys as _sys_w
+            _mono_f = "Menlo" if _sys_w.platform == "darwin" else ("DejaVu Sans Mono" if _sys_w.platform.startswith("linux") else "Consolas")
+            self.create_text(4, h // 2, anchor="w", text=txt, fill=self.theme["cyan"], font=(_mono_f, 11, "bold"))
             return
 
         if self.indet:

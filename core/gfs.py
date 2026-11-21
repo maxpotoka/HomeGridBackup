@@ -1,10 +1,10 @@
 # ==============================================================================
-# [ФАЙЛ: core/gfs.py (v2.00 | 21.11.2026 03:24) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
+# [ФАЙЛ: core/gfs.py (v2.06 | 21.11.2026 07:34) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
 # ==============================================================================
 import os
 import re
 from datetime import datetime, timedelta
-from core.files import parse_backup_dt, remove_backup_file
+from core.files import parse_backup_dt, format_backup_dt, remove_backup_file
 
 def compute_gfs_plan(state):
     bdir = state["backup_dir"]
@@ -78,7 +78,7 @@ def apply_gfs_cleanup(engine, skip_prompt=False):
         old_p = it["path"]
         old_sha = old_p + ".sha256"
         tg = it["new_tag"]
-        d_str = it["dt"].strftime("%Y-%m-%d_%A_%H-%M")
+        d_str = format_backup_dt(it["dt"])
         nn = f"homegrid_backup_{tg}_{d_str}.zip"
         new_p = os.path.join(bdir, nn)
         if it["name"] != nn:

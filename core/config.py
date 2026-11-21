@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v2.05 | 21.11.2026 07:18) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.06 | 21.11.2026 07:34) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -52,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.05"
-BUILD_DATE = "21.11.2026 07:18"
+SCRIPT_VER = "2.06"
+BUILD_DATE = "21.11.2026 07:34"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -382,7 +382,8 @@ def load_state():
         state["lite_mode"] = True
     if not state["hw_checked"]:
         state["hw_checked"] = True
-        state["theme"] = "dark"
+        if not cfg_to_read:
+            state["theme"] = "dark"
         state["dirty"] = True
 
     loaded_from_keyring = False
