@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v2.09 | 21.11.2026 21:40) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.10 | 21.11.2026 22:30) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -282,6 +282,9 @@ EN_EXACT = {
     "Вікно згорнуто у Dock (програма продовжує роботу).": "Window minimized to Dock (app keeps running).",
     "Системний трей недоступний у середовищі WSL — робота продовжується без іконки в треї.": "System tray unavailable in WSL — running without tray icon.",
     "Системний трей недоступний (потрібне розширення AppIndicator у GNOME).": "System tray unavailable (AppIndicator extension for GNOME required).",
+    "Помилка резервного копіювання": "Backup error",
+    "Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).": "Graphical server (DISPLAY/WSLg) unavailable — console mode (--cli) enabled automatically.",
+    "Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.": "Backup folder on Windows drive (/mnt/): POSIX permissions not applied, I/O speed is lower.",
     "Помилка мережі": "Network error",
     "Завдання Linux не знайдено або вже видалено.": "Linux task not found or already deleted.",
 }
@@ -436,6 +439,20 @@ EN_SUBSTR = sorted([
     ("Трей вимкнено (--no-tray або в налаштуваннях).", "Tray disabled (--no-tray or in settings)."),
     ("Вікно згорнуто в панель задач (трей вимкнено).", "Window minimized to taskbar (tray disabled)."),
     ("Системний трей недоступний", "System tray unavailable"),
+    ("Помилка підготовки (порожня відповідь сервера, HTTP ", "Preparation error (empty server response, HTTP "),
+    ("Сервер повернув некоректну відповідь замість JSON", "Server returned invalid response instead of JSON"),
+    ("перестав відповідати під час збірки", "stopped responding during build"),
+    ("Сайт ", "Site "),
+    ("повернув HTML замість статусу JSON", "returned HTML instead of JSON status"),
+    ("повідомив про помилку під час створення архіву!", "reported an error while creating archive!"),
+    (" спроб: ", " attempts: "),
+    ("завантажено лише ", "downloaded only "),
+    (" із ", " of "),
+    ("обрив потоку", "stream interrupted"),
+    ("SHA-256 файлу на носії не збігається зі завантаженим потоком!", "SHA-256 of file on disk does not match the downloaded stream!"),
+    ("але файл .sha256 відсутній", "but .sha256 file is missing"),
+    ("Робота в WSL (дистрибутив:", "Running in WSL (distro:"),
+    (", режим: ", ", mode: "),
 ], key=lambda x: len(x), reverse=True)
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}

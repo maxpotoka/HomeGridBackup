@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.03 | 21.11.2026 21:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.04 | 21.11.2026 22:30) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -228,9 +228,9 @@ class HomeGridApp(DialogsMixin):
 
         hdr_left = tk.Frame(self.header)
         hdr_left.pack(side="left", fill="x", expand=True)
-        self.lbl_title = tk.Label(hdr_left, text="HomeGrid Backup", font=("Segoe UI", fs + 4, "bold"))
+        self.lbl_title = tk.Label(hdr_left, text="HomeGrid Backup", font=(self._base_fam, fs + 4, "bold"))
         self.lbl_title.pack(anchor="w")
-        self.lbl_sub = tk.Label(hdr_left, text="", font=("Segoe UI", 1))
+        self.lbl_sub = tk.Label(hdr_left, text="", font=(self._base_fam, 1))
 
         hdr_right = tk.Frame(self.header)
         hdr_right.pack(side="right")
@@ -249,7 +249,7 @@ class HomeGridApp(DialogsMixin):
 
         self.card_conn = tk.Frame(self.body, padx=px, pady=py, bd=1, relief="solid")
         self.card_conn.pack(fill="x", pady=(0, py))
-        self.lbl_c1 = tk.Label(self.card_conn, text="Підключення до сервера та папки збереження", font=("Segoe UI", fs, "bold"))
+        self.lbl_c1 = tk.Label(self.card_conn, text="Підключення до сервера та папки збереження", font=(self._base_fam, fs, "bold"))
         self.lbl_c1.pack(anchor="w", pady=(0, 4))
 
         conn_grid = tk.Frame(self.card_conn)
@@ -258,9 +258,9 @@ class HomeGridApp(DialogsMixin):
         for c_btn in (2, 3, 4):
             conn_grid.columnconfigure(c_btn, weight=0, uniform="b")
 
-        self.l_srv = tk.Label(conn_grid, text="Адреса:", anchor="w", font=("Segoe UI", fs))
+        self.l_srv = tk.Label(conn_grid, text="Адреса:", anchor="w", font=(self._base_fam, fs))
         self.l_srv.grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_srv = tk.Entry(conn_grid, width=1, textvariable=self.var_srv, bd=1, relief="solid", font=("Segoe UI", fs))
+        self.ent_srv = tk.Entry(conn_grid, width=1, textvariable=self.var_srv, bd=1, relief="solid", font=(self._base_fam, fs))
         self.ent_srv.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
         self.btn_hist = tk.Button(conn_grid, text="Історія", command=self.open_history_modal, padx=8, pady=2, cursor="hand2")
         self.btn_hist.grid(row=0, column=2, sticky="ew", padx=(0, 4), pady=2)
@@ -274,9 +274,9 @@ class HomeGridApp(DialogsMixin):
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
 
-        self.l_dir = tk.Label(conn_grid, text="Папка:", anchor="w", font=("Segoe UI", fs))
+        self.l_dir = tk.Label(conn_grid, text="Папка:", anchor="w", font=(self._base_fam, fs))
         self.l_dir.grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_dir = tk.Entry(conn_grid, width=1, textvariable=self.var_dir, bd=1, relief="solid", font=("Segoe UI", fs))
+        self.ent_dir = tk.Entry(conn_grid, width=1, textvariable=self.var_dir, bd=1, relief="solid", font=(self._base_fam, fs))
         self.ent_dir.grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
         self.btn_dir = tk.Button(conn_grid, text="Папка архівів...", command=self.choose_dir, padx=8, pady=2, cursor="hand2")
         self.btn_dir.grid(row=1, column=2, columnspan=2, sticky="ew", padx=(0, 4), pady=2)
@@ -284,9 +284,9 @@ class HomeGridApp(DialogsMixin):
         self.btn_open_dir.grid(row=1, column=4, sticky="ew", pady=2)
         self.ent_dir.bind("<FocusOut>", lambda e: self.save_dir_manual())
 
-        self.l_mir = tk.Label(conn_grid, text="Дзеркало:", anchor="w", font=("Segoe UI", fs))
+        self.l_mir = tk.Label(conn_grid, text="Дзеркало:", anchor="w", font=(self._base_fam, fs))
         self.l_mir.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_mir = tk.Entry(conn_grid, width=1, textvariable=self.var_mirror, state="disabled", bd=1, relief="solid", font=("Segoe UI", fs))
+        self.ent_mir = tk.Entry(conn_grid, width=1, textvariable=self.var_mirror, state="disabled", bd=1, relief="solid", font=(self._base_fam, fs))
         self.ent_mir.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
         self.btn_mir = tk.Button(conn_grid, text="Папка дзеркала...", command=self.choose_mirror, state="disabled", padx=8, pady=2)
         self.btn_mir.grid(row=2, column=2, columnspan=2, sticky="ew", padx=(0, 4), pady=2)
@@ -305,16 +305,16 @@ class HomeGridApp(DialogsMixin):
 
         t2 = tk.Frame(stat_row)
         t2.grid(row=0, column=0, sticky="w", padx=(0, 12))
-        self.t2_cap = tk.Label(t2, text="ЛОКАЛЬНЕ СХОВИЩЕ:", font=("Segoe UI", max(8, fs - 1), "bold"))
+        self.t2_cap = tk.Label(t2, text="ЛОКАЛЬНЕ СХОВИЩЕ:", font=(self._base_fam, max(8, fs - 1), "bold"))
         self.t2_cap.pack(side="left", padx=(0, 6))
-        self.t2_val = tk.Label(t2, textvariable=self.var_disk, font=("Segoe UI", fs, "bold"))
+        self.t2_val = tk.Label(t2, textvariable=self.var_disk, font=(self._base_fam, fs, "bold"))
         self.t2_val.pack(side="left")
 
         t3 = tk.Frame(stat_row)
         t3.grid(row=1, column=0, sticky="w", padx=(0, 12), pady=(3, 0))
-        self.t3_cap = tk.Label(t3, text="ОСТАННІЙ АРХІВ:", font=("Segoe UI", max(8, fs - 1), "bold"))
+        self.t3_cap = tk.Label(t3, text="ОСТАННІЙ АРХІВ:", font=(self._base_fam, max(8, fs - 1), "bold"))
         self.t3_cap.pack(side="left", padx=(0, 6))
-        self.t3_val = tk.Label(t3, textvariable=self.var_last_bkp, font=("Segoe UI", fs, "bold"))
+        self.t3_val = tk.Label(t3, textvariable=self.var_last_bkp, font=(self._base_fam, fs, "bold"))
         self.t3_val.pack(side="left")
 
         self.stat_btns = tk.Frame(stat_row)
@@ -331,11 +331,11 @@ class HomeGridApp(DialogsMixin):
         self.card_prog.pack(fill="x", pady=(0, py))
         p_top = tk.Frame(self.card_prog)
         p_top.pack(fill="x", pady=(0, 4))
-        self.lbl_stage = tk.Label(p_top, textvariable=self.var_stage, font=("Segoe UI", fs, "bold"))
+        self.lbl_stage = tk.Label(p_top, textvariable=self.var_stage, font=(self._base_fam, fs, "bold"))
         self.lbl_stage.pack(side="left")
-        self.lbl_pct = tk.Label(p_top, textvariable=self.var_pct, font=("Segoe UI", fs, "bold"))
+        self.lbl_pct = tk.Label(p_top, textvariable=self.var_pct, font=(self._base_fam, fs, "bold"))
         self.lbl_pct.pack(side="right")
-        self.lbl_pill = tk.Label(p_top, text="Очікування", padx=8, pady=1, bd=1, relief="solid", font=("Segoe UI", max(8, fs - 1), "bold"))
+        self.lbl_pill = tk.Label(p_top, text="Очікування", padx=8, pady=1, bd=1, relief="solid", font=(self._base_fam, max(8, fs - 1), "bold"))
         self.lbl_pill.pack(side="right", padx=(0, 10))
         self.pbar = StyledProgressBar(self.card_prog, height=18)
         self.pbar.pack(fill="x")
@@ -344,21 +344,21 @@ class HomeGridApp(DialogsMixin):
         self.card_log.pack(fill="both", expand=True)
         log_hdr = tk.Frame(self.card_log)
         log_hdr.pack(fill="x", pady=(0, 4))
-        self.lbl_c4 = tk.Label(log_hdr, text="Системний лог", font=("Segoe UI", fs, "bold"))
+        self.lbl_c4 = tk.Label(log_hdr, text="Системний лог", font=(self._base_fam, fs, "bold"))
         self.lbl_c4.pack(side="left")
         self.btn_clear_log = tk.Button(log_hdr, text="Очистити", command=self.clear_log_view, padx=8, pady=1, cursor="hand2")
         self.btn_clear_log.pack(side="right")
 
         log_wrap = tk.Frame(self.card_log)
         log_wrap.pack(fill="both", expand=True)
-        self.txt_log = tk.Text(log_wrap, height=10, wrap="word", state="disabled", font=("Segoe UI", fs), bd=1, relief="solid", padx=10, pady=6, spacing1=1, spacing3=1)
+        self.txt_log = tk.Text(log_wrap, height=10, wrap="word", state="disabled", font=(self._base_fam, fs), bd=1, relief="solid", padx=10, pady=6, spacing1=1, spacing3=1)
         sb = tk.Scrollbar(log_wrap, command=self.txt_log.yview)
         self.txt_log.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.txt_log.pack(side="left", fill="both", expand=True)
         self.txt_log.bind("<Configure>", lambda _e: self._center_log_vertically(), add="+")
 
-        self.btn_start = tk.Button(self.footer, text="ЗАПУСТИТИ БЕКАП", command=self.do_backup, font=("Segoe UI", fs, "bold"), padx=16, pady=5, cursor="hand2")
+        self.btn_start = tk.Button(self.footer, text="ЗАПУСТИТИ БЕКАП", command=self.do_backup, font=(self._base_fam, fs, "bold"), padx=16, pady=5, cursor="hand2")
         self.btn_start.pack(side="left", padx=(0, 10))
         self.btn_strat = tk.Button(self.footer, text="Налаштування", command=self.open_settings, padx=12, pady=5, cursor="hand2")
         self.btn_strat.pack(side="left", padx=8)
@@ -523,10 +523,10 @@ class HomeGridApp(DialogsMixin):
             return
         p = self._get_palette()
         fs = self.metrics["font_sz"]
-        menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=("Segoe UI", fs))
+        menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=(self._base_fam, fs))
         for url, t_ms, a_ms in found:
             menu.add_command(
-                label=f"📡 {url}   (TCP: {t_ms} мс, API: {a_ms} мс)",
+                label=tr(f"📡 {url}   (TCP: {t_ms} мс, API: {a_ms} мс)", self.engine.state.get("lang", "en")),
                 command=lambda u=url: self._select_discovered_server(u)
             )
         x = self.btn_pick_lan.winfo_rootx()
@@ -549,7 +549,7 @@ class HomeGridApp(DialogsMixin):
     def open_mode_menu(self):
         p = self._get_palette()
         fs = self.metrics["font_sz"]
-        menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=("Segoe UI", fs))
+        menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=(self._base_fam, fs))
         lng = self.engine.state.get("lang", "en")
         menu.add_command(label=tr("✨ Повна графіка (стандартний режим)", lng), command=lambda: self._set_graphic_mode(False))
         menu.add_command(label=tr("⚡ Ультралегкий LITE-режим (швидкий текст)", lng), command=lambda: self._set_graphic_mode(True))
@@ -751,7 +751,7 @@ class HomeGridApp(DialogsMixin):
                 pill_fg = {"ok": p_cur.get("pill_ok_fg", p_cur["green"]), "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
                 pill_bg = p_cur.get("pill_ok_bg", p_cur["card"]) if ptype in ("ok", "idle") and "pill_ok_bg" in p_cur else p_cur["card"]
                 bd_pill = 0 if "pill_ok_bg" in p_cur else 1
-                self.lbl_pill.configure(text=tr(ptxt, st.get("lang", "en")), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=("Segoe UI", max(8, self.metrics["font_sz"] - 1), "bold"))
+                self.lbl_pill.configure(text=tr(ptxt, st.get("lang", "en")), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=(self._base_fam, max(8, self.metrics["font_sz"] - 1), "bold"))
 
             self.var_stage.set(self.engine.stage)
             self.var_pct.set(tr("пошук...", st.get("lang", "en")) if self.engine.indeterminate else f"{self.engine.progress}%")
