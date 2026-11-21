@@ -59,11 +59,18 @@ jobs:
 
           update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100
           update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 100
+
+          # Линковка идёт через настройки sysconfig Python, поэтому задаём их явно
           export CC=gcc-8
           export CXX=g++-8
+          export LDSHARED="gcc-8 -pthread -shared"
+          export LDCXXSHARED="g++-8 -pthread -shared"
+          # Страховка: если что-то всё же вызовет префиксный компилятор, подставим нативный
+          ln -sf /usr/bin/gcc-8 /usr/local/bin/i686-linux-gnu-gcc
+          ln -sf /usr/bin/g++-8 /usr/local/bin/i686-linux-gnu-g++
 
           python3.8 -m venv /opt/venv32
-          export PATH="/opt/venv32/bin:$PATH"
+          export PATH="/opt/venv32/bin:/usr/local/bin:$PATH"
 
           # --- Условие 3: Python 3.8, 32-битный, с tkinter ---
           python -c 'import sys, struct, tkinter
