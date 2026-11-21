@@ -33,6 +33,7 @@ jobs:
             -w /src \
             i386/ubuntu:18.04 bash -euo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
+              export PYTHONUTF8=1
               apt-get update
               apt-get install -y --no-install-recommends \
                 ca-certificates gcc-8 g++-8 patchelf pkg-config \
@@ -45,20 +46,22 @@ jobs:
               export CXX=g++-8
 
               python3.8 -m venv /opt/venv32
-              /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
-              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
-              /opt/venv32/bin/python -m pip install --no-cache-dir \
-                "secretstorage==3.3.1" "keyring==23.13.1" \
-                "nuitka==2.5.9" ordered-set "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
+              export PATH="/opt/venv32/bin:$PATH"
+              python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
+              python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
+              python -m pip install --no-cache-dir \
+                "secretstorage==3.3.1" "jeepney==0.8.0" "keyring==23.13.1" \
+                "nuitka==2.5.9" ordered-set \
+                "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
-              /opt/venv32/bin/python -c "import struct; assert struct.calcsize(\"P\")*8 == 32; print(\"32-bit Python 3.8 OK\")"
-              /opt/venv32/bin/python -c "import tkinter, pystray, keyring, PIL, send2trash; print(\"All modules OK\")"
+              python -c "import struct; assert struct.calcsize(\"P\")*8 == 32; print(\"32-bit Python 3.8 OK\")"
+              python -c "import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print(\"All modules OK\")"
 
               export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export LDFLAGS="-Wl,-O1,--as-needed"
 
-              /opt/venv32/bin/python -m nuitka \
+              python -m nuitka \
                 --onefile \
                 --enable-plugin=tk-inter \
                 --lto=no \
@@ -77,6 +80,7 @@ jobs:
                 --include-package=Xlib \
                 --include-package=keyring \
                 --include-package=secretstorage \
+                --include-package=jeepney \
                 --include-package=PIL \
                 --include-package-data=keyring \
                 --include-package-data=pystray \
@@ -136,9 +140,5 @@ jobs:
         with:
           tag_name: linux-32bit-latest
           name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+)
-          body: |
-            Одиничний 32-бітний виконуваний файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, зібраний на Ubuntu 18.04 / glibc 2.27) для старих та легких 32-бітних Linux (Ubuntu 18.04+, Debian 10+, MX Linux, antiX, Puppy Linux, Lubuntu).
-            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
-            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
           files: homegrid-backup-linux-i386-legacy.7z
           make_latest: true
