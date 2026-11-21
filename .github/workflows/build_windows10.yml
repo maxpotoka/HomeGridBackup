@@ -4,12 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main, master ]
-    paths:
-      - 'main.py'
-      - 'core/**'
-      - 'console/**'
-      - 'gui/**'
-      - '.github/workflows/build_windows10.yml'
 
 permissions:
   contents: write
@@ -72,6 +66,15 @@ jobs:
             --output-dir=dist_win10 ^
             --output-filename=HomeGridBackup_Win10_x64.exe ^
             main.py
+
+      - name: Delete old Windows 10/11 release and tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "SilentlyContinue"
+          gh release delete windows10-x64-latest --yes 2>$null
+          git push origin --delete windows10-x64-latest 2>$null
 
       - name: Publish clean .exe to GitHub Releases (no zip wrapper)
         uses: softprops/action-gh-release@v2
