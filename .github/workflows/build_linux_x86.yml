@@ -87,8 +87,8 @@ jobs:
             "nuitka==2.5.9" ordered-set \
             "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
-          # --- Условие 4: все модули доступны ---
-          python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All modules OK")'
+          # --- Условие 4: все модули импортируются (без X-сервера в CI) ---
+          PYSTRAY_BACKEND=dummy python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All modules OK")'
 
           export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
           export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
