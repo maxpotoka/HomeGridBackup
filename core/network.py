@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v1.140 | 20.11.2026 22:08) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v1.15 | 21.11.2026 02:28) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -189,6 +189,32 @@ def test_hgm_stage2(base_url, state, timeout=6.0):
 
     return False, 0.0
 
+def _linux_proc_net_hints():
+    gw_ips, arp_ips = [], []
+    if os.name == "nt":
+        return gw_ips, arp_ips
+    try:
+        with open("/proc/net/route", "r", encoding="utf-8", errors="ignore") as f:
+            next(f, None)
+            for ln in f:
+                pt = ln.split()
+                if len(pt) >= 3 and pt != "00000000" and len(pt) == 8:
+                    gw = socket.inet_ntoa(int(pt, 16).to_bytes(4, "little"))
+                    if gw not in gw_ips:
+                        gw_ips.append(gw)
+    except Exception:
+        pass
+    try:
+        with open("/proc/net/arp", "r", encoding="utf-8", errors="ignore") as f:
+            next(f, None)
+            for ln in f:
+                pt = ln.split()
+                if len(pt) >= 4 and pt != "0x0":
+                    arp_ips.append(pt)
+    except Exception:
+        pass
+    return gw_ips, arp_ips
+
 def _local_ipv4_with_prefix():
     """Локальные IPv4 с длиной префикса для Linux/macOS."""
     res = []
@@ -214,6 +240,9 @@ def _local_ipv4_with_prefix():
                 res.append((m.group(1), ipaddress.IPv4Network("0.0.0.0/" + mask).prefixlen))
         except Exception:
             pass
+    gw_ips, arp_ips = _linux_proc_net_hints()
+    for ip_h in gw_ips + arp_ips:
+        res.append((ip_h, 24))
     return res
 
 def get_main_subnets(state=None):
@@ -371,25 +400,42 @@ def scan_lan_servers(engine):
     found = []
     with engine.lock:
         base_state = dict(engine.state)
+    _, arp_h = _linux_proc_net_hints()
+    prio = set(arp_h)
+    for u in [base_state.get("server", "")] + list(base_state.get("server_history") or []):
+        hp = urlparse((u or "").strip().rstrip("!")).hostname
+        if hp:
+            prio.add(hp)
     for pref in subs:
         engine.set_progress(None, f"Сканування {pref}.1-254...")
-        ips = [f"{pref}.{i}" for i in range(1, 255)]
+        raw = [f"{pref}.{i}" for i in range(1, 255)]
+        ips = [x for x in raw if x in prio] + [x for x in raw if x not in prio]
+        try:
+            us = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            us.setblocking(False)
+            for t in ips:
+                try: us.sendto(b"\x00", (t, 9))
+                except Exception: pass
+            us.close()
+            time.sleep(0.12)
+        except Exception:
+            pass
         def check_ip(ip_addr):
             try:
-                ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=0.55)
+                ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=0.85)
                 if not ok_tcp:
                     time.sleep(0.15)
-                    ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=1.15)
+                    ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=1.85)
                 if ok_tcp:
                     temp_state = dict(base_state)
                     temp_state["_jar"] = None
-                    ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=3.5)
+                    ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=5.0)
                     if ok_api:
                         return ip_addr, temp_state.get("client_token", ""), tcp_ms, api_ms
             except Exception:
                 return None
             return None
-        with ThreadPoolExecutor(max_workers=48) as ex:
+        with ThreadPoolExecutor(max_workers=32) as ex:
             for res in ex.map(check_ip, ips):
                 if res:
                     f_ip, f_tok, t_ms, a_ms = res

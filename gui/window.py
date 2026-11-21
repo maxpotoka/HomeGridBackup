@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.140 | 20.11.2026 22:08) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.15 | 21.11.2026 02:24) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -208,6 +208,9 @@ class HomeGridApp(DialogsMixin):
 
         hdr_right = tk.Frame(self.header)
         hdr_right.pack(side="right")
+        self.btn_theme = tk.Button(hdr_right, text="☀️ Світла тема", command=self.toggle_theme_quick, padx=10, pady=4, cursor="hand2")
+        self.btn_theme.pack(side="left", padx=(0, 6))
+        ToolTip(self.btn_theme, "Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)")
         self.btn_mode = tk.Button(hdr_right, text="Графіка (1920×1080) ▾", command=self.open_mode_menu, padx=10, pady=4, cursor="hand2")
         self.btn_mode.pack(side="left", padx=(6, 0))
         ToolTip(self.btn_mode, "Оберіть режим (Графіка / LITE) або роздільну здатність вікна")
@@ -462,6 +465,12 @@ class HomeGridApp(DialogsMixin):
         if hasattr(self, "btn_pick_lan"):
             self.btn_pick_lan.configure(bg=p["card"], fg=p["green"], disabledforeground=dis_fg, font=f_bold, padx=bpx, pady=bpy)
 
+        if hasattr(self, "btn_theme"):
+            thm_lbl = "☀️ Світла тема" if cur_theme == "dark" else "🌙 Темна тема"
+            self.btn_theme.configure(
+                text=thm_lbl, bg=p["card"], fg=p["text"], activebackground=p["border"],
+                activeforeground=p["text"], relief="solid", bd=1, font=f_sub, padx=8, pady=2
+            )
         res_txt = f"{m['outer_w']}×{m['outer_h']}"
         mode_lbl = f"LITE ({res_txt}) ▾" if is_lite else f"Графіка ({res_txt}) ▾"
         self.btn_mode.configure(
@@ -503,6 +512,13 @@ class HomeGridApp(DialogsMixin):
         self.engine.state["server"] = url
         self._last_synced_srv = url
         self.engine.log(f"Обрано виявлений у мережі сервер: {url}", "ok")
+
+    def toggle_theme_quick(self):
+        cur = self.engine.state.get("theme", "dark")
+        self.engine.state["theme"] = "light" if cur == "dark" else "dark"
+        self.engine.state["lite_mode"] = False
+        commit_state(self.engine.state)
+        self.apply_theme_and_mode(resize_win=False)
 
     def open_mode_menu(self):
         p = self._get_palette()

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.19 | 21.11.2026 02:15) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.22 | 21.11.2026 02:28) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -52,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.20"
-BUILD_DATE = "21.11.2026 02:15"
+SCRIPT_VER = "1.23"
+BUILD_DATE = "21.11.2026 02:28"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -86,13 +86,8 @@ NO_CLEAN = any(a in ("--no-clean", "/noclean") for a in ARGS_LOW)
 SECRET_KEYS = ("client_token", "session_token", "login_pin", "editor_pin")
 SCHED_TASK_NAME = "HomeGridBackup"
 
-VALID_PBAR_STYLES = (
-    "v8", "amber_pro", "emerald_pro", "s_20s_macos", "classic",
-    "s_00s_win7", "s_00s_aqua", "s_00s_winxp",
-    "s_90s_win95", "s_80s_mac1", "s_80s_dos", "s_70s_crt", "s_60s_tty",
-    "digits_only"
-)
-VALID_THEMES = ("crt", "norton", "mac_classic", "win95", "winxp", "mac_aqua", "win7", "mac_light", "mac_dark", "dark", "light")
+VALID_PBAR_STYLES = ("v8",)
+VALID_THEMES = ("dark", "light")
 VALID_SCALES = ("auto", "800x600", "1024x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440")
 
 def _get_ram_summary():

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v1.132 | 20.11.2026 15:38) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v1.14 | 21.11.2026 02:23) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import os
 import ctypes
@@ -35,22 +35,7 @@ UI_FONT_LABELS = [
     (26, "26 pt (Максимальний)"),
 ]
 
-PBAR_STYLE_LABELS = [
-    ("v8", "2026 — Неоновий кібер-градієнт (v8)"),
-    ("amber_pro", "2026 — Бурштиново-жовтий градієнт"),
-    ("emerald_pro", "2026 — Смарагдовий градієнт"),
-    ("s_20s_macos", "2024 — macOS Sonoma (фірмовий синій)"),
-    ("classic", "2015 — Сучасний плоский синій"),
-    ("s_00s_win7", "2007 — Windows Vista / 7 Aero"),
-    ("s_00s_aqua", "2004 — macOS X Aqua (глянцеві смуги)"),
-    ("s_00s_winxp", "2001 — Windows XP Luna (зелені блоки)"),
-    ("s_90s_win95", "1995 — Windows 95 / 98 Classic"),
-    ("s_80s_mac1", "1984 — Macintosh System 1 (ч/б штрих)"),
-    ("s_80s_dos", "1980-ті — MS-DOS / Norton Commander"),
-    ("s_70s_crt", "1970-ті — Термінал мейнфрейму CRT"),
-    ("s_60s_tty", "1960-ті — Телетайп / Перфострічка"),
-    ("digits_only", "Цифровий лічильник (тільки відсотки)"),
-]
+PBAR_STYLE_LABELS = [("v8", "Адаптивний градієнт (v8)")]
 
 THEMES = {
     "dark": {
@@ -58,7 +43,14 @@ THEMES = {
         "text": "#f1f5f9", "muted": "#94a3b8", "blue": "#2b7fff", "green": "#10b981",
         "amber": "#f59e0b", "red": "#ef4444", "cyan": "#38bdf8",
         "inp_bg": "#060911", "log_bg": "#060911", "btn_txt": "#ffffff", "green_txt": "#042f2e",
-        "font": "Segoe UI", "relief": "solid"
+        "pbar_bg": "#1e293b", "pbar_brd": "#475569", "font": "Segoe UI", "relief": "solid"
+    },
+    "light": {
+        "bg": "#eef2f6", "panel": "#ffffff", "card": "#f8fafc", "border": "#cbd5e1",
+        "text": "#0f172a", "muted": "#475569", "blue": "#2563eb", "green": "#059669",
+        "amber": "#d97706", "red": "#dc2626", "cyan": "#0284c7",
+        "inp_bg": "#ffffff", "log_bg": "#f8fafc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "pbar_bg": "#e2e8f0", "pbar_brd": "#94a3b8", "font": "Segoe UI", "relief": "solid"
     }
 }
 

@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.19 | 21.11.2026 02:04) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.20 | 21.11.2026 02:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -12,8 +12,7 @@ from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _resolve_exe_path, _sync_scheduler_from_windows, _manage_windows_scheduler
-from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, PBAR_STYLE_LABELS, THEMES
-from gui.widgets import StyledProgressBar
+from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES
 from gui.tray import _force_quit_app
 
 class _EmbeddedDialog(tk.Frame):
@@ -532,6 +531,16 @@ class DialogsMixin:
         cb_lang.set(rev_lang.get(v_lang.get(), "English (Default)"))
         cb_lang.pack(side="left", fill="x", expand=True)
 
+        t_r1 = tk.Frame(f_thm, bg=p["card"])
+        t_r1.pack(fill="x", pady=4)
+        tk.Label(t_r1, text="Тема оформлення:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        lng_t = st.get("lang", "en")
+        thm_map = {tr("Темна тема", lng_t): "dark", tr("Світла тема", lng_t): "light"}
+        rev_thm = {"dark": tr("Темна тема", lng_t), "light": tr("Світла тема", lng_t)}
+        cb_theme = ttk.Combobox(t_r1, values=list(thm_map.keys()), state="readonly", font=("Segoe UI", fs))
+        cb_theme.set(rev_thm.get(v_theme.get(), tr("Темна тема", lng_t)))
+        cb_theme.pack(side="left", fill="x", expand=True)
+
 
         t_r2 = tk.Frame(f_thm, bg=p["card"])
         t_r2.pack(fill="x", pady=4)
@@ -552,26 +561,6 @@ class DialogsMixin:
         cb_font.set(rev_font.get(v_font.get(), tr(UI_FONT_LABELS[0][1], lng_cur)))
         cb_font.pack(side="left", fill="x", expand=True)
 
-        f_sty = tk.LabelFrame(bot_col, text=" 5. Стиль індикатора прогресу (14 стилів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=14, pady=8)
-        f_sty.pack(fill="x", pady=(0, 4))
-        s_r0 = tk.Frame(f_sty, bg=p["card"])
-        s_r0.pack(fill="x", pady=(2, 8))
-        tk.Label(s_r0, text="Стиль смуги:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
-        style_map = {tr(lbl, lng_cur): code for code, lbl in PBAR_STYLE_LABELS}
-        rev_map = {code: tr(lbl, lng_cur) for code, lbl in PBAR_STYLE_LABELS}
-        cb_style = ttk.Combobox(s_r0, values=[tr(lbl, lng_cur) for _, lbl in PBAR_STYLE_LABELS], state="readonly", font=("Segoe UI", fs))
-        cb_style.set(rev_map.get(v_pstyle.get(), tr(PBAR_STYLE_LABELS[0][1], lng_cur)))
-        cb_style.pack(side="left", fill="x", expand=True)
-        prev_bar = StyledProgressBar(f_sty, height=max(24, fs + 12))
-        prev_bar.pack(fill="x")
-
-        def _upd_prev(_e=None):
-            code = style_map.get(cb_style.get(), "v8")
-            t_code = st.get("theme", "dark")
-            v_pstyle.set(code)
-            prev_bar.set_state(65, False, code, False, THEMES.get(t_code, THEMES["dark"]))
-        cb_style.bind("<<ComboboxSelected>>", _upd_prev)
-        _upd_prev()
 
         def _commit_settings(close_after):
             st["keep_last_count"] = max(1, int(v_keep_n.get()))
@@ -581,6 +570,7 @@ class DialogsMixin:
             st["monthly_count"] = max(0, int(v_month.get()))
             st["yearly_count"] = max(0, int(v_year.get()))
             st["lang"] = lang_map.get(cb_lang.get(), "en")
+            st["theme"] = thm_map.get(cb_theme.get(), "dark")
             st["delete_mode"] = "trash" if v_trash.get() else "direct"
             st["minimize_to_tray"] = bool(v_tray_min.get())
             st["silent_cleanup"] = bool(v_sclean.get())
@@ -588,7 +578,7 @@ class DialogsMixin:
             new_sc = scale_map.get(cb_scale.get(), "auto")
             st["ui_scale"] = new_sc
             st["ui_font"] = font_map.get(cb_font.get(), 0)
-            st["progress_style"] = style_map.get(cb_style.get(), "v8")
+            st["progress_style"] = "v8"
             commit_state(st)
             self.apply_theme_and_mode(resize_win=(new_sc != old_sc))
             self.engine.log("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "ok")
