@@ -100,23 +100,50 @@ jobs:
             --include-data-files="$TYPELIB_DIR/AyatanaAppIndicator3-0.1.typelib=girepository-1.0/AyatanaAppIndicator3-0.1.typelib" \
             --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build \
-            --output-filename=homegridBackup \
+            --output-filename=homegrid-backup \
             main.py
 
-      - name: Verify build output
+      - name: Verify build output and create shortcut helper
         run: |
-          test -f build/homegridBackup || { echo "ERROR: Nuitka не створив виконуваний файл build/homegridBackup"; exit 1; }
+          test -f build/homegrid-backup || { echo "ERROR: Nuitka не створив виконуваний файл build/homegrid-backup"; exit 1; }
           mkdir -p dist
-          mv build/homegridBackup dist/homegridBackup
-          chmod +x dist/homegridBackup
-          file dist/homegridBackup
+          mv build/homegrid-backup dist/homegrid-backup
+          chmod +x dist/homegrid-backup
+          file dist/homegrid-backup
+
+          cat << 'EOF' > dist/install_shortcut.sh
+          #!/usr/bin/env bash
+          set -e
+          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+          BIN_PATH="$APP_DIR/homegrid-backup"
+          chmod +x "$BIN_PATH"
+          mkdir -p "$HOME/.local/share/applications"
+          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
+          cat > "$DESKTOP_FILE" << EOD
+          [Desktop Entry]
+          Type=Application
+          Name=HomeGrid Backup
+          Comment=Inverter Data Backup Utility
+          Exec="$BIN_PATH" --gui
+          Icon=drive-harddisk
+          Terminal=false
+          Categories=Utility;Archiving;
+          EOD
+          chmod +x "$DESKTOP_FILE"
+          if [ -d "$HOME/Desktop" ]; then
+            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
+            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
+          fi
+          echo "[OK] Shortcut created: $DESKTOP_FILE"
+          EOF
+          chmod +x dist/install_shortcut.sh
 
       - name: Package application into single .7z
         run: |
           cd dist
-          7z a -t7z -mx=9 ../HomeGridBackup-Ubuntu-x86_64.7z homegridBackup
+          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup install_shortcut.sh
           cd ..
-          ls -lh HomeGridBackup-Ubuntu-x86_64.7z
+          ls -lh homegrid-backup-ubuntu-x86_64.7z
 
       - name: Publish clean .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -124,8 +151,9 @@ jobs:
           tag_name: ubuntu-x64-latest
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
-            Одиничний виконуваний файл **homegridBackup** (onefile) для Linux x86_64.
-            Розпакуйте архів і запустіть: `chmod +x homegridBackup && ./homegridBackup`
+            Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
+            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
+            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
             Вимоги: Ubuntu 24.04 або новіша, для іконки в треї потрібен AppIndicator.
-          files: HomeGridBackup-Ubuntu-x86_64.7z
-          make_latest: false
+          files: homegrid-backup-ubuntu-x86_64.7z
+          make_latest: true
