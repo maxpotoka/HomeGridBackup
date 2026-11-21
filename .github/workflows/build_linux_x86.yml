@@ -120,6 +120,7 @@ jobs:
       - name: Verify 32-bit binary and create shortcut helper
         run: |
           sudo apt-get update && sudo apt-get install -y p7zip-full
+          sudo chown -R "$USER:$USER" build32
           test -f build32/homegrid-backup || { echo "ERROR: build32/homegrid-backup not created"; exit 1; }
           mkdir -p dist32
           mv build32/homegrid-backup dist32/homegrid-backup
