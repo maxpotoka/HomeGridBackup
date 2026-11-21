@@ -69,7 +69,7 @@ jobs:
         run: |
           TYPELIB_DIR="/usr/lib/x86_64-linux-gnu/girepository-1.0"
           python -m nuitka \
-            --standalone \
+            --onefile \
             --enable-plugin=tk-inter \
             --disable-plugin=gi \
             --clang \
