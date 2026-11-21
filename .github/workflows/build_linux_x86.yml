@@ -33,13 +33,14 @@ jobs:
             -w /src \
             i386/ubuntu:18.04 bash -euo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
+              export PYGOBJECT_WITHOUT_PYCAIRO=1
               apt-get update
               apt-get install -y --no-install-recommends \
                 ca-certificates gcc-8 g++-8 patchelf pkg-config \
                 libssl-dev libffi-dev \
                 python3.8 python3.8-dev python3.8-venv python3-tk python3-distutils \
                 libappindicator3-dev gir1.2-appindicator3-0.1 \
-                libgirepository1.0-dev libcairo2-dev \
+                libgirepository1.0-dev \
                 gir1.2-secret-1 libsecret-1-0
 
               update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100
@@ -50,7 +51,6 @@ jobs:
               python3.8 -m venv /opt/venv32
               /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
               /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
-              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "pycairo==1.20.1"
               /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "PyGObject==3.40.1"
               /opt/venv32/bin/python -m pip install --no-cache-dir \
                 "secretstorage==3.3.1" "keyring==23.13.1" \
