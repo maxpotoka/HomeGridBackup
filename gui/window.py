@@ -1,13 +1,13 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v1.15 | 21.11.2026 02:24) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v1.16 | 21.11.2026 03:00) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
 import tkinter as tk
 from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state
-from core.files import open_folder_native, choose_folder_native
+from core.files import open_folder_native, choose_folder_native, get_app_icon_path
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
 from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip
@@ -35,6 +35,7 @@ class HomeGridApp(DialogsMixin):
         self._ignore_resize_until = time.time() + 1.0
 
         self.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})")
+        self._apply_window_icon()
         m = self.metrics
         self.root.geometry(f"{m['win_w']}x{m['win_h']}+{m['pos_x']}+{m['pos_y']}")
         self.root.minsize(min(620, m['win_w']), min(420, m['win_h']))
@@ -87,6 +88,23 @@ class HomeGridApp(DialogsMixin):
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
+
+    def _apply_window_icon(self):
+        ico = get_app_icon_path()
+        if not ico:
+            return
+        if os.name == "nt":
+            try:
+                self.root.iconbitmap(default=ico)
+            except Exception:
+                pass
+        try:
+            from PIL import Image, ImageTk
+            im = Image.open(ico).convert("RGBA")
+            self._win_icons = [ImageTk.PhotoImage(im.resize((sz, sz), Image.LANCZOS)) for sz in (16, 32, 48, 64)]
+            self.root.iconphoto(True, *self._win_icons)
+        except Exception:
+            pass
 
     def _warmup_ttk_styles(self):
         try:

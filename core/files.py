@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/files.py (v1.15 | 21.11.2026 02:56) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v1.16 | 21.11.2026 03:00) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 # ==============================================================================
 import os
 import re
@@ -129,3 +129,17 @@ def format_duration(sec, lang="uk"):
         return f"{s} с" if lang == "uk" else f"{s} s"
     mins, rem = divmod(s, 60)
     return f"{mins} хв {rem} с ({s} с)" if lang == "uk" else f"{mins}m {rem}s ({s}s)"
+
+def get_app_icon_path():
+    import sys
+    cands = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon.ico"),
+        os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "icon.ico"),
+        os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "icon.ico"),
+        os.path.join(getattr(sys, "_MEIPASS", ""), "icon.ico"),
+        os.path.join(os.getcwd(), "icon.ico"),
+    ]
+    for c in cands:
+        if c and os.path.isfile(c):
+            return c
+    return ""

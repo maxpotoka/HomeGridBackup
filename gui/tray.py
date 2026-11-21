@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v1.142 | 20.11.2026 22:11) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v1.16 | 21.11.2026 03:04) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
@@ -13,37 +13,54 @@ def _clean_sys_env():
         env["LD_LIBRARY_PATH"] = env["LD_LIBRARY_PATH_ORIG"]
     else:
         env.pop("LD_LIBRARY_PATH", None)
-    if not env.get("DBUS_SESSION_BUS_ADDRESS") and hasattr(os, "getuid"):
+    if hasattr(os, "getuid"):
         bus_p = f"/run/user/{os.getuid()}/bus"
-        if os.path.exists(bus_p):
+        cur_bus = env.get("DBUS_SESSION_BUS_ADDRESS", "")
+        if os.path.exists(bus_p) and (not cur_bus or ("unix:path=" in cur_bus and not os.path.exists(cur_bus.split("unix:path=", 1)[1].split(",", 1)[0]))):
             env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus_p}"
             os.environ["DBUS_SESSION_BUS_ADDRESS"] = env["DBUS_SESSION_BUS_ADDRESS"]
     return env
 
+def _has_appindicator_gi():
+    try:
+        import gi
+        for ns in ("AyatanaAppIndicator3", "AppIndicator3"):
+            try:
+                gi.require_version(ns, "0.1")
+                __import__(f"gi.repository.{ns}")
+                return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
 def _detect_linux_tray_backend():
-    import sys, subprocess
+    import sys, re as _re, subprocess
     if not sys.platform.startswith("linux"):
         return "native"
     from core.config import IS_WSL
-    if IS_WSL:
+    if IS_WSL or (not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")):
         return ""
-    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-        return ""
-    for gp in ("/usr/lib/x86_64-linux-gnu/girepository-1.0", "/usr/lib/girepository-1.0"):
+    for gp in ("/usr/lib/x86_64-linux-gnu/girepository-1.0", "/usr/lib/aarch64-linux-gnu/girepository-1.0", "/usr/lib/girepository-1.0"):
         if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
             os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
     sys_env = _clean_sys_env()
-    try:
-        out = subprocess.check_output(
-            ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call",
-             "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner",
-             "string:org.kde.StatusNotifierWatcher"],
-            env=sys_env, stderr=subprocess.DEVNULL, timeout=0.8
-        ).decode("utf-8", errors="ignore")
-        if "boolean true" in out:
-            return "appindicator"
-    except Exception:
-        pass
+    has_sni = False
+    for cmd in (
+        ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call", "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner", "string:org.kde.StatusNotifierWatcher"],
+        ["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus", "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner", "org.kde.StatusNotifierWatcher"],
+        ["busctl", "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", "s", "org.kde.StatusNotifierWatcher"],
+    ):
+        try:
+            out = subprocess.check_output(cmd, env=sys_env, stderr=subprocess.DEVNULL, timeout=0.9).decode("utf-8", errors="ignore")
+            if _re.search(r"\btrue\b", out, _re.I):
+                has_sni = True
+                break
+        except Exception:
+            pass
+    if has_sni:
+        return "appindicator" if _has_appindicator_gi() else "auto"
     try:
         out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], env=sys_env, stderr=subprocess.DEVNULL, timeout=0.6).decode("utf-8", errors="ignore")
         if "window id #" in out_x and "0x0" not in out_x:
@@ -52,7 +69,7 @@ def _detect_linux_tray_backend():
         pass
     de = f"{os.environ.get('XDG_CURRENT_DESKTOP', '')} {os.environ.get('DESKTOP_SESSION', '')}".upper()
     if any(k in de for k in ("XFCE", "KDE", "LXQT", "MATE", "CINNAMON", "UNITY")):
-        return "appindicator"
+        return "appindicator" if _has_appindicator_gi() else "auto"
     return ""
 
 _LNX_TRAY_BE = _detect_linux_tray_backend()
@@ -89,21 +106,26 @@ def _get_tray_font():
     return _TRAY_FONT
 
 def create_tray_image(pct=0, spin_idx=0):
+    from core.files import get_app_icon_path
+    ico_p = get_app_icon_path()
+    base_img = None
+    if ico_p:
+        try:
+            base_img = Image.open(ico_p).convert("RGBA").resize((64, 64), Image.LANCZOS)
+        except Exception:
+            base_img = None
+    if base_img is not None:
+        img = base_img.copy()
+        p_val = max(0, min(100, int(pct)))
+        if p_val > 0:
+            drw = ImageDraw.Draw(img)
+            drw.ellipse([36, 36, 62, 62], fill=(11, 18, 32, 235), outline=(16, 185, 129, 255), width=3)
+            end_ang = -90 + int(360 * p_val / 100.0)
+            drw.arc([38, 38, 60, 60], start=-90, end=end_ang, fill=(16, 185, 129, 255), width=4)
+        return img
     img = Image.new("RGBA", (64, 64), (11, 18, 32, 255))
     drw = ImageDraw.Draw(img)
     drw.ellipse([3, 3, 61, 61], outline=(43, 127, 255, 255), width=6)
-    p_val = max(0, min(100, int(pct)))
-    if p_val > 0:
-        end_ang = -90 + int(360 * p_val / 100.0)
-        drw.arc([3, 3, 61, 61], start=-90, end=end_ang, fill=(16, 185, 129, 255), width=8)
-    if os.name != "nt":
-        drw.ellipse([21, 21, 43, 43], fill=(16, 185, 129, 255) if p_val > 0 else (43, 127, 255, 255))
-        return img
-    lbl = f"{p_val}" if p_val > 0 else "HG"
-    fnt = _get_tray_font()
-    bbox = drw.textbbox((0, 0), lbl, font=fnt) if hasattr(drw, "textbbox") else (0, 0, len(lbl) * 10, 16)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    drw.text(((64 - tw) // 2, (64 - th) // 2 - 1), lbl, fill=(255, 255, 255, 255), font=fnt)
     return img
 
 def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
