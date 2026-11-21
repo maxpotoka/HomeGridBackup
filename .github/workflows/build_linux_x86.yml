@@ -90,6 +90,27 @@ jobs:
           # --- Условие 4: все модули импортируются (без X-сервера в CI) ---
           PYSTRAY_BACKEND=dummy python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All modules OK")'
 
+          # Плагин Nuitka: пакет Xlib включаем как байткод, а не компилируем в C.
+          # Причина: cc1 для Xlib/protocol/request падал по памяти (лимит 32-бит процесса).
+          # Проверено по исходникам Nuitka 2.5.9: PluginBase.decideCompilation, --user-plugin.
+          cat > /tmp/nuitka_xlib_bytecode.py << 'PLUGIN_EOF'
+          from nuitka.plugins.PluginBase import NuitkaPluginBase
+
+
+          class NuitkaPluginXlibBytecode(NuitkaPluginBase):
+              plugin_name = "xlib-bytecode"
+              plugin_desc = "Include Xlib as bytecode to avoid C compiler OOM on 32-bit"
+
+              @staticmethod
+              def isAlwaysEnabled():
+                  return True
+
+              def decideCompilation(self, module_name):
+                  if module_name.hasNamespace("Xlib"):
+                      return "bytecode"
+                  return None
+          PLUGIN_EOF
+
           export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
           export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
           export LDFLAGS="-Wl,-O1,--as-needed"
@@ -97,94 +118,10 @@ jobs:
           python -m nuitka \
             --onefile \
             --enable-plugin=tk-inter \
+            --user-plugin=/tmp/nuitka_xlib_bytecode.py \
             --lto=no \
             --jobs=2 \
             --assume-yes-for-downloads \
             --python-flag=no_asserts \
             --python-flag=no_docstrings \
-            --noinclude-pytest-mode=nofollow \
-            --noinclude-setuptools-mode=nofollow \
-            --noinclude-unittest-mode=nofollow \
-            --include-package=core \
-            --include-package=console \
-            --include-package=gui \
-            --include-module=pystray \
-            --include-module=pystray._xorg \
-            --include-package=Xlib \
-            --include-package=keyring \
-            --include-package=secretstorage \
-            --include-package=jeepney \
-            --include-package=PIL \
-            --include-package-data=keyring \
-            --include-package-data=pystray \
-            --include-package-data=PIL \
-            --include-module=send2trash \
-            --nofollow-import-to=gi,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
-            --output-dir=build32 \
-            --output-filename=homegrid-backup \
-            main.py
-
-          # --- Условие 5: результат обязан быть ELF 32-bit Intel 80386 ---
-          test -f build32/homegrid-backup || { echo "ERROR: бинарник не создан"; exit 1; }
-          file build32/homegrid-backup | tee /tmp/bin.txt
-          grep -q "ELF 32-bit LSB.*Intel 80386" /tmp/bin.txt || { echo "ERROR: бинарник не i386"; exit 1; }
-          echo "[OK] Бинарник ELF 32-bit i386"
-          CONTAINER_EOF
-
-      - name: Verify 32-bit binary and create shortcut helper
-        run: |
-          sudo apt-get update && sudo apt-get install -y p7zip-full file
-          test -f build32/homegrid-backup || { echo "ERROR: build32/homegrid-backup not created"; exit 1; }
-          mkdir -p dist32
-          mv build32/homegrid-backup dist32/homegrid-backup
-          chmod +x dist32/homegrid-backup
-
-          # Повторная проверка на хосте уже после переноса файла
-          if ! file dist32/homegrid-backup | grep -q "ELF 32-bit LSB.*Intel 80386"; then
-            echo "ERROR: собранный файл не 32-битный:"
-            file dist32/homegrid-backup
-            exit 1
-          fi
-          echo "[OK] Бинарник 32-битный (ELF i386)"
-
-          cat << 'EOF' > dist32/install_shortcut.sh
-          #!/usr/bin/env bash
-          set -e
-          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-          BIN_PATH="$APP_DIR/homegrid-backup"
-          chmod +x "$BIN_PATH"
-          mkdir -p "$HOME/.local/share/applications"
-          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
-          cat > "$DESKTOP_FILE" << EOD
-          [Desktop Entry]
-          Type=Application
-          Name=HomeGrid Backup
-          Comment=Inverter Data Backup Utility
-          Exec="$BIN_PATH" --gui
-          Icon=drive-harddisk
-          Terminal=false
-          Categories=Utility;Archiving;
-          EOD
-          chmod +x "$DESKTOP_FILE"
-          if [ -d "$HOME/Desktop" ]; then
-            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
-            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
-          fi
-          echo "[OK] Shortcut created: $DESKTOP_FILE"
-          EOF
-          chmod +x dist32/install_shortcut.sh
-
-      - name: Package into .7z
-        run: |
-          cd dist32
-          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup install_shortcut.sh
-          cd ..
-          ls -lh homegrid-backup-linux-i386-legacy.7z
-
-      - name: Publish legacy 32-bit .7z to GitHub Releases
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: linux-32bit-latest
-          name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+)
-          files: homegrid-backup-linux-i386-legacy.7z
-          make_latest: true
+            --noinclude-pytest-mode=n
