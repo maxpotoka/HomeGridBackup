@@ -33,15 +33,11 @@ jobs:
             -w /src \
             i386/ubuntu:18.04 bash -euo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
-              export PYGOBJECT_WITHOUT_PYCAIRO=1
               apt-get update
               apt-get install -y --no-install-recommends \
                 ca-certificates gcc-8 g++-8 patchelf pkg-config \
                 libssl-dev libffi-dev \
-                python3.8 python3.8-dev python3.8-venv python3-tk python3-distutils \
-                libappindicator3-dev gir1.2-appindicator3-0.1 \
-                libgirepository1.0-dev \
-                gir1.2-secret-1 libsecret-1-0
+                python3.8 python3.8-dev python3.8-venv python3-tk python3-distutils
 
               update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100
               update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 100
@@ -51,31 +47,20 @@ jobs:
               python3.8 -m venv /opt/venv32
               /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
               /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
-              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "PyGObject==3.40.1"
               /opt/venv32/bin/python -m pip install --no-cache-dir \
                 "secretstorage==3.3.1" "keyring==23.13.1" \
-                "nuitka==2.5.9" ordered-set "pystray==0.19.5" "pillow<10.5" send2trash
+                "nuitka==2.5.9" ordered-set "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
               /opt/venv32/bin/python -c "import struct; assert struct.calcsize(\"P\")*8 == 32; print(\"32-bit Python 3.8 OK\")"
-              /opt/venv32/bin/python -c "import tkinter, gi; gi.require_version(\"Secret\", \"1\"); gi.require_version(\"AppIndicator3\", \"0.1\"); print(\"Tk + GI 3.8 OK\")"
+              /opt/venv32/bin/python -c "import tkinter, pystray, keyring, PIL, send2trash; print(\"All modules OK\")"
 
               export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export LDFLAGS="-Wl,-O1,--as-needed"
 
-              DATA_FLAGS=()
-              for tl in Secret-1.typelib AppIndicator3-0.1.typelib; do
-                FOUND_TL="$(find /usr/lib -name "$tl" 2>/dev/null | head -n 1 || true)"
-                if [ -n "$FOUND_TL" ]; then
-                  echo "Found typelib: $FOUND_TL"
-                  DATA_FLAGS+=("--include-data-files=${FOUND_TL}=girepository-1.0/${tl}")
-                fi
-              done
-
               /opt/venv32/bin/python -m nuitka \
                 --onefile \
                 --enable-plugin=tk-inter \
-                --disable-plugin=gi \
                 --lto=no \
                 --jobs=4 \
                 --assume-yes-for-downloads \
@@ -87,10 +72,9 @@ jobs:
                 --include-package=core \
                 --include-package=console \
                 --include-package=gui \
-                --include-module=gi._gi \
                 --include-module=pystray \
-                --include-module=pystray._appindicator \
                 --include-module=pystray._xorg \
+                --include-package=Xlib \
                 --include-package=keyring \
                 --include-package=secretstorage \
                 --include-package=PIL \
@@ -98,8 +82,7 @@ jobs:
                 --include-package-data=pystray \
                 --include-package-data=PIL \
                 --include-module=send2trash \
-                "${DATA_FLAGS[@]}" \
-                --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
+                --nofollow-import-to=gi,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
                 --output-dir=build32 \
                 --output-filename=homegrid-backup \
                 main.py
