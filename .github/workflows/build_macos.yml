@@ -83,6 +83,13 @@ jobs:
           cd dist_mac/pack
           7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app
 
+      - name: Delete old macOS release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete macos-intel-latest --yes || true
+          git push origin --delete macos-intel-latest || true
+
       - name: Publish clean .7z to GitHub Releases (no double zip)
         uses: softprops/action-gh-release@v2
         with:
