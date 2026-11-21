@@ -4,12 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main, master ]
-    paths:
-      - 'main.py'
-      - 'core/**'
-      - 'console/**'
-      - 'gui/**'
-      - '.github/workflows/build_windows7.yml'
 
 permissions:
   contents: write
@@ -86,6 +80,17 @@ jobs:
             echo start "" "%%~dp0HomeGridBackup.exe" --hidden
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
+
+      - name: Delete old Windows release and tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "SilentlyContinue"
+          gh release delete windows7-x86-latest --yes 2>$null
+          gh release delete windows7-x86-backup --yes 2>$null
+          git push origin --delete windows7-x86-latest 2>$null
+          git push origin --delete windows7-x86-backup 2>$null
 
       - name: Publish clean .7z to GitHub Releases (no double zip)
         uses: softprops/action-gh-release@v2
