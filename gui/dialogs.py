@@ -3,7 +3,8 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v2.05 | 21.11.2026 07:18) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v2.06 | 21.11.2026 19:44)
+# patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -57,6 +58,12 @@ class _EmbeddedDialog(tk.Frame):
         super().destroy()
 
 class DialogsMixin:
+    def _ui_fam(self):
+        if hasattr(self, '_base_fam') and self._base_fam:
+            return self._base_fam
+        import sys as _sf
+        return 'Helvetica Neue' if _sf.platform == 'darwin' else ('Ubuntu' if _sf.platform.startswith('linux') else 'Segoe UI')
+
     def _calc_parent_center(self, parent_win, w_box, h_box):
         m = self.metrics
         try:
@@ -470,12 +477,25 @@ class DialogsMixin:
         tk.Radiobutton(sr1, text="У фоні (з іконкою в треї)", variable=v_smode, value="--hidden", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=(16, 8))
         tk.Radiobutton(sr1, text="З вікном консолі", variable=v_smode, value="--silent", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=8)
 
-        sr2 = tk.Frame(f_sch, bg=p["card"])
-        sr2.pack(fill="x", pady=3)
-        tk.Label(sr2, text="Пріоритет (2-9):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs_sch)).pack(side="left")
-        tk.Spinbox(sr2, from_=2, to=9, textvariable=v_sprio, width=4, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs_sch)).pack(side="left", padx=6)
-        tk.Checkbutton(sr2, text="Запускати пропущене", variable=v_smissed, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=12)
-        tk.Checkbutton(sr2, text="Розбудити ПК зі сну", variable=v_swake, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=12)
+        from core.config import IS_WINDOWS as _IS_WIN_S, IS_WSL as _IS_WSL_S, IS_MAC as _IS_MAC_S
+        if _IS_WIN_S:
+            sr2 = tk.Frame(f_sch, bg=p["card"])
+            sr2.pack(fill="x", pady=3)
+            tk.Label(sr2, text="Пріоритет (2-9):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs_sch)).pack(side="left")
+            tk.Spinbox(sr2, from_=2, to=9, textvariable=v_sprio, width=4, bg=p["inp_bg"], fg=p["text"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=6)
+            tk.Checkbutton(sr2, text="Запускати пропущене", variable=v_smissed, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=12)
+            tk.Checkbutton(sr2, text="Розбудити ПК зі сну", variable=v_swake, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=12)
+        else:
+            lng_n = st.get("lang", "en")
+            os_note = (
+                ("WSL: розклад реєструється у Планувальнику Windows (schtasks.exe)." if lng_n == "uk" else "WSL: schedule uses Windows Task Scheduler (schtasks.exe).")
+                if _IS_WSL_S else (
+                    ("macOS: розклад працює через системний агент LaunchAgent." if lng_n == "uk" else "macOS: schedule runs via native LaunchAgent.")
+                    if _IS_MAC_S else
+                    ("Linux: розклад працює через crontab та ~/.config/autostart." if lng_n == "uk" else "Linux: schedule runs via crontab & ~/.config/autostart.")
+                )
+            )
+            tk.Label(f_sch, text=os_note, bg=p["card"], fg=p["muted"], font=(self._ui_fam(), max(8, fs - 1))).pack(anchor="w", pady=(2, 3))
 
         lbl_sch_msg = tk.Label(f_sch, text="", bg=p["card"], fg=p["green"], font=("Segoe UI", fs, "bold"))
         lbl_sch_msg.pack(side="left", padx=8)
@@ -626,8 +646,8 @@ class DialogsMixin:
         tk.Button(bf, text="Застосувати", command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
         def _i18n_settings():
             lng = st.get("lang", "en")
-            nb.tab(0, text=tr("  Резервне копіювання та Розклад  ", lng))
-            nb.tab(1, text=tr("  Вигляд та Інтерфейс  ", lng))
+            nb.tab(0, text="  " + tr("Резервне копіювання та Розклад", lng) + "  ")
+            nb.tab(1, text="  " + tr("Вигляд та Інтерфейс", lng) + "  ")
             apply_widget_i18n(dlg, lng)
         _i18n_settings()
 
@@ -834,12 +854,13 @@ class DialogsMixin:
 
     def open_stats_modal(self):
         fs = self.metrics["font_sz"]
+        lng_c = self.engine.state.get("lang", "en")
         dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 780, 620)
         st = self.engine.get_detailed_stats() if hasattr(self.engine, "get_detailed_stats") else {}
 
-        tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs, "bold"), padx=int(24 * self.metrics["k"]), pady=int(6 * self.metrics["k"])).pack(side="bottom", anchor="e", padx=16, pady=(6, 12))
+        tk.Button(dlg, text=tr("Закрити", lng_c), command=dlg.destroy, bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold"), padx=int(24 * self.metrics["k"]), pady=int(6 * self.metrics["k"])).pack(side="bottom", anchor="e", padx=16, pady=(6, 12))
 
-        tk.Label(dlg, text="Зведена аналітика за періодами та станом локального сховища:", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
+        tk.Label(dlg, text=tr("Зведена аналітика за періодами та станом локального сховища:", lng_c), bg=p["panel"], fg=p["muted"], font=(self._ui_fam(), fs)).pack(anchor="w", padx=14, pady=(10, 6))
 
         grid_f = tk.Frame(dlg, bg=p["panel"])
         grid_f.pack(fill="x", padx=14, pady=4)
@@ -910,7 +931,7 @@ class DialogsMixin:
 
         chart_card = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
         chart_card.pack(fill="both", expand=True, padx=14, pady=(4, 6))
-        tk.Label(chart_card, text="ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(7, fs - 3), "bold")).pack(anchor="w", pady=(0, 6))
+        tk.Label(chart_card, text=tr("ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ", lng_c), bg=p["card"], fg=p["muted"], font=(self._ui_fam(), max(7, fs - 3), "bold")).pack(anchor="w", pady=(0, 6))
 
         cv = tk.Canvas(chart_card, height=int(120 * self.metrics["k"]), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
         cv.pack(fill="both", expand=True)
@@ -934,7 +955,7 @@ class DialogsMixin:
                 cv.create_rectangle(cx - bar_w / 2, y1, cx + bar_w / 2, bot_y, fill=p["green"] if val > 0 else p["border"], outline="")
                 if val > 0:
                     cv.create_text(cx, y1 - int(12 * k), text=str(val), fill=p["text"], font=("Segoe UI", max(8, fs - 1), "bold"))
-                cv.create_text(cx, bot_y + int(14 * k), text=m_lbl, fill=p["muted"], font=("Segoe UI", max(8, fs - 1)))
+                cv.create_text(cx, bot_y + int(14 * k), text=tr(m_lbl, lng_c), fill=p["muted"], font=(self._ui_fam(), max(8, fs - 1)))
 
         cv.bind("<Configure>", _draw_chart)
         dlg.after(40, _draw_chart)

@@ -1,7 +1,10 @@
-# [ФАЙЛ: core/i18n.py (v2.07 | 21.11.2026 18:30) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.08 | 21.11.2026 19:44) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
+    "Січень": "January", "Лютий": "February", "Березень": "March", "Квітень": "April",
+    "Травень": "May", "Червень": "June", "Липень": "July", "Серпень": "August",
+    "Вересень": "September", "Жовтень": "October", "Листопад": "November", "Грудень": "December",
     "Файл не знайдено": "File not found",
     "Порожній ZIP-архів": "Empty ZIP archive",
     "Перевірку перервано": "Verification aborted",
@@ -463,9 +466,16 @@ def apply_widget_i18n(widget, lang="en"):
             raw_cur = widget.cget("text")
             cur = str(raw_cur) if raw_cur is not None else ""
             if cur.strip():
-                t_val = tr(cur, lang)
-                if t_val != cur:
-                    widget.configure(text=t_val)
+                core_s = cur.strip()
+                t_core = tr(core_s, lang)
+                if t_core != core_s:
+                    lead = cur[:len(cur) - len(cur.lstrip())]
+                    trail = cur[len(cur.rstrip()):]
+                    widget.configure(text=f"{lead}{t_core}{trail}")
+                else:
+                    t_val = tr(cur, lang)
+                    if t_val != cur:
+                        widget.configure(text=t_val)
     except Exception:
         pass
     try:
