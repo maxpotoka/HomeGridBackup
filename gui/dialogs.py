@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v2.06 | 21.11.2026 19:44)
+# [ФАЙЛ: gui/dialogs.py (v2.07 | 22.11.2026 00:46)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -13,7 +13,7 @@ from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage_windows_scheduler
-from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES
+from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES, fix_mac_buttons
 from gui.tray import _force_quit_app
 
 class _EmbeddedDialog(tk.Frame):
@@ -106,6 +106,7 @@ class DialogsMixin:
                 rw = max(420, self.root.winfo_width() - 24)
                 rh = max(220, self.root.winfo_height() - 24)
                 dlg.place_configure(width=min(max(w_box, req_w + 16), rw), height=min(max(h_box, req_h + 16), rh))
+            fix_mac_buttons(dlg, self._get_palette())
             if not sys.platform.startswith("linux"):
                 dlg.focus_force()
         except Exception:

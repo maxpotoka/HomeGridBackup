@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.04 | 21.11.2026 22:30) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.06 | 22.11.2026 00:54) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -10,7 +10,7 @@ from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state
 from core.files import open_folder_native, choose_folder_native, get_app_icon_path
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
-from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip
+from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip, fix_mac_buttons
 from gui.widgets import StyledProgressBar
 from gui.tray import HAS_TRAY, _start_tray_thread
 from gui.dialogs import DialogsMixin
@@ -79,6 +79,8 @@ class HomeGridApp(DialogsMixin):
                     e.widget.select_range(0, "end")
                     return "break"
             self.root.bind_class("Entry", "<KeyPress>", _x11_ctrl_key, add="+")
+        if sys.platform == "darwin" or sys.platform.startswith("linux"):
+            self._setup_native_menubar()
         self._build_ui()
         self.apply_theme_and_mode()
         self.root.deiconify()
@@ -88,6 +90,59 @@ class HomeGridApp(DialogsMixin):
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
+
+    def _setup_native_menubar(self):
+        import sys
+        try:
+            lng = self.engine.state.get("lang", "en")
+            p = self._get_palette()
+            m_kw = {} if sys.platform == "darwin" else {"bg": p["panel"], "fg": p["text"], "activebackground": p["blue"], "activeforeground": "#ffffff"}
+            menubar = tk.Menu(self.root, **m_kw)
+
+            if sys.platform == "darwin":
+                app_menu = tk.Menu(menubar, name="apple", tearoff=0)
+                app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
+                app_menu.add_separator()
+                app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
+                app_menu.add_separator()
+                app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
+                menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
+                try:
+                    self.root.createcommand("tk::mac::Quit", self.confirm_exit)
+                    self.root.createcommand("tk::mac::ShowPreferences", self.open_settings)
+                except Exception:
+                    pass
+
+            file_menu = tk.Menu(menubar, tearoff=0, **m_kw)
+            file_menu.add_command(label=tr("ЗАПУСТИТИ БЕКАП", lng), command=self.do_backup)
+            file_menu.add_command(label=tr("Автопошук", lng), command=self.do_scan)
+            file_menu.add_separator()
+            file_menu.add_command(label=tr("Відкрити папку", lng), command=self.open_backup_folder)
+            file_menu.add_separator()
+            file_menu.add_command(label=tr("Закрити", lng), command=self.on_window_close)
+            if sys.platform != "darwin":
+                file_menu.add_command(label=tr("Вихід", lng), command=self.confirm_exit)
+            menubar.add_cascade(label="Файл" if lng == "uk" else "File", menu=file_menu)
+
+            tools_menu = tk.Menu(menubar, tearoff=0, **m_kw)
+            tools_menu.add_command(label=tr("Статистика", lng), command=self.open_stats_modal)
+            tools_menu.add_command(label=tr("Журнал операцій", lng), command=self.open_ops_history)
+            tools_menu.add_command(label=tr("Аналіз GFS / SHA-256", lng), command=self.open_analyze)
+            tools_menu.add_separator()
+            is_dk = (self.engine.state.get("theme", "dark") == "dark")
+            tools_menu.add_command(label=tr("Світла тема" if is_dk else "Темна тема", lng), command=self.toggle_theme_quick)
+            if sys.platform != "darwin":
+                tools_menu.add_command(label=tr("Налаштування", lng), command=self.open_settings)
+            menubar.add_cascade(label="Інструменти" if lng == "uk" else "Tools", menu=tools_menu)
+
+            if sys.platform != "darwin":
+                help_menu = tk.Menu(menubar, tearoff=0, **m_kw)
+                help_menu.add_command(label=tr("Про програму", lng), command=self.open_about)
+                menubar.add_cascade(label="Довідка" if lng == "uk" else "Help", menu=help_menu)
+
+            self.root.configure(menu=menubar)
+        except Exception:
+            pass
 
     def _apply_window_icon(self):
         ico = get_app_icon_path()
@@ -515,6 +570,9 @@ class HomeGridApp(DialogsMixin):
         self.root._cur_lang = lang
         self.root.title(tr(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})", lang))
         apply_widget_i18n(self.root, lang)
+        fix_mac_buttons(self.root, p)
+        if (sys.platform == "darwin" or sys.platform.startswith("linux")) and hasattr(self, "_setup_native_menubar"):
+            self._setup_native_menubar()
 
 
     def open_discovered_menu(self):
@@ -594,7 +652,7 @@ class HomeGridApp(DialogsMixin):
         fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
         is_lite = bool(self.engine.state.get("lite_mode", False))
-        fam = "Consolas" if is_lite else p.get("font", "Segoe UI")
+        fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         is_run = bool(getattr(self.engine, "is_running", False))
         checked = bool(self.engine.state.get("mirror_enabled", False))
         self.var_mir_en.set(checked)

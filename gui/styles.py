@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v2.00 | 21.11.2026 03:24) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v2.01 | 22.11.2026 00:46) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import os
 import ctypes
@@ -198,7 +198,7 @@ class ToolTip:
         top._active_tooltip = self
         cur_fs = getattr(top, "_cur_font_sz", 10)
         tip_fs = max(9, cur_fs - 1)
-        fam = "Ubuntu" if sys.platform.startswith("linux") else "Segoe UI"
+        fam = "Helvetica Neue" if sys.platform == "darwin" else ("Ubuntu" if sys.platform.startswith("linux") else "Segoe UI")
         from core.i18n import tr
         tip_txt = tr(self.text, getattr(top, "_cur_lang", "en"))
         wx, wy = self.widget.winfo_rootx(), self.widget.winfo_rooty()
@@ -267,3 +267,43 @@ class ToolTip:
             except Exception:
                 pass
             self.tipwin = None
+
+
+def fix_mac_buttons(root_widget, palette=None):
+    import sys
+    if sys.platform != "darwin" or root_widget is None:
+        return
+    p = palette or {}
+    c_green = p.get("green", "#10b981")
+    c_blue = p.get("blue", "#2b7fff")
+    c_red = p.get("red", "#ef4444")
+    c_amber = p.get("amber", "#f59e0b")
+    c_cyan = p.get("cyan", "#38bdf8")
+
+    def _walk(w):
+        try:
+            if isinstance(w, tk.Button):
+                cur_bg = str(w.cget("bg")).lower()
+                cur_fg = str(w.cget("fg")).lower()
+                if cur_bg == str(c_green).lower():
+                    mac_fg = "#065f46"
+                elif cur_bg == str(c_blue).lower():
+                    mac_fg = "#1d4ed8"
+                elif cur_bg == str(c_red).lower() or cur_fg == str(c_red).lower():
+                    mac_fg = "#b91c1c"
+                elif cur_bg == str(c_amber).lower():
+                    mac_fg = "#92400e"
+                elif cur_fg == str(c_cyan).lower():
+                    mac_fg = "#0369a1"
+                else:
+                    mac_fg = "#0f172a"
+                w.configure(fg=mac_fg, activeforeground=mac_fg, disabledforeground="#94a3b8", highlightbackground=p.get("panel", "#111827"))
+        except Exception:
+            pass
+        try:
+            for ch in w.winfo_children():
+                _walk(ch)
+        except Exception:
+            pass
+
+    _walk(root_widget)

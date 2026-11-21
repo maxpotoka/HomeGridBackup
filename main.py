@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# [ФАЙЛ: main.py (v2.00 | 21.11.2026 03:24) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v2.01 | 22.11.2026 00:54) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
 import os
 import sys
@@ -115,7 +115,7 @@ def main():
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
-    root = tk.Tk()
+    root = tk.Tk(className="HomeGridBackup")
     app = HomeGridApp(root, engine)
     engine.app_ref = app
     _start_show_window_listener(engine, _SHOW_EVENT_NAME)
