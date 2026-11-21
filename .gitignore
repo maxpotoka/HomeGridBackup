@@ -1,31 +1,34 @@
-# Кэш Python
+cat > .gitignore << 'EOF'
+# Игнорировать всё по умолчанию
+*
+
+# Разрешённые файлы и папки проекта
+!.gitignore
+!main.py
+!icon.ico
+!buildozer.spec
+!.github/
+!.github/**
+!core/
+!core/**
+!gui/
+!gui/**
+!console/
+!console/**
+!mobile/
+!mobile/**
+
+# Внутри разрешённых папок всё равно исключаем мусор
 __pycache__/
+*.pyc
 *.py[cod]
-
-# Сборка и выгрузка
-dist_*/
-build/
-*.spec.bak
-
-# Локальные бэкапы патчей и патч-скрипты
-.patch_bak/
-patch_*.py
-
-# Локальные сборочные скрипты Windows (сборка идёт в GitHub Actions)
-*.bat
-
-# Логи, архивы и секреты, которые не должны попасть в репозиторий
 *.log
 *.zip
 *.sha256
+*.tmp
+*.bak
 .env
 config.json
-*.tmp
-
-# Заметки и конспекты
-конспект*
-*.txt
-
-# Редакторы
-.vscode/
-.idea/
+EOF
+git add .gitignore
+git status --short
