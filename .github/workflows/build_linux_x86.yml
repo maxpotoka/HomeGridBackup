@@ -52,7 +52,15 @@ jobs:
               export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
               export LDFLAGS="-Wl,-O1,--as-needed"
-              TYPELIB_DIR="/usr/lib/i386-linux-gnu/girepository-1.0"
+
+              DATA_FLAGS=()
+              for tl in Secret-1.typelib AppIndicator3-0.1.typelib; do
+                FOUND_TL="$(find /usr/lib -name "$tl" 2>/dev/null | head -n 1 || true)"
+                if [ -n "$FOUND_TL" ]; then
+                  echo "Found typelib: $FOUND_TL"
+                  DATA_FLAGS+=("--include-data-files=${FOUND_TL}=girepository-1.0/${tl}")
+                fi
+              done
 
               /opt/venv32/bin/python -m nuitka \
                 --onefile \
@@ -80,8 +88,7 @@ jobs:
                 --include-package-data=pystray \
                 --include-package-data=PIL \
                 --include-module=send2trash \
-                --include-data-files="$TYPELIB_DIR/Secret-1.typelib=girepository-1.0/Secret-1.typelib" \
-                --include-data-files="$TYPELIB_DIR/AppIndicator3-0.1.typelib=girepository-1.0/AppIndicator3-0.1.typelib" \
+                "${DATA_FLAGS[@]}" \
                 --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
                 --output-dir=build32 \
                 --output-filename=homegrid-backup \
