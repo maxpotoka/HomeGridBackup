@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v2.11 | 21.11.2026 19:44) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.12 | 21.11.2026 21:40) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -52,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.11"
-BUILD_DATE = "21.11.2026 19:44"
+SCRIPT_VER = "2.12"
+BUILD_DATE = "21.11.2026 21:40"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -82,6 +82,7 @@ if not HAS_DISPLAY and not HIDDEN_MODE:
     GUI_MODE = False
     CLI_MODE = True
 NO_CLEAN = any(a in ("--no-clean", "/noclean") for a in ARGS_LOW)
+NO_TRAY = any(a in ("--no-tray", "/notray") for a in ARGS_LOW)
 
 SECRET_KEYS = ("client_token", "session_token", "login_pin", "editor_pin")
 SCHED_TASK_NAME = "HomeGridBackup"
@@ -312,7 +313,7 @@ def load_state():
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
         "mirror_dir": "", "mirror_enabled": False, "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
-        "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True,
+        "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True, "tray_enabled": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
         "progress_style": "v8", "silent_sec_digits": True, "silent_cleanup": False,
         "sched_time": "03:00", "sched_mode": "--hidden", "sched_missed": True,
@@ -354,7 +355,7 @@ def load_state():
                 state["progress_style"] = data["progress_style"]
             if data.get("delete_mode") in ("trash", "direct", "permanent"):
                 state["delete_mode"] = data["delete_mode"]
-            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake"):
+            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled"):
                 if isinstance(data.get(bk), bool):
                     state[bk] = data[bk]
             st_raw = str(data.get("sched_time") or "").strip()
@@ -422,7 +423,7 @@ def commit_state(state):
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
-        "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray",
+        "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
         "sched_time", "sched_mode", "sched_missed", "sched_wake", "sched_prio"
     )

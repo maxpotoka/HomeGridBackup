@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v2.00 | 21.11.2026 03:24) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v2.01 | 21.11.2026 21:40) — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
 # ==============================================================================
 import os
 import time
@@ -159,11 +159,33 @@ def _force_quit_app(engine):
 def _can_dock_linux_tray():
     return bool(_LNX_TRAY_BE)
 
+def _tray_problem():
+    import sys
+    if not HAS_TRAY:
+        return "Трей: не встановлено pystray і Pillow"
+    if sys.platform.startswith("linux") and not _LNX_TRAY_BE:
+        if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            return "Немає графічної сесії (DISPLAY не задано) — трей вимкнено"
+        de = f"{os.environ.get('XDG_CURRENT_DESKTOP', '')} {os.environ.get('DESKTOP_SESSION', '')}".upper()
+        if "XFCE" in de:
+            return "Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель"
+        if "GNOME" in de or "UNITY" in de:
+            return "Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support"
+        if "KDE" in de:
+            return "Трей KDE: перевірте, що увімкнено віджет «Системний лоток»"
+        return "Панель не підтримує трей (потрібен StatusNotifier або XEmbed)"
+    return "Системний трей недоступний"
+
 def _start_tray_thread(engine):
     global _TRAY_STARTED
-    from core.config import IS_WSL
+    from core.config import IS_WSL, NO_TRAY
     with _TRAY_LOCK:
         if _TRAY_STARTED:
+            return
+        if NO_TRAY or not engine.state.get("tray_enabled", True):
+            _TRAY_STARTED = True
+            engine.tray_icon = None
+            engine.log("Трей вимкнено (--no-tray або в налаштуваннях).", "info")
             return
         if IS_WSL:
             _TRAY_STARTED = True
@@ -173,7 +195,7 @@ def _start_tray_thread(engine):
         if not HAS_TRAY or not _can_dock_linux_tray():
             _TRAY_STARTED = True
             engine.tray_icon = None
-            engine.log("Системний трей недоступний (потрібне розширення AppIndicator у GNOME).", "warn")
+            engine.log(_tray_problem(), "warn")
             return
         _TRAY_STARTED = True
         _TRAY_STOP.clear()

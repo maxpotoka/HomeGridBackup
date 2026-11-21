@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v2.08 | 21.11.2026 19:44) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.09 | 21.11.2026 21:40) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -427,6 +427,15 @@ EN_SUBSTR = sorted([
     ("Архів готовий", "Archive ready"),
     ("Обробка", "Processing"),
     ("Застарілих GFS:", "Expired:"),
+    ("Трей: не встановлено pystray і Pillow", "Tray: pystray and Pillow not installed"),
+    ("Немає графічної сесії (DISPLAY не задано) — трей вимкнено", "No graphical session (DISPLAY not set) — tray disabled"),
+    ("Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель", "XFCE tray: install xfce4-statusnotifier-plugin and add «Status Notifier» to the panel"),
+    ("Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support", "GNOME tray: install the AppIndicator and KStatusNotifierItem Support extension"),
+    ("Трей KDE: перевірте, що увімкнено віджет «Системний лоток»", "KDE tray: check that the «System Tray» widget is enabled"),
+    ("Панель не підтримує трей (потрібен StatusNotifier або XEmbed)", "Panel does not support tray (StatusNotifier or XEmbed required)"),
+    ("Трей вимкнено (--no-tray або в налаштуваннях).", "Tray disabled (--no-tray or in settings)."),
+    ("Вікно згорнуто в панель задач (трей вимкнено).", "Window minimized to taskbar (tray disabled)."),
+    ("Системний трей недоступний", "System tray unavailable"),
 ], key=lambda x: len(x), reverse=True)
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}

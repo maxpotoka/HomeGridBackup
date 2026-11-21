@@ -1,12 +1,12 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.02 | 21.11.2026 05:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.03 | 21.11.2026 21:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
 import tkinter as tk
-from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state
+from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY
 from core.files import open_folder_native, choose_folder_native, get_app_icon_path
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
@@ -176,6 +176,10 @@ class HomeGridApp(DialogsMixin):
                 return
             self._exit_confirm_open = True
             self.confirm_exit()
+            return
+        if NO_TRAY or not self.engine.state.get("tray_enabled", True):
+            self.root.iconify()
+            self.engine.log("Вікно згорнуто в панель задач (трей вимкнено).", "info")
             return
         keep_tray = bool(self.engine.state.get("minimize_to_tray", True))
         if keep_tray and HAS_TRAY:
