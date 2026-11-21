@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.20 | 21.11.2026 02:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.21 | 21.11.2026 02:56) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -845,23 +845,9 @@ class DialogsMixin:
             if act == "sha":
                 c.bind("<Button-1>", lambda _e: _show_missing_sha())
 
-        def _fmt_wt(sec_val, lng_c):
-            s = max(0.0, float(sec_val or 0.0))
-            if s <= 0.0:
-                return "—"
-            if s < 1.0:
-                return "1 с" if lng_c == "uk" else "1 s"
-            if s < 60.0:
-                return f"{s:.1f} с" if lng_c == "uk" else f"{s:.1f} s"
-            mins = int(s // 60)
-            rem = round(s - mins * 60, 1)
-            if rem >= 60.0:
-                mins += 1
-                rem = 0.0
-            return f"{mins} хв {rem:.1f} с ({s:.1f} с)" if lng_c == "uk" else f"{mins}m {rem:.1f}s ({s:.1f}s)"
         lng_s = self.engine.state.get("lang", "en")
-        avg_t_s = _fmt_wt(st.get("avg_dur_sec", 0.0), lng_s)
-        tot_t_s = _fmt_wt(st.get("total_dur_sec", 0.0), lng_s)
+        avg_t_s = (format_duration(st.get("avg_dur_sec", 0.0), lng_s) if float(st.get("avg_dur_sec") or 0) > 0 else "—")
+        tot_t_s = (format_duration(st.get("total_dur_sec", 0.0), lng_s) if float(st.get("total_dur_sec") or 0) > 0 else "—")
         mid_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
         mid_f.pack(fill="x", padx=14, pady=(6, 6))
         wt_txt = (

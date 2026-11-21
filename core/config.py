@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v1.22 | 21.11.2026 02:28) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v1.23 | 21.11.2026 02:56) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -52,8 +52,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "1.23"
-BUILD_DATE = "21.11.2026 02:28"
+SCRIPT_VER = "1.24"
+BUILD_DATE = "21.11.2026 02:56"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
