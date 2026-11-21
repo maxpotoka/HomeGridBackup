@@ -1,0 +1,129 @@
+name: Build HomeGrid Backup for Linux 32-bit (i386)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+    paths:
+      - 'main.py'
+      - 'core/**'
+      - 'console/**'
+      - 'gui/**'
+      - '.github/workflows/build_linux_x86.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-i386:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: i386/debian:bookworm
+      options: --platform linux/386
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install 32-bit build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates gcc g++ patchelf file p7zip-full pkg-config \
+            python3 python3-dev python3-pip python3-venv python3-tk \
+            libayatana-appindicator3-dev gir1.2-ayatanaappindicator3-0.1 \
+            libgirepository1.0-dev libcairo2-dev \
+            gir1.2-secret-1 libsecret-1-0 \
+            python3-gi python3-cairo python3-pil python3-keyring python3-secretstorage python3-jeepney
+
+      - name: Create 32-bit virtual environment (with system GI/Tk packages)
+        run: |
+          python3 -m venv --system-site-packages /opt/venv32
+          /opt/venv32/bin/python -m pip install --upgrade pip
+          /opt/venv32/bin/pip install --no-cache-dir "nuitka<2.7" ordered-set "pystray==0.19.5" send2trash
+
+      - name: Verify 32-bit Python and GI namespaces
+        run: |
+          /opt/venv32/bin/python -c "import struct; assert struct.calcsize('P')*8 == 32; print('32-bit Python OK')"
+          /opt/venv32/bin/python -c "import tkinter; print('Tkinter OK')"
+          /opt/venv32/bin/python -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI OK')"
+          /opt/venv32/bin/python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI OK')"
+
+      - name: Patch pystray for AyatanaAppIndicator3
+        run: |
+          PYSTRAY_AI="$(/opt/venv32/bin/python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/pystray/_appindicator.py"
+          sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
+          sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
+          grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: pystray patch failed"; exit 1; }
+          echo "pystray patch OK"
+
+      - name: Build with Nuitka (32-bit onefile)
+        env:
+          CFLAGS: "-O2 -march=i686 -mtune=generic -pipe"
+          CXXFLAGS: "-O2 -march=i686 -mtune=generic -pipe"
+          LDFLAGS: "-Wl,-O1,--as-needed"
+        run: |
+          TYPELIB_DIR="/usr/lib/i386-linux-gnu/girepository-1.0"
+          /opt/venv32/bin/python -m nuitka \
+            --onefile \
+            --enable-plugin=tk-inter \
+            --disable-plugin=gi \
+            --lto=no \
+            --jobs=4 \
+            --assume-yes-for-downloads \
+            --python-flag=no_asserts \
+            --python-flag=no_docstrings \
+            --noinclude-pytest-mode=nofollow \
+            --noinclude-setuptools-mode=nofollow \
+            --noinclude-unittest-mode=nofollow \
+            --include-package=core \
+            --include-package=console \
+            --include-package=gui \
+            --include-module=gi._gi \
+            --include-module=pystray \
+            --include-module=pystray._appindicator \
+            --include-module=pystray._xorg \
+            --include-package=keyring \
+            --include-package=secretstorage \
+            --include-package=jeepney \
+            --include-package=PIL \
+            --include-package-data=keyring \
+            --include-package-data=pystray \
+            --include-package-data=PIL \
+            --include-module=send2trash \
+            --include-data-files="$TYPELIB_DIR/Secret-1.typelib=girepository-1.0/Secret-1.typelib" \
+            --include-data-files="$TYPELIB_DIR/AyatanaAppIndicator3-0.1.typelib=girepository-1.0/AyatanaAppIndicator3-0.1.typelib" \
+            --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
+            --output-dir=build32 \
+            --output-filename=homegridBackup \
+            main.py
+
+      - name: Verify 32-bit binary
+        run: |
+          test -f build32/homegridBackup || { echo "ERROR: build32/homegridBackup not created"; exit 1; }
+          mkdir -p dist32
+          mv build32/homegridBackup dist32/homegridBackup
+          chmod +x dist32/homegridBackup
+          file dist32/homegridBackup
+
+      - name: Package into .7z
+        run: |
+          cd dist32
+          7z a -t7z -mx=9 ../HomeGridBackup-Linux-i386-32bit.7z homegridBackup
+          cd ..
+          ls -lh HomeGridBackup-Linux-i386-32bit.7z
+
+      - name: Publish 32-bit .7z to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: linux-32bit-latest
+          name: HomeGrid Backup — Linux 32-bit (i686 / Debian / Ubuntu)
+          body: |
+            Одиничний 32-бітний виконуваний файл **homegridBackup** (`--onefile`, ELF 32-bit LSB i686) для старого та легкого ПК на Linux (Debian 12+, MX Linux, antiX, Ubuntu 32-bit).
+            Запуск: `chmod +x homegridBackup && ./homegridBackup`
+          files: HomeGridBackup-Linux-i386-32bit.7z
+          make_latest: false
