@@ -43,8 +43,8 @@ jobs:
                 python3-gi python3-cairo python3-pil python3-keyring python3-secretstorage
 
               python3 -m venv --system-site-packages /opt/venv32
-              /opt/venv32/bin/python -m pip install --upgrade "pip<21.4" "setuptools<58" wheel
-              /opt/venv32/bin/python -m pip install --no-cache-dir "nuitka==2.5.9" ordered-set "pystray==0.19.5" send2trash
+              /opt/venv32/bin/python -m pip install --upgrade "pip==21.3.1" "setuptools==59.6.0" wheel
+              /opt/venv32/bin/python -m pip install --no-cache-dir "importlib-metadata==4.8.3" "nuitka==2.5.9" ordered-set "pystray==0.19.5" send2trash
 
               /opt/venv32/bin/python -c "import struct; assert struct.calcsize(\"P\")*8 == 32; print(\"32-bit Python OK\")"
               /opt/venv32/bin/python -c "import tkinter, gi; gi.require_version(\"Secret\", \"1\"); gi.require_version(\"AppIndicator3\", \"0.1\"); print(\"Tk + GI OK\")"
