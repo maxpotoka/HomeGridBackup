@@ -80,8 +80,7 @@ jobs:
             "nuitka==2.5.9" ordered-set \
             "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
-          python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All 32-bit modules OK")'
-
+          PYSTRAY_BACKEND=dummy python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All 32-bit modules OK")'
           export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
           export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
           export LDFLAGS="-Wl,-O1,--as-needed"
