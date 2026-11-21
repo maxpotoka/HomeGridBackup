@@ -58,10 +58,10 @@ jobs:
           PYSTRAY_AI="$(python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/pystray/_appindicator.py"
           sed -i "s/gi.require_version('AppIndicator3', '0.1')/raise ValueError('AyatanaOnly')/g" "$PYSTRAY_AI"
           sed -i "s/from gi.repository import AppIndicator3 as AppIndicator/pass/g" "$PYSTRAY_AI"
-          grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не применился"; exit 1; }
+          grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не застосувався"; exit 1; }
           echo "pystray patch OK"
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (onefile)
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
@@ -103,21 +103,20 @@ jobs:
             --output-filename=homegridBackup \
             main.py
 
-      - name: Locate and verify build output
+      - name: Verify build output
         run: |
-          DIST_DIR=$(find build -maxdepth 1 -type d -name "*.dist" -print -quit)
-          if [ -z "$DIST_DIR" ]; then
-            echo "ERROR: Nuitka distribution directory not found"
-            exit 1
-          fi
-          mv "$DIST_DIR" homegridBackup
-          chmod +x homegridBackup/homegridBackup
-          test -f homegridBackup/girepository-1.0/Secret-1.typelib || { echo "ERROR: нет Secret-1.typelib"; exit 1; }
-          test -f homegridBackup/girepository-1.0/AyatanaAppIndicator3-0.1.typelib || { echo "ERROR: нет AyatanaAppIndicator3-0.1.typelib"; exit 1; }
+          test -f build/homegridBackup || { echo "ERROR: Nuitka не створив виконуваний файл build/homegridBackup"; exit 1; }
+          mkdir -p dist
+          mv build/homegridBackup dist/homegridBackup
+          chmod +x dist/homegridBackup
+          file dist/homegridBackup
 
       - name: Package application into single .7z
         run: |
-          7z a -t7z -mx=9 HomeGridBackup-Ubuntu-x86_64.7z homegridBackup/
+          cd dist
+          7z a -t7z -mx=9 ../HomeGridBackup-Ubuntu-x86_64.7z homegridBackup
+          cd ..
+          ls -lh HomeGridBackup-Ubuntu-x86_64.7z
 
       - name: Publish clean .7z to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -126,7 +125,8 @@ jobs:
           tag_name: ubuntu-x64-latest
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
-            Збірка у вигляді папки **homegridBackup/** для максимальної швидкодії (без розпакування при запуску).
-            Після розпакування архіву запустіть: `cd homegridBackup && chmod +x homegridBackup && ./homegridBackup`
+            Одиничний виконуваний файл **homegridBackup** (onefile) для Linux x86_64.
+            Розпакуйте архів і запустіть: `chmod +x homegridBackup && ./homegridBackup`
+            Вимоги: Ubuntu 24.04 або новіша, для іконки в треї потрібен AppIndicator.
           files: HomeGridBackup-Ubuntu-x86_64.7z
           make_latest: false
