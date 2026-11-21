@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v2.06 | 21.11.2026 07:34) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.07 | 21.11.2026 18:30) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -13,7 +13,7 @@ import urllib.request
 import http.cookiejar
 from urllib.parse import urlparse
 from datetime import datetime
-from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state
+from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state, SCRIPT_VER, get_fast_sysinfo
 from core.files import pretty_phase, format_duration, format_backup_dt
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
 
@@ -560,6 +560,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
         tot_fmt = format_duration(total_sec, engine.state.get("lang", "en"))
         engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
+        engine.log(f"[SUMMARY] v{SCRIPT_VER} | {get_fast_sysinfo()} | download {spd_mbs} MB/s ({dl_sec} s) | server {srv_sec} s | total {total_sec} s | files {cnt}", "info")
         from core.i18n import tr as _tr_n
         _lng_n = engine.state.get("lang", "en")
         _desktop_notify("HomeGrid Backup", _tr_n(f"Резервну копію створено: {final_name} ({total_mb:.1f} МБ)", _lng_n))

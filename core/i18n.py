@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v2.06 | 21.11.2026 07:51) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.07 | 21.11.2026 18:30) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -418,6 +418,12 @@ EN_SUBSTR = sorted([
     ("закритий або недоступний.", "is closed or unreachable."),
     ("' доступний, але це НЕ сервер HomeGrid Monitor!", "' is reachable, but it is NOT a HomeGrid Monitor server!"),
     ("Хост '", "Host '"),
+    ("Сервер HGM онлайн", "HGM server online"),
+    ("Сервер http", "Server http"),
+    ("Сервер ", "Server "),
+    ("Архів готовий", "Archive ready"),
+    ("Обробка", "Processing"),
+    ("Застарілих GFS:", "Expired:"),
 ], key=lambda x: len(x), reverse=True)
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}

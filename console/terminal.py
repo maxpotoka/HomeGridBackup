@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: console/terminal.py (v2.00 | 21.11.2026 03:24) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
+# [ФАЙЛ: console/terminal.py (v2.01 | 21.11.2026 18:30) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
 # ==============================================================================
 import os
 import re
@@ -8,7 +8,7 @@ import time
 import ctypes
 from ctypes import wintypes
 from datetime import datetime
-from core.config import SCRIPT_VER, HIDDEN_MODE, SILENT_MODE, CLI_MODE
+from core.config import SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE
 
 _STAGE_TR_MAP = (
     ("Перевірка сайту та сервера HGM...", "Checking HGM host and server..."),
@@ -19,6 +19,13 @@ _STAGE_TR_MAP = (
     ("Перевірка файлів", "Checking files"),
     ("Стиснення ZIP-архіву", "Packing ZIP"),
     ("Архів готовий (75%). Завантаження...", "Archive ready (75%). Downloading..."),
+    ("Архів готовий", "Archive ready"),
+    ("Обробка", "Processing"),
+    ("Збірка архіву на сервері", "Building archive on server"),
+    ("Етап сервера", "Server stage"),
+    ("Сервер HGM онлайн", "HGM server online"),
+    ("Сервер http", "Server http"),
+    ("Сервер ", "Server "),
     ("Завантаження", "Downloading"),
     ("Швидкість:", "Speed:"),
     ("МБ/с", "MB/s"),
@@ -65,7 +72,7 @@ def _safe_con_write(text):
 def _print_cli_banner():
     from core.config import get_fast_sysinfo
     sys_line = get_fast_sysinfo()
-    title_line = f"  HomeGrid Backup v{SCRIPT_VER} - Inverter Data Backup"
+    title_line = f"  HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup"
     os_line = f"  {sys_line}"[:76]
     _safe_con_write("+" + ("-" * 76) + "+\n")
     _safe_con_write("|" + title_line.ljust(76) + "|\n")
@@ -89,7 +96,7 @@ def _init_console_for_cli():
         try:
             k32.SetConsoleOutputCP(65001)
             k32.SetConsoleCP(65001)
-            k32.SetConsoleTitleW(f"HomeGrid Backup v{SCRIPT_VER} - Inverter Data Backup")
+            k32.SetConsoleTitleW(f"HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup")
         except Exception:
             pass
         try:

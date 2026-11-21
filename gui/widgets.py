@@ -1,85 +1,107 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v2.06 | 21.11.2026 07:34) — ЕДИНЫЙ ОПТИМАЛЬНЫЙ ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
+# [ФАЙЛ: gui/widgets.py (v2.08 | 21.11.2026 18:18) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
+# patch-id: progress-2.09
 # ==============================================================================
+import sys
 import tkinter as tk
 from gui.styles import THEMES
+from core.i18n import tr
+
+# Цвета градиента по умолчанию; тема может переопределить ключами pbar_from / pbar_to
+PBAR_FROM = "#2563eb"
+PBAR_TO = "#10b981"
+STRIPS = 60
+LITE_CHARS = 36
+MONO = "Menlo" if sys.platform == "darwin" else ("DejaVu Sans Mono" if sys.platform.startswith("linux") else "Consolas")
+
 
 class StyledProgressBar(tk.Canvas):
+    """Полосу строит один раз; при обновлении меняются только координаты и видимость полос."""
+
     def __init__(self, parent, height=20, **kwargs):
         super().__init__(parent, height=height, highlightthickness=0, bd=0, **kwargs)
         self.pct = 0
         self.indet = False
-        self.style_name = "v8"
         self.lite_mode = False
         self.theme = THEMES["dark"]
-        self._phase = 0
-        self.status_lbl = ""
         self.lang = "en"
-        self.bind("<Configure>", lambda e: self.redraw())
+        self._phase = 0
+        self._strips = []
+        self._text = None
+        self._cw = self._ch = 0
+        self.bind("<Configure>", lambda e: self._rebuild())
 
     def set_state(self, pct, indet, style_name, lite_mode, theme, status_lbl="", lang="en"):
+        # style_name и status_lbl оставлены для совместимости с вызовом из gui/window.py
         self.lang = lang or "en"
-        self.status_lbl = str(status_lbl or "")
         self.pct = max(0, min(100, int(pct or 0)))
         self.indet = bool(indet)
-        self.style_name = "v8"
-        self.lite_mode = bool(lite_mode)
-        self.theme = theme
         if self.indet:
             self._phase = (self._phase + 1) % 40
-        sig = (self.pct, self.indet, self._phase if self.indet else 0, self.lite_mode, id(theme), self.winfo_width(), self.winfo_height())
-        if sig == getattr(self, "_last_draw_sig", None):
+        lite = bool(lite_mode)
+        if lite != self.lite_mode or theme != self.theme or self._cw == 0:
+            self.lite_mode = lite
+            self.theme = theme
+            self._rebuild()
             return
-        self._last_draw_sig = sig
-        self.redraw()
+        self._update()
 
-    def _draw_gradient(self, x1, y1, x2, y2, c1, c2):
-        w = max(1, int(x2 - x1))
-        r1, g1, b1 = self.winfo_rgb(c1)
-        r2, g2, b2 = self.winfo_rgb(c2)
-        steps = min(w, 60)
-        for i in range(steps):
-            t = i / max(1, steps - 1)
-            r = int((r1 + (r2 - r1) * t) / 256)
-            g = int((g1 + (g2 - g1) * t) / 256)
-            b = int((b1 + (b2 - b1) * t) / 256)
-            sx1 = x1 + int(w * i / steps)
-            sx2 = x1 + int(w * (i + 1) / steps)
-            self.create_rectangle(sx1, y1, sx2, y2, fill=f"#{r:02x}{g:02x}{b:02x}", outline="")
-
-    def redraw(self):
+    def _rebuild(self):
         self.delete("all")
+        self._strips = []
+        self._text = None
         w = max(10, self.winfo_width())
         h = max(10, self.winfo_height())
+        self._cw, self._ch = w, h
         if self.lite_mode:
             self.configure(bg=self.theme["bg"])
-            chars = 36
+            self._text = self.create_text(4, h // 2, anchor="w", text="", fill=self.theme["cyan"], font=(MONO, 11, "bold"))
+        else:
+            self.configure(bg=self.theme.get("pbar_bg", "#1e293b"))
+            self.create_rectangle(0, 0, w - 1, h - 1, outline=self.theme.get("pbar_brd", "#475569"), width=1)
+            c1 = self.winfo_rgb(self.theme.get("pbar_from", PBAR_FROM))
+            c2 = self.winfo_rgb(self.theme.get("pbar_to", PBAR_TO))
+            span = w - 4
+            steps = max(1, min(span, STRIPS))
+            for i in range(steps):
+                t = i / max(1, steps - 1)
+                r = int((c1[0] + (c2[0] - c1[0]) * t) / 256)
+                g = int((c1[1] + (c2[1] - c1[1]) * t) / 256)
+                b = int((c1[2] + (c2[2] - c1[2]) * t) / 256)
+                x1 = 2 + span * i // steps
+                x2 = 2 + span * (i + 1) // steps
+                item = self.create_rectangle(x1, 2, x2, h - 2, fill=f"#{r:02x}{g:02x}{b:02x}", outline="", state="hidden")
+                self._strips.append((x1, x2, item))
+        self._update()
+
+    def _update(self):
+        if self.lite_mode:
+            if self._text is None:
+                return
             if self.indet:
-                pos = self._phase % (chars - 4)
-                bar = ["-"] * chars
+                pos = self._phase % (LITE_CHARS - 4)
+                bar = ["-"] * LITE_CHARS
                 for k in range(4):
                     bar[pos + k] = "#"
-                from core.i18n import tr
                 txt = f"[{''.join(bar)}] {tr('пошук...', self.lang)}"
             else:
-                filled = int(round((self.pct / 100.0) * chars))
-                txt = f"[{'#' * filled}{'-' * (chars - filled)}] {self.pct:3d}%"
-            import sys as _sys_w
-            _mono_f = "Menlo" if _sys_w.platform == "darwin" else ("DejaVu Sans Mono" if _sys_w.platform.startswith("linux") else "Consolas")
-            self.create_text(4, h // 2, anchor="w", text=txt, fill=self.theme["cyan"], font=(_mono_f, 11, "bold"))
+                filled = int(round((self.pct / 100.0) * LITE_CHARS))
+                txt = f"[{'#' * filled}{'-' * (LITE_CHARS - filled)}] {self.pct:3d}%"
+            self.itemconfigure(self._text, text=txt)
             return
-
+        w, h = self._cw, self._ch
         if self.indet:
-            seg_w = max(40, int(w * 0.28))
-            fx1 = int(((self._phase / 39.0) * (w + seg_w)) - seg_w)
-            fx2 = fx1 + seg_w
+            seg = max(40, int(w * 0.28))
+            lo = int(((self._phase / 39.0) * (w + seg)) - seg)
+            hi = lo + seg
         else:
-            fx1 = 2
-            fx2 = 2 + int(((w - 4) * self.pct) / 100.0)
-
-        bg_c = self.theme.get("pbar_bg", "#1e293b")
-        brd_c = self.theme.get("pbar_brd", "#475569")
-        self.configure(bg=bg_c)
-        self.create_rectangle(0, 0, w - 1, h - 1, outline=brd_c, width=1)
-        if fx2 > fx1:
-            self._draw_gradient(max(2, fx1), 2, min(w - 2, fx2), h - 2, "#2563eb", "#10b981")
+            lo = 2
+            hi = 2 + int(((w - 4) * self.pct) / 100.0)
+        lo, hi = max(2, lo), min(w - 2, hi)
+        for x1, x2, item in self._strips:
+            a, b = max(x1, lo), min(x2, hi)
+            if b > a:
+                self.coords(item, a, 2, b, h - 2)
+                self.itemconfigure(item, state="normal")
+            else:
+                self.itemconfigure(item, state="hidden")
