@@ -1,6 +1,6 @@
 from core.i18n import tr
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v1.154 | 20.11.2026 23:46) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v1.20 | 21.11.2026 02:15) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -70,7 +70,8 @@ def _to_con_en(txt):
     s = re.sub(r"\bКБ/с\b", "KB/s", s)
     s = re.sub(r"\bМБ\b", "MB", s)
     s = re.sub(r"\bмс\b", "ms", s)
-    s = re.sub(r"(?<=\d)\s*с(?=\b|\.)", " s", s)
+    s = re.sub(r"(\d+)\s*хв\s*([\d.]+)\s*с", r"\1m \2s", s)
+    s = re.sub(r"(?<=\d)\s*с(?=\b|\)|\.)", " s", s)
     s = re.sub(r"\bза\s+(?=\d)", "in ", s)
     s = re.sub(r"\bіз\s+(?=\d)", "of ", s)
     return s
@@ -287,7 +288,7 @@ class BackupEngine:
             "today_cnt": 0, "today_mb": 0.0, "week_cnt": 0, "week_mb": 0.0,
             "month_cnt": 0, "month_mb": 0.0, "total_cnt": 0, "total_mb": 0.0,
             "gfs_daily": 0, "gfs_weekly": 0, "gfs_monthly": 0,
-            "sha_cnt": 0, "avg_mb": 0.0, "span_days": 0, "success_rate": 100, "months": []
+            "sha_cnt": 0, "avg_mb": 0.0, "span_days": 0, "success_rate": 100, "avg_dur_sec": 0.0, "total_dur_sec": 0.0, "dur_cnt": 0, "months": []
         }
         m_keys = []
         y, m = now_dt.year, now_dt.month
@@ -334,23 +335,57 @@ class BackupEngine:
                         m_counts[ym] += 1
             except Exception:
                 pass
+        disk_cnt = res["total_cnt"]
+        res["disk_cnt"] = disk_cnt
+        ops = getattr(self, "op_history", []) or []
+        if disk_cnt == 0 and ops:
+            for op in ops:
+                if op.get("status") != "Успішно":
+                    continue
+                sz_o = float(op.get("size_mb") or 0.0)
+                try:
+                    op_dt = datetime.strptime(op.get("ts", ""), "%d.%m.%Y %H:%M")
+                    op_ts = op_dt.timestamp()
+                    mtimes.append(op_ts)
+                    if op_ts >= today_start:
+                        res["today_cnt"] += 1
+                        res["today_mb"] += sz_o
+                    if op_ts >= week_start:
+                        res["week_cnt"] += 1
+                        res["week_mb"] += sz_o
+                    if op_ts >= month_start:
+                        res["month_cnt"] += 1
+                        res["month_mb"] += sz_o
+                    ym_o = op_dt.strftime("%Y-%m")
+                    if ym_o in m_counts:
+                        m_counts[ym_o] += 1
+                except Exception:
+                    pass
         for k in ("today_mb", "week_mb", "month_mb", "total_mb"):
             res[k] = round(res[k], 1)
-        if res["total_cnt"] > 0:
-            res["avg_mb"] = round(res["total_mb"] / res["total_cnt"], 1)
         st_cnt = int(self.state.get("all_time_cnt", 0) or 0)
         st_mb = round(float(self.state.get("all_time_mb", 0.0) or 0.0), 1)
-        if res["total_cnt"] > st_cnt:
-            self.state["all_time_cnt"] = res["total_cnt"]
+        if disk_cnt > st_cnt:
+            self.state["all_time_cnt"] = disk_cnt
             self.state["all_time_mb"] = max(st_mb, res["total_mb"])
-        res["total_cnt"] = max(res["total_cnt"], int(self.state.get("all_time_cnt", 0)))
-        res["total_mb"] = max(res["total_mb"], round(float(self.state.get("all_time_mb", 0.0)), 1))
+        res["total_cnt"] = max(disk_cnt, res["month_cnt"], res["week_cnt"], res["today_cnt"], int(self.state.get("all_time_cnt", 0)))
+        res["total_mb"] = round(max(res["total_mb"], res["month_mb"], res["week_mb"], res["today_mb"], float(self.state.get("all_time_mb", 0.0))), 1)
+        self.state["all_time_cnt"] = res["total_cnt"]
+        self.state["all_time_mb"] = res["total_mb"]
+        if res["total_cnt"] > 0:
+            res["avg_mb"] = round(res["total_mb"] / res["total_cnt"], 1)
         if len(mtimes) >= 2:
             res["span_days"] = max(1, int((max(mtimes) - min(mtimes)) // 86400))
-        ops = getattr(self, "op_history", []) or []
+        elif len(mtimes) == 1:
+            res["span_days"] = 1
         if ops:
             ok_ops = sum(1 for x in ops if x.get("status") == "Успішно")
             res["success_rate"] = int(round((ok_ops / len(ops)) * 100))
+            durs = [float(x["dur_sec"]) for x in ops if x.get("dur_sec") is not None and float(x["dur_sec"]) > 0]
+            if durs:
+                res["dur_cnt"] = len(durs)
+                res["total_dur_sec"] = round(sum(durs), 1)
+                res["avg_dur_sec"] = round(sum(durs) / len(durs), 1)
         _m_names = {
             "01": "Січень", "02": "Лютий", "03": "Березень", "04": "Квітень",
             "05": "Травень", "06": "Червень", "07": "Липень", "08": "Серпень",

@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v1.139 | 20.11.2026 16:26) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v1.16 | 21.11.2026 01:59) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -349,6 +349,7 @@ def tr(text, lang="en"):
     for uk, en in EN_SUBSTR:
         if uk in s:
             s = s.replace(uk, en)
+    s = re.sub(r"(\d+)\s*хв\s*([\d.]+)\s*с", r"\1m \2s", s)
     s = re.sub(r"(?<=\d)\s*с(?=\b|\)|\.)", " s", s)
     s = re.sub(r"\bза\s+(?=\d)", "in ", s)
     s = re.sub(r"\bіз\s+(?=\d)", "of ", s)

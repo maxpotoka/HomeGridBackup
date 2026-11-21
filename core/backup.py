@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v1.154 | 20.11.2026 23:46) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v1.17 | 21.11.2026 01:59) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -14,7 +14,7 @@ import http.cookiejar
 from urllib.parse import urlparse
 from datetime import datetime
 from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state
-from core.files import pretty_phase
+from core.files import pretty_phase, format_duration
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
 
 def _backup_stage1_prepare(engine, raw_url, force_skip):
@@ -523,7 +523,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         final_name = os.path.basename(out_file)
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
-        engine.log(f"УСПІХ! Резервне копіювання завершено за {total_sec} с ({ts_start_str} → {ts_end_str}).", "ok")
+        tot_fmt = format_duration(total_sec, engine.state.get("lang", "en"))
+        engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
         engine.state["all_time_cnt"] = max(int(engine.state.get("all_time_cnt", 0)), 0) + 1
         engine.state["all_time_mb"] = round(max(float(engine.state.get("all_time_mb", 0.0)), 0.0) + total_mb, 1)
         commit_state(engine.state)

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/files.py (v1.123 | 20.11.2026 15:06) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v1.14 | 21.11.2026 01:59) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 # ==============================================================================
 import os
 import re
@@ -121,3 +121,16 @@ def parse_backup_dt(filename, fallback_ts):
             except Exception:
                 pass
     return datetime.fromtimestamp(fallback_ts)
+
+def format_duration(sec, lang="uk"):
+    s = max(0.0, float(sec or 0.0))
+    if s < 1.0:
+        return "1 с" if lang == "uk" else "1 s"
+    if s < 60.0:
+        return f"{s:.1f} с" if lang == "uk" else f"{s:.1f} s"
+    mins = int(s // 60)
+    rem = round(s - mins * 60, 1)
+    if rem >= 60.0:
+        mins += 1
+        rem = 0.0
+    return f"{mins} хв {rem:.1f} с ({s:.1f} с)" if lang == "uk" else f"{mins}m {rem:.1f}s ({s:.1f}s)"

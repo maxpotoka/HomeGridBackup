@@ -3,11 +3,12 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.153 | 20.11.2026 23:42) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v1.19 | 21.11.2026 02:04) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
 from core.config import SCRIPT_VER, commit_state
+from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _resolve_exe_path, _sync_scheduler_from_windows, _manage_windows_scheduler
@@ -239,7 +240,7 @@ class DialogsMixin:
                 self.engine.submit_modal(True)
             dlg.protocol("WM_DELETE_WINDOW", _close_rep)
             tot_s = max(0.1, float(d.get("total_sec", 0.1)))
-            sec_u = "с" if lang == "uk" else "s"
+            tot_disp = format_duration(tot_s, lang)
             fn_s = d.get("file", "backup.zip")
             sz_s = d.get("size_mb", 0.0)
             fc_s = d.get("files_cnt", 0)
@@ -261,7 +262,7 @@ class DialogsMixin:
             tk.Label(top_c, text=(f"Файл архіву:  {fn_s}" if lang == "uk" else f"Archive file:  {fn_s}"), bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
             tk.Label(top_c, text=(f"Джерело (сервер):  {srv_disp}" if lang == "uk" else f"Source server:  {srv_disp}"), bg=p["card"], fg=p["green"] if _is_lan else p["amber"], font=(fam, fs, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
             tk.Label(top_c, text=(f"Розмір:  {sz_s} МБ ({fc_s} файлів)   •   CRC32 + SHA-256: Підтверджено" if lang == "uk" else f"Size:  {sz_s} MB ({fc_s} files)   •   CRC32 + SHA-256: Verified"), bg=p["card"], fg=p["text"], font=(fam, fs), anchor="w").pack(fill="x", pady=(0, 6))
-            tk.Label(top_c, text=(f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_s} {sec_u})" if lang == "uk" else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_s} {sec_u})"), bg=p["card"], fg=p["green"], font=(fam, fs, "bold"), anchor="w").pack(fill="x")
+            tk.Label(top_c, text=(f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_disp})" if lang == "uk" else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_disp})"), bg=p["card"], fg=p["green"], font=(fam, fs, "bold"), anchor="w").pack(fill="x")
             mid_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=10)
             mid_c.pack(fill="x", padx=16, pady=(0, 8))
             mid_c.columnconfigure(0, weight=1)
@@ -280,7 +281,7 @@ class DialogsMixin:
             for idx_r, (lbl_st, val_s, col_st) in enumerate(stages):
                 pct_v = min(100, int(round((float(val_s) / tot_s) * 100)))
                 tk.Label(mid_c, text=lbl_st, bg=p["card"], fg=col_st, font=(fam, fs), anchor="w").grid(row=idx_r, column=0, sticky="w", pady=4)
-                tk.Label(mid_c, text=f"{float(val_s):.1f} {sec_u}  ({pct_v}%)", bg=p["card"], fg=col_st, font=(fam, fs, "bold"), anchor="e").grid(row=idx_r, column=1, sticky="e", padx=(12, 0), pady=4)
+                tk.Label(mid_c, text=f"{format_duration(val_s, lang)}  ({pct_v}%)", bg=p["card"], fg=col_st, font=(fam, fs, "bold"), anchor="e").grid(row=idx_r, column=1, sticky="e", padx=(12, 0), pady=4)
             bot_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=8)
             bot_c.pack(fill="x", padx=16, pady=(0, 8))
             tk.Label(bot_c, text=(f"Сховище:  {d.get('z_cnt', 0)} архівів ({d.get('z_mb', 0)} МБ)   •   Вільно:  {d.get('free_gb', 0)} ГБ   •   Застарілих GFS:  {d.get('old_cnt', 0)} шт." if lang == "uk" else f"Storage:  {d.get('z_cnt', 0)} archives ({d.get('z_mb', 0)} MB)   •   Free:  {d.get('free_gb', 0)} GB   •   Outdated GFS:  {d.get('old_cnt', 0)}"), bg=p["card"], fg=p["muted"], font=(fam, fs), anchor="w").pack(fill="x")
@@ -808,9 +809,11 @@ class DialogsMixin:
         for c_i in range(4):
             grid_f.columnconfigure(c_i, weight=1)
 
-        tot_c, sha_c = st.get("total_cnt", 0), st.get("sha_cnt", 0)
-        sha_pct = int(round((sha_c / tot_c) * 100)) if tot_c > 0 else 100
-        sha_col = p["green"] if (tot_c == 0 or sha_c == tot_c) else p["amber"]
+        tot_c = st.get("total_cnt", 0)
+        disk_c = st.get("disk_cnt", tot_c)
+        sha_c = st.get("sha_cnt", 0)
+        sha_pct = int(round((sha_c / disk_c) * 100)) if disk_c > 0 else 100
+        sha_col = p["green"] if (disk_c == 0 or sha_c == disk_c) else p["amber"]
 
         cards = [
             ("СЬОГОДНІ", f"{st.get('today_cnt', 0)} шт.", f"{st.get('today_mb', 0.0)} МБ", p["muted"] if st.get("today_cnt", 0) == 0 else p["cyan"], None),
@@ -818,7 +821,7 @@ class DialogsMixin:
             ("ЗА МІСЯЦЬ", f"{st.get('month_cnt', 0)} шт.", f"{st.get('month_mb', 0.0)} МБ", p["muted"] if st.get("month_cnt", 0) == 0 else p["cyan"], None),
             ("ЗА ВЕСЬ ЧАС", f"{tot_c} шт.", f"{st.get('total_mb', 0.0)} МБ", p["muted"] if tot_c == 0 else p["cyan"], None),
             ("СЕР. РОЗМІР", f"{st.get('avg_mb', 0.0)} МБ", "на один архів", p["text"], None),
-            ("ЗАХИСТ SHA-256", f"{sha_c} / {tot_c} ({sha_pct}%)", "натисніть для списку" if sha_c < tot_c else "усі захищені", sha_col, "sha"),
+            ("ЗАХИСТ SHA-256", f"{sha_c} / {disk_c} ({sha_pct}%)", "натисніть для списку" if sha_c < disk_c else ("усі захищені" if disk_c > 0 else "папка порожня"), sha_col, "sha"),
             ("УСПІШНІСТЬ", f"{st.get('success_rate', 100)}%", "останніх запусків", p["text"], None),
             ("ГЛИБИНА", ("1 день" if (self.engine.state.get("lang") == "uk" and st.get("span_days", 0) == 1) else ("1 day" if (self.engine.state.get("lang") != "uk" and st.get("span_days", 0) == 1) else (f"{st.get('span_days', 0)} дн." if self.engine.state.get("lang") == "uk" else f"{st.get('span_days', 0)} days"))), "діапазон копій", p["text"], None),
         ]
@@ -839,7 +842,7 @@ class DialogsMixin:
 
         for idx, (cap, v_main, v_sub, col, act) in enumerate(cards):
             r_i, c_i = divmod(idx, 4)
-            is_warn_sha = (act == "sha" and sha_c < tot_c)
+            is_warn_sha = (act == "sha" and sha_c < disk_c)
             c = tk.Frame(grid_f, bg=p["card"], bd=2 if is_warn_sha else 1, relief="solid", highlightbackground=p["amber"] if is_warn_sha else p["border"], highlightthickness=2 if is_warn_sha else 0, padx=9, pady=7, cursor="hand2" if act else "")
             c.grid(row=r_i, column=c_i, sticky="nsew", padx=(0 if c_i == 0 else 6, 0), pady=(0 if r_i == 0 else 6, 0))
             w1 = tk.Label(c, text=cap, bg=p["card"], fg=p["muted"], font=("Segoe UI", max(7, fs - 3), "bold"))
@@ -852,10 +855,31 @@ class DialogsMixin:
             if act == "sha":
                 c.bind("<Button-1>", lambda _e: _show_missing_sha())
 
+        def _fmt_wt(sec_val, lng_c):
+            s = max(0.0, float(sec_val or 0.0))
+            if s <= 0.0:
+                return "—"
+            if s < 1.0:
+                return "1 с" if lng_c == "uk" else "1 s"
+            if s < 60.0:
+                return f"{s:.1f} с" if lng_c == "uk" else f"{s:.1f} s"
+            mins = int(s // 60)
+            rem = round(s - mins * 60, 1)
+            if rem >= 60.0:
+                mins += 1
+                rem = 0.0
+            return f"{mins} хв {rem:.1f} с ({s:.1f} с)" if lng_c == "uk" else f"{mins}m {rem:.1f}s ({s:.1f}s)"
+        lng_s = self.engine.state.get("lang", "en")
+        avg_t_s = _fmt_wt(st.get("avg_dur_sec", 0.0), lng_s)
+        tot_t_s = _fmt_wt(st.get("total_dur_sec", 0.0), lng_s)
         mid_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
         mid_f.pack(fill="x", padx=14, pady=(6, 6))
-        gfs_txt = f"Структура GFS:   Щоденних: {st.get('gfs_daily', 0)}   •   Тижневих: {st.get('gfs_weekly', 0)}   •   Місячних: {st.get('gfs_monthly', 0)}"
-        tk.Label(mid_f, text=gfs_txt, bg=p["card"], fg=p["text"], font=("Segoe UI", fs, "bold")).pack(anchor="w")
+        wt_txt = (
+            f"Час роботи:   Середній: {avg_t_s}   •   Загальний ({st.get('dur_cnt', 0)} оп.): {tot_t_s}"
+            if lng_s == "uk" else
+            f"Work time:   Average: {avg_t_s}   •   Total ({st.get('dur_cnt', 0)} runs): {tot_t_s}"
+        )
+        tk.Label(mid_f, text=wt_txt, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold")).pack(anchor="w")
 
         chart_card = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=12, pady=8)
         chart_card.pack(fill="both", expand=True, padx=14, pady=(4, 6))
@@ -954,10 +978,10 @@ class DialogsMixin:
                     if dur_v is None and (p_clean.endswith(" с") or p_clean.endswith(" s")):
                         dur_txt = p_clean
                     else:
-                        dur_txt = f"{dur_v} {'с' if lang == 'uk' else 's'}" if dur_v is not None else "—"
+                        dur_txt = format_duration(dur_v, lang) if dur_v is not None else "—"
                 else:
                     fname = det
-                    dur_txt = f"{dur_v} {'с' if lang == 'uk' else 's'}" if dur_v is not None else "—"
+                    dur_txt = format_duration(dur_v, lang) if dur_v is not None else "—"
 
                 has_sha = "✔" if (bdir and fname.endswith(".zip") and os.path.exists(os.path.join(bdir, fname + ".sha256"))) else "—"
                 mb_txt = f"{item.get('size_mb', 0)} {'МБ' if lang == 'uk' else 'MB'}" if is_ok else "—"
