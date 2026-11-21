@@ -1,7 +1,13 @@
-# [ФАЙЛ: core/i18n.py (v2.02 | 21.11.2026 05:32) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.05 | 21.11.2026 07:18) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
+    "Файл не знайдено": "File not found",
+    "Порожній ZIP-архів": "Empty ZIP archive",
+    "Перевірку перервано": "Verification aborted",
+    "папка порожня": "folder is empty",
+    "Перевірка захисту SHA-256": "SHA-256 Protection Check",
+    "1 день": "1 day",
     "Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).": "Tray unavailable. Window minimized to taskbar (running in background).",
     "HomeGrid Backup: помилка": "HomeGrid Backup: Error",
     "Автопошук": "Auto-scan",
@@ -252,6 +258,11 @@ EN_EXACT = {
 }
 
 EN_SUBSTR = sorted([
+    ("Усі ", "All "),
+    ("Пошкоджених:", "Corrupted:"),
+    ("Видалити пошкоджені", "Delete corrupted"),
+    ("Архіви без файлу .sha256:", "Archives without .sha256 file:"),
+    ("… та ще ", "… and "),
     ("Резервну копію створено:", "Backup created:"),
     ("Обрати виявлений", "Select found"),
     ("Виявлені (", "Found ("),

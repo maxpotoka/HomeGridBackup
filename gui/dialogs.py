@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v2.00 | 21.11.2026 03:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v2.05 | 21.11.2026 07:18) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -643,7 +643,13 @@ class DialogsMixin:
 
         bf = tk.Frame(dlg, bg=p["panel"])
         bf.pack(side="bottom", fill="x", padx=14, pady=(4, 10))
-        verify_bar = ttk.Progressbar(dlg, mode="determinate", maximum=100)
+        _v_st = ttk.Style()
+        try:
+            _v_st.theme_use("clam")
+        except Exception:
+            pass
+        _v_st.configure("HGB.Horizontal.TProgressbar", troughcolor=p["log_bg"], background=p["green"], bordercolor=p["border"], lightcolor=p["green"], darkcolor=p["green"])
+        verify_bar = ttk.Progressbar(dlg, mode="determinate", maximum=100, style="HGB.Horizontal.TProgressbar")
         verify_bar.pack(side="bottom", fill="x", padx=14, pady=(2, 4))
         verify_status = tk.Label(dlg, text="Перевірка не запущена", bg=p["panel"], fg=p["muted"], anchor="w", font=(fam, max(8, fs - 1)))
         verify_status.pack(side="bottom", fill="x", padx=14, pady=(2, 0))
@@ -701,7 +707,8 @@ class DialogsMixin:
                 return
             if verify_state["running"]:
                 verify_bar["value"] = verify_state["pct"]
-                verify_status.configure(text=f"{verify_state['pct']}% — {verify_state['stage']}")
+                _st_tr = tr(verify_state["stage"], self.engine.state.get("lang", "en"))
+                verify_status.configure(text=f"{verify_state['pct']}% — {_st_tr}", fg=p["cyan"])
                 dlg.after(120, _poll_verify)
                 return
             btn_verify.configure(text=tr("Перевірити SHA-256 + CRC32", self.engine.state.get("lang", "en")), state="normal")
@@ -747,18 +754,24 @@ class DialogsMixin:
             dlg.after(120, _poll_verify)
 
         def _refresh():
+            lng_r = self.engine.state.get("lang", "en")
             for w in list_box.winfo_children():
                 w.destroy()
             all_items, keep_items, del_items = compute_gfs_plan(self.engine.state)
             tot_mb = round(sum(x["size"] for x in all_items) / 1048576.0, 1)
             del_mb = round(sum(x["size"] for x in del_items) / 1048576.0, 1)
             no_sha = sum(1 for x in all_items if not os.path.exists(x["path"] + ".sha256"))
-            lbl_sum.configure(text=f"Всього: {len(all_items)} ({tot_mb} МБ) | Залишиться: {len(keep_items)} | Застарілих: {len(del_items)} ({del_mb} МБ) | Без .sha256: {no_sha}")
+            lbl_sum.configure(text=tr(f"Всього: {len(all_items)} ({tot_mb} МБ) | Залишиться: {len(keep_items)} | Застарілих: {len(del_items)} ({del_mb} МБ) | Без .sha256: {no_sha}", lng_r))
             _upd_del_bad_btn()
             if "btn_clean_exp" in locals():
-                btn_clean_exp.configure(state="normal" if del_items else "disabled", bg=p["amber"] if del_items else p["card"], fg="#000000" if del_items else p["muted"])
+                btn_clean_exp.configure(
+                    state="normal" if del_items else "disabled",
+                    bg=p["amber"] if del_items else p["card"],
+                    fg=p["btn_txt"] if del_items else p["muted"],
+                    disabledforeground=p["muted"],
+                )
             if not all_items:
-                tk.Label(list_box, text="У папці поки немає ZIP-архівів.", bg=p["log_bg"], fg=p["muted"], font=(fam, fs)).pack(pady=16)
+                tk.Label(list_box, text=tr("У папці поки немає ZIP-архівів.", lng_r), bg=p["log_bg"], fg=p["muted"], font=(fam, fs)).pack(pady=16)
                 return
             for it in all_items:
                 row = tk.Frame(list_box, bg=p["card"], bd=1, relief="solid", padx=8, pady=4)
@@ -773,11 +786,11 @@ class DialogsMixin:
                     st_c = p["cyan"] if is_pin else (p["green"] if is_keep else p["red"])
                     st_t = "ЗАХИЩЕНО" if is_pin else ("ЗБЕРЕГТИ" if is_keep else "ВИДАЛИТИ")
                 row.columnconfigure(1, weight=1)
-                tk.Label(row, text=tr(st_t, self.engine.state.get("lang", "en")), width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).grid(row=0, column=0, sticky="w")
+                tk.Label(row, text=tr(st_t, lng_r), width=10, bg=p["card"], fg=st_c, font=(fam, max(8, fs - 1), "bold")).grid(row=0, column=0, sticky="w")
                 sz_m = round(it["size"] / 1048576.0, 1)
-                det_s = f" — {v_info.get('detail', '')}" if is_bad else ""
-                disp_n = it["name"] if len(it["name"]) <= 52 else (it["name"][:49] + "...")
-                tk.Label(row, text=f"{disp_n}  ({sz_m} МБ){det_s}", anchor="w", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).grid(row=0, column=1, sticky="ew", padx=6)
+                det_s = f" — {tr(v_info.get('detail', ''), lng_r)}" if is_bad else ""
+                disp_n = it["name"] if len(it["name"]) <= 46 else (it["name"][:43] + "...")
+                tk.Label(row, text=tr(f"{disp_n}  ({sz_m} МБ){det_s}", lng_r), anchor="w", bg=p["card"], fg=p["red"] if is_bad else p["text"], font=(fam, max(8, fs - 1))).grid(row=0, column=1, sticky="ew", padx=6)
                 def _ask_del_arc(n=it['name']):
                     lng_d = self.engine.state.get('lang', 'en')
                     t_c = 'Видалення архіву' if lng_d == 'uk' else 'Delete Archive'
@@ -789,8 +802,8 @@ class DialogsMixin:
                     tk.Button(cbf, text=tr('Скасувати', lng_d), command=cdlg.destroy, bg=cp['card'], fg=cp['text'], font=(fam, fs), padx=12, pady=4).pack(side='right', padx=6)
                     tk.Button(cbf, text=tr('Видалити', lng_d), command=lambda: (cdlg.destroy(), _delete_archive_pair(n), _refresh()), bg=cp['red'], fg='#ffffff', font=(fam, fs, 'bold'), padx=12, pady=4).pack(side='right', padx=6)
                     self._fit_dialog(cdlg)
-                tk.Button(row, text=tr("🔒 Захист" if is_pin else "Немає захисту", self.engine.state.get("lang", "en")), width=15, command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["cyan"] if is_pin else p["panel"], fg="#000000" if is_pin else p["muted"], font=(fam, max(8, fs - 1), "bold" if is_pin else "normal"), padx=8, pady=1, cursor="hand2").grid(row=0, column=2, sticky="e")
-                tk.Button(row, text='🗑', command=_ask_del_arc, bg=p['red'] if is_bad else p['panel'], fg='#ffffff' if is_bad else p['red'], font=(fam, max(8, fs - 1), 'bold'), padx=8, pady=1, cursor='hand2').grid(row=0, column=3, sticky='e', padx=(6, 0))
+                tk.Button(row, text=tr("🔒 Захист" if is_pin else "Немає захисту", lng_r), width=15, command=lambda n=it["name"]: (toggle_keep_tag(self.engine.state, n), _refresh()), bg=p["blue"] if is_pin else p["panel"], fg=p["btn_txt"] if is_pin else p["muted"], activebackground=p["border"], activeforeground=p["text"], font=(fam, max(8, fs - 1), "bold" if is_pin else "normal"), padx=8, pady=1, cursor="hand2").grid(row=0, column=2, sticky="e")
+                tk.Button(row, text="✖", width=3, command=_ask_del_arc, bg=p['red'] if is_bad else p['panel'], fg=p['btn_txt'] if is_bad else p['red'], activebackground=p['red'], activeforeground='#ffffff', font=(fam, max(8, fs - 1), 'bold'), padx=4, pady=1, cursor='hand2').grid(row=0, column=3, sticky='e', padx=(6, 0))
 
         def _clean():
             apply_gfs_cleanup(self.engine, skip_prompt=True)
@@ -812,7 +825,7 @@ class DialogsMixin:
         cb_buf.pack(side="left", padx=(0, 8))
         btn_del_bad = tk.Button(bf, text="🗑 Пошкоджених: 0", command=_clean_corrupted, state="disabled", bg=p["card"], fg=p["muted"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
         btn_del_bad.pack(side="left", padx=4)
-        btn_clean_exp = tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg="#000000", font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
+        btn_clean_exp = tk.Button(bf, text="Очистити застарілі зараз", command=_clean, bg=p["amber"], fg=p["btn_txt"], disabledforeground=p["muted"], font=(fam, fs, "bold"), padx=bpx, pady=bpy, cursor="hand2")
         btn_clean_exp.pack(side="left", padx=4)
         tk.Button(bf, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs), padx=bpx, pady=bpy, cursor="hand2").pack(side="right")
         _refresh()
@@ -839,15 +852,19 @@ class DialogsMixin:
         sha_pct = int(round((sha_c / disk_c) * 100)) if disk_c > 0 else 100
         sha_col = p["green"] if (disk_c == 0 or sha_c == disk_c) else p["amber"]
 
+        lng_c = self.engine.state.get("lang", "en")
+        span_d = st.get("span_days", 0)
+        depth_val = tr("1 день", lng_c) if span_d == 1 else tr(f"{span_d} дн.", lng_c)
+        sha_sub = tr("натисніть для списку", lng_c) if sha_c < disk_c else (tr("усі захищені", lng_c) if disk_c > 0 else tr("папка порожня", lng_c))
         cards = [
-            ("СЬОГОДНІ", f"{st.get('today_cnt', 0)} шт.", f"{st.get('today_mb', 0.0)} МБ", p["muted"] if st.get("today_cnt", 0) == 0 else p["cyan"], None),
-            ("ЗА ТИЖДЕНЬ", f"{st.get('week_cnt', 0)} шт.", f"{st.get('week_mb', 0.0)} МБ", p["muted"] if st.get("week_cnt", 0) == 0 else p["cyan"], None),
-            ("ЗА МІСЯЦЬ", f"{st.get('month_cnt', 0)} шт.", f"{st.get('month_mb', 0.0)} МБ", p["muted"] if st.get("month_cnt", 0) == 0 else p["cyan"], None),
-            ("ЗА ВЕСЬ ЧАС", f"{tot_c} шт.", f"{st.get('total_mb', 0.0)} МБ", p["muted"] if tot_c == 0 else p["cyan"], None),
-            ("СЕР. РОЗМІР", f"{st.get('avg_mb', 0.0)} МБ", "на один архів", p["text"], None),
-            ("ЗАХИСТ SHA-256", f"{sha_c} / {disk_c} ({sha_pct}%)", "натисніть для списку" if sha_c < disk_c else ("усі захищені" if disk_c > 0 else "папка порожня"), sha_col, "sha"),
-            ("УСПІШНІСТЬ", f"{st.get('success_rate', 100)}%", "останніх запусків", p["text"], None),
-            ("ГЛИБИНА", ("1 день" if (self.engine.state.get("lang") == "uk" and st.get("span_days", 0) == 1) else ("1 day" if (self.engine.state.get("lang") != "uk" and st.get("span_days", 0) == 1) else (f"{st.get('span_days', 0)} дн." if self.engine.state.get("lang") == "uk" else f"{st.get('span_days', 0)} days"))), "діапазон копій", p["text"], None),
+            (tr("СЬОГОДНІ", lng_c), tr(f"{st.get('today_cnt', 0)} шт.", lng_c), tr(f"{st.get('today_mb', 0.0)} МБ", lng_c), p["muted"] if st.get("today_cnt", 0) == 0 else p["cyan"], None),
+            (tr("ЗА ТИЖДЕНЬ", lng_c), tr(f"{st.get('week_cnt', 0)} шт.", lng_c), tr(f"{st.get('week_mb', 0.0)} МБ", lng_c), p["muted"] if st.get("week_cnt", 0) == 0 else p["cyan"], None),
+            (tr("ЗА МІСЯЦЬ", lng_c), tr(f"{st.get('month_cnt', 0)} шт.", lng_c), tr(f"{st.get('month_mb', 0.0)} МБ", lng_c), p["muted"] if st.get("month_cnt", 0) == 0 else p["cyan"], None),
+            (tr("ЗА ВЕСЬ ЧАС", lng_c), tr(f"{tot_c} шт.", lng_c), tr(f"{st.get('total_mb', 0.0)} МБ", lng_c), p["muted"] if tot_c == 0 else p["cyan"], None),
+            (tr("СЕР. РОЗМІР", lng_c), tr(f"{st.get('avg_mb', 0.0)} МБ", lng_c), tr("на один архів", lng_c), p["text"], None),
+            (tr("ЗАХИСТ SHA-256", lng_c), f"{sha_c} / {disk_c} ({sha_pct}%)", sha_sub, sha_col, "sha"),
+            (tr("УСПІШНІСТЬ", lng_c), f"{st.get('success_rate', 100)}%", tr("останніх запусків", lng_c), p["text"], None),
+            (tr("ГЛИБИНА", lng_c), depth_val, tr("діапазон копій", lng_c), p["text"], None),
         ]
 
         def _show_missing_sha():
@@ -859,10 +876,10 @@ class DialogsMixin:
                 return
             miss.sort(reverse=True)
             shown = miss[:12]
-            msg_m = "Архіви без файлу .sha256:\n\n• " + "\n• ".join(shown)
+            msg_m = tr("Архіви без файлу .sha256:", lng_c) + "\n\n• " + "\n• ".join(shown)
             if len(miss) > len(shown):
-                msg_m += f"\n… та ще {len(miss) - len(shown)}"
-            self._show_engine_modal({"type": "alert", "title": "Перевірка захисту SHA-256", "text": msg_m})
+                msg_m += "\n" + (f"… та ще {len(miss) - len(shown)} шт." if lng_c == "uk" else f"… and {len(miss) - len(shown)} more")
+            self._show_engine_modal({"type": "alert", "title": tr("Перевірка захисту SHA-256", lng_c), "text": msg_m})
 
         for idx, (cap, v_main, v_sub, col, act) in enumerate(cards):
             r_i, c_i = divmod(idx, 4)
