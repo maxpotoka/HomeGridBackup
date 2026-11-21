@@ -3,7 +3,7 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v1.21 | 21.11.2026 02:56) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
+# [ФАЙЛ: gui/dialogs.py (v2.00 | 21.11.2026 03:24) — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
@@ -11,7 +11,7 @@ from core.config import SCRIPT_VER, commit_state
 from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
-from core.scheduler import _resolve_exe_path, _sync_scheduler_from_windows, _manage_windows_scheduler
+from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage_windows_scheduler
 from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES
 from gui.tray import _force_quit_app
 
@@ -500,10 +500,39 @@ class DialogsMixin:
             self.engine.log(msg_s, "warn" if ok_s else "err")
 
         def _copy_cmd(flag):
-            cmd = f'"{_resolve_exe_path()}" {flag}'
+            cmd = _build_run_cmd(flag)
             self.root.clipboard_clear()
             self.root.clipboard_append(cmd)
             lbl_sch_msg.configure(text=tr(f"✓ Скопійовано у буфер: {cmd}", st.get("lang", "en")), fg=p["cyan"])
+
+        def _export_cfg():
+            import json as _j
+            from tkinter import filedialog
+            fp = filedialog.asksaveasfilename(defaultextension=".json", initialfile="homegrid_backup_settings.json", filetypes=[("JSON", "*.json")])
+            if not fp: return
+            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend"}
+            data = {k: v for k, v in st.items() if k not in skip_k}
+            with open(fp, "w", encoding="utf-8") as fo:
+                _j.dump(data, fo, indent=2, ensure_ascii=False)
+            lbl_sch_msg.configure(text=tr("✓ Налаштування експортовано у JSON", st.get("lang", "en")), fg=p["green"])
+
+        def _import_cfg():
+            import json as _j
+            from tkinter import filedialog
+            fp = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+            if not fp: return
+            with open(fp, "r", encoding="utf-8") as fi:
+                data = _j.load(fi)
+            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend"}
+            for k, v in data.items():
+                if k in st and k not in skip_k:
+                    st[k] = v
+            commit_state(st)
+            self.var_srv.set(st.get("server", ""))
+            self.var_dir.set(st.get("backup_dir", ""))
+            self.apply_theme_and_mode(resize_win=True)
+            dlg.destroy()
+            self.open_settings()
 
         tk.Button(sr3, text="Додати в Планувальник", command=_create_task, bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2").pack(side="left", padx=(0, 10))
         tk.Button(sr3, text="Видалити задачу", command=_del_task, bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=4, cursor="hand2").pack(side="left", padx=6)
@@ -512,6 +541,9 @@ class DialogsMixin:
             m_adv = tk.Menu(dlg, tearoff=0, bg=p["panel"], fg=p["text"], font=("Segoe UI", fs))
             m_adv.add_command(label=tr("Копіювати команду фонового запуску", lng_m), command=lambda: _copy_cmd("--hidden"))
             m_adv.add_command(label=tr("Копіювати команду консольного запуску", lng_m), command=lambda: _copy_cmd("--silent"))
+            m_adv.add_separator()
+            m_adv.add_command(label=tr("Експорт налаштувань (JSON)...", lng_m), command=_export_cfg)
+            m_adv.add_command(label=tr("Імпорт налаштувань (JSON)...", lng_m), command=_import_cfg)
             m_adv.tk_popup(btn_adv.winfo_rootx(), btn_adv.winfo_rooty() + btn_adv.winfo_height())
         btn_adv = tk.Button(sr3, text="Додатково ▾", command=_open_adv_sched, bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2")
         btn_adv.pack(side="right")
@@ -587,6 +619,8 @@ class DialogsMixin:
                 self.open_settings()
 
         tk.Button(bf, text="Скинути PIN", command=lambda: (self.reset_pins(), lbl_sch_msg.configure(text="✓ Збережені PIN-коди очищено", fg=p["amber"])), bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=(6, 6), pady=6)
+        tk.Button(bf, text="Експорт JSON", command=_export_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
+        tk.Button(bf, text="Імпорт JSON", command=_import_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
         tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=6, cursor="hand2").pack(side="right", padx=(6, 6), pady=6)
         tk.Button(bf, text="Зберегти та закрити", command=lambda: _commit_settings(True), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
         tk.Button(bf, text="Застосувати", command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)

@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v1.128 | 20.11.2026 15:40) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v2.00 | 21.11.2026 03:24) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -30,8 +30,41 @@ def _resolve_exe_path():
             return cand_exe
     return os.path.join(root_dir, "HomeGridBackup.exe")
 
+def _build_run_cmd(flag):
+    if os.name == "nt":
+        return f'"{_resolve_exe_path()}" {flag}'
+    if is_compiled_app():
+        bp = os.path.abspath(sys.argv if sys.argv else sys.executable)
+        return f'"{bp}" {flag}'
+    mp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+    return f'"{sys.executable}" "{mp}" {flag}'
+
 def _sync_scheduler_from_windows(st):
     if os.name != "nt":
+        if sys.platform == "darwin":
+            pp = os.path.expanduser("~/Library/LaunchAgents/com.homegrid.backup.plist")
+            if os.path.exists(pp):
+                try:
+                    txt = open(pp, "r", encoding="utf-8").read()
+                    mh = re.search(r"<key>Hour</key>\s*<integer>(\d+)</integer>", txt)
+                    mm = re.search(r"<key>Minute</key>\s*<integer>(\d+)</integer>", txt)
+                    if mh and mm:
+                        st["sched_time"] = f"{int(mh.group(1)):02d}:{int(mm.group(1)):02d}"
+                    st["sched_mode"] = "--silent" if "--silent" in txt else "--hidden"
+                except Exception:
+                    pass
+            return
+        try:
+            out = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=4).stdout or ""
+            for ln in out.splitlines():
+                if "# HomeGridBackup" in ln:
+                    pt = ln.split()
+                    if len(pt) >= 2 and pt.isdigit() and pt.isdigit():
+                        st["sched_time"] = f"{int(pt):02d}:{int(pt):02d}"
+                    st["sched_mode"] = "--silent" if "--silent" in ln else "--hidden"
+                    break
+        except Exception:
+            pass
         return
     try:
         res = subprocess.run(

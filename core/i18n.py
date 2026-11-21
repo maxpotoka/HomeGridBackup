@@ -1,4 +1,4 @@
-# [ФАЙЛ: core/i18n.py (v1.16 | 21.11.2026 01:59) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.00 | 21.11.2026 03:24) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
@@ -206,6 +206,9 @@ EN_EXACT = {
     "У Кошик (замість видалення)": "Move to Trash (instead of delete)",
     "Згортати у трей при закритті": "Minimize to tray on close",
     "Автоочищення у фоні (GFS)": "Auto-cleanup in background (GFS)",
+    " 1. Кільцева стратегія (останні N архівів) ": " 1. Ring Strategy (Last N Archives) ",
+    "Зберігати останніх архівів (шт.):": "Keep last archives (pcs):",
+    " 2. Трей та тихий режим ": " 2. Tray & Silent Mode ",
     " 3. Автозапуск за розкладом ": " 3. Scheduled Autostart ",
     "У фоні (з іконкою в треї)": "Background (with tray icon)",
     "З вікном консолі": "With console window",
@@ -214,7 +217,12 @@ EN_EXACT = {
     "Додатково ▾": "More ▾",
     "Копіювати команду фонового запуску": "Copy background run command",
     "Копіювати команду консольного запуску": "Copy console run command",
+    "Експорт налаштувань (JSON)...": "Export settings (JSON)...",
+    "Імпорт налаштувань (JSON)...": "Import settings (JSON)...",
+    "✓ Налаштування експортовано у JSON": "✓ Settings exported to JSON",
     "Скинути PIN": "Reset PINs",
+    "Експорт JSON": "Export JSON",
+    "Імпорт JSON": "Import JSON",
     "Зберегти та закрити": "Save & Close",
     "Застосувати": "Apply",
     "  Резервне копіювання та Розклад  ": "  Backup & Scheduler  ",
