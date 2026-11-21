@@ -29,7 +29,6 @@ jobs:
       - name: Check that the container userspace is 32-bit
         run: |
           docker version --format '{{.Server.Version}}'
-          # uname -m показывает архитектуру ядра (x86_64), поэтому проверяем userspace
           docker run --rm --platform linux/386 i386/ubuntu:18.04 sh -c 'echo "$(dpkg --print-architecture) $(getconf LONG_BIT)"' | tee /tmp/arch.txt
           grep -qx "i386 32" /tmp/arch.txt || { echo "ERROR: userspace контейнера не 32-битный"; cat /tmp/arch.txt; exit 1; }
           echo "[OK] Userspace контейнера 32-битный (i386, LONG_BIT=32)"
@@ -43,7 +42,6 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           export PYTHONUTF8=1
 
-          # --- Условие 1: userspace 32-битный ---
           test "$(dpkg --print-architecture)" = "i386" || { echo "ERROR: не i386"; exit 1; }
           test "$(getconf LONG_BIT)" = "32" || { echo "ERROR: LONG_BIT не 32"; exit 1; }
 
@@ -53,36 +51,123 @@ jobs:
             libssl-dev libffi-dev libjpeg-dev zlib1g-dev \
             python3.8 python3.8-dev python3.8-venv python3-tk python3-distutils
 
-          # --- Условие 2: компилятор нативный (без кросс-префикса) ---
           command -v gcc-8 >/dev/null || { echo "ERROR: нет gcc-8"; exit 1; }
           test "$(gcc-8 -dumpmachine)" = "i686-linux-gnu" || { echo "ERROR: gcc не i686-linux-gnu"; gcc-8 -dumpmachine; exit 1; }
 
           update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100
           update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 100
 
-          # Линковка идёт через настройки sysconfig Python, поэтому задаём их явно
           export CC=gcc-8
           export CXX=g++-8
           export LDSHARED="gcc-8 -pthread -shared"
           export LDCXXSHARED="g++-8 -pthread -shared"
-          # Страховка: если что-то всё же вызовет префиксный компилятор, подставим нативный
           ln -sf /usr/bin/gcc-8 /usr/local/bin/i686-linux-gnu-gcc
           ln -sf /usr/bin/g++-8 /usr/local/bin/i686-linux-gnu-g++
 
           python3.8 -m venv /opt/venv32
           export PATH="/opt/venv32/bin:/usr/local/bin:$PATH"
 
-          # --- Условие 3: Python 3.8, 32-битный, с tkinter ---
           python -c 'import sys, struct, tkinter
           assert sys.version_info[:2] == (3, 8), sys.version
           assert struct.calcsize("P") * 8 == 32, "Python не 32-битный"
           print("Python", sys.version.split()[0], "32-bit + tkinter OK")'
 
           python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel
-          # cffi берём колесом: сборка из исходников тянула кросс-компилятор
           python -m pip install --no-cache-dir --only-binary=cffi "cffi==1.15.1"
           python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
           python -m pip install --no-cache-dir \
             "secretstorage==3.3.1" "jeepney==0.8.0" "keyring==23.13.1" \
             "nuitka==2.5.9" ordered-set \
-            "pystray==0.19.5" "python-xlib==0.33"
+            "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
+
+          python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All 32-bit modules OK")'
+
+          export CFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
+          export CXXFLAGS="-O2 -march=i686 -mtune=generic -mno-avx -pipe"
+          export LDFLAGS="-Wl,-O1,--as-needed"
+
+          python -m nuitka \
+            --onefile \
+            --enable-plugin=tk-inter \
+            --lto=no \
+            --jobs=4 \
+            --assume-yes-for-downloads \
+            --python-flag=no_asserts \
+            --python-flag=no_docstrings \
+            --noinclude-pytest-mode=nofollow \
+            --noinclude-setuptools-mode=nofollow \
+            --noinclude-unittest-mode=nofollow \
+            --include-package=core \
+            --include-package=console \
+            --include-package=gui \
+            --include-module=pystray \
+            --include-module=pystray._xorg \
+            --include-package=Xlib \
+            --include-package=keyring \
+            --include-package=secretstorage \
+            --include-package=jeepney \
+            --include-package=PIL \
+            --include-package-data=keyring \
+            --include-package-data=pystray \
+            --include-package-data=PIL \
+            --include-module=send2trash \
+            --nofollow-import-to=gi,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
+            --output-dir=build32 \
+            --output-filename=homegrid-backup \
+            main.py
+          CONTAINER_EOF
+
+      - name: Verify 32-bit binary and create shortcut helper
+        run: |
+          sudo apt-get update && sudo apt-get install -y p7zip-full
+          test -f build32/homegrid-backup || { echo "ERROR: build32/homegrid-backup not created"; exit 1; }
+          mkdir -p dist32
+          mv build32/homegrid-backup dist32/homegrid-backup
+          chmod +x dist32/homegrid-backup
+          file dist32/homegrid-backup
+
+          cat << 'EOF' > dist32/install_shortcut.sh
+          #!/usr/bin/env bash
+          set -e
+          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+          BIN_PATH="$APP_DIR/homegrid-backup"
+          chmod +x "$BIN_PATH"
+          mkdir -p "$HOME/.local/share/applications"
+          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
+          cat > "$DESKTOP_FILE" << EOD
+          [Desktop Entry]
+          Type=Application
+          Name=HomeGrid Backup
+          Comment=Inverter Data Backup Utility
+          Exec="$BIN_PATH" --gui
+          Icon=drive-harddisk
+          Terminal=false
+          Categories=Utility;Archiving;
+          EOD
+          chmod +x "$DESKTOP_FILE"
+          if [ -d "$HOME/Desktop" ]; then
+            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
+            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
+          fi
+          echo "[OK] Shortcut created: $DESKTOP_FILE"
+          EOF
+          chmod +x dist32/install_shortcut.sh
+
+      - name: Package into .7z
+        run: |
+          cd dist32
+          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup install_shortcut.sh
+          cd ..
+          ls -lh homegrid-backup-linux-i386-legacy.7z
+
+      - name: Publish legacy 32-bit .7z to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: linux-32bit-latest
+          name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+)
+          body: |
+            Одиничний 32-бітний виконуваний файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, зібраний на Ubuntu 18.04 / glibc 2.27) для MX Linux 32-bit, antiX, Debian 10+, Ubuntu 18.04+.
+            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
+            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
+          files: homegrid-backup-linux-i386-legacy.7z
+          make_latest: false
