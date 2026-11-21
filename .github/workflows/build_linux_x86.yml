@@ -26,12 +26,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check host can run i386 containers
+      - name: Check that the container userspace is 32-bit
         run: |
           docker version --format '{{.Server.Version}}'
-          docker run --rm --platform linux/386 i386/ubuntu:18.04 uname -m | tee /tmp/arch.txt
-          grep -qx "i686" /tmp/arch.txt || { echo "ERROR: контейнер не i686"; exit 1; }
-          echo "[OK] Контейнер работает как i686"
+          # uname -m показывает архитектуру ядра (x86_64), поэтому проверяем userspace
+          docker run --rm --platform linux/386 i386/ubuntu:18.04 sh -c 'echo "$(dpkg --print-architecture) $(getconf LONG_BIT)"' | tee /tmp/arch.txt
+          grep -qx "i386 32" /tmp/arch.txt || { echo "ERROR: userspace контейнера не 32-битный"; cat /tmp/arch.txt; exit 1; }
+          echo "[OK] Userspace контейнера 32-битный (i386, LONG_BIT=32)"
 
       - name: Build 32-bit onefile on Ubuntu 18.04 i386 (glibc 2.27)
         run: |
@@ -42,8 +43,9 @@ jobs:
               export DEBIAN_FRONTEND=noninteractive
               export PYTHONUTF8=1
 
-              # --- Условие 1: архитектура контейнера ---
-              test "$(uname -m)" = "i686" || { echo "ERROR: не i686"; exit 1; }
+              # --- Условие 1: userspace 32-битный ---
+              test "$(dpkg --print-architecture)" = "i386" || { echo "ERROR: не i386"; exit 1; }
+              test "$(getconf LONG_BIT)" = "32" || { echo "ERROR: LONG_BIT не 32"; exit 1; }
 
               apt-get update
               apt-get install -y --no-install-recommends \
