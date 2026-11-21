@@ -1,7 +1,9 @@
-# [ФАЙЛ: core/i18n.py (v2.00 | 21.11.2026 03:24) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.02 | 21.11.2026 05:32) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 
 EN_EXACT = {
+    "Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).": "Tray unavailable. Window minimized to taskbar (running in background).",
+    "HomeGrid Backup: помилка": "HomeGrid Backup: Error",
     "Автопошук": "Auto-scan",
     "Виявлені сервери в мережі": "Discovered Servers on Network",
     "Сервер не знайдено": "Server not found",
@@ -250,6 +252,7 @@ EN_EXACT = {
 }
 
 EN_SUBSTR = sorted([
+    ("Резервну копію створено:", "Backup created:"),
     ("Обрати виявлений", "Select found"),
     ("Виявлені (", "Found ("),
     ("1980-ті", "1980s"), ("1970-ті", "1970s"), ("1960-ті", "1960s"),

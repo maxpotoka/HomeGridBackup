@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.00 | 21.11.2026 03:24) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.02 | 21.11.2026 05:32) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -188,6 +188,10 @@ class HomeGridApp(DialogsMixin):
                     return
             except Exception:
                 pass
+        if sys.platform.startswith("linux") and keep_tray and self.engine.tray_icon is None:
+            self.root.iconify()
+            self.engine.log("Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).", "info")
+            return
         self.confirm_exit()
 
     def _get_palette(self):

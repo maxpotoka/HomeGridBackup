@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v2.00 | 21.11.2026 03:24) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.02 | 21.11.2026 05:32) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -16,6 +16,41 @@ from datetime import datetime
 from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state
 from core.files import pretty_phase, format_duration
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
+
+def _desktop_notify(title, text):
+    import sys, subprocess
+    try:
+        if sys.platform.startswith("linux"):
+            if (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and shutil.which("notify-send"):
+                subprocess.Popen(
+                    ["notify-send", "-a", "HomeGrid Backup", title, text],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+        elif sys.platform == "darwin":
+            t_esc = str(title).replace('\\', '\\\\').replace('"', '\\"')
+            m_esc = str(text).replace('\\', '\\\\').replace('"', '\\"')
+            subprocess.Popen(
+                ["osascript", "-e", f'display notification "{m_esc}" with title "{t_esc}"'],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        elif os.name == "nt":
+            t_ps = str(title).replace("'", "''")
+            m_ps = str(text).replace("'", "''")
+            ps_cmd = (
+                "Add-Type -AssemblyName System.Windows.Forms;"
+                "$n=New-Object System.Windows.Forms.NotifyIcon;"
+                "$n.Icon=[System.Drawing.SystemIcons]::Information;"
+                "$n.Visible=$true;"
+                f"$n.ShowBalloonTip(5000,'{t_ps}','{m_ps}',[System.Windows.Forms.ToolTipIcon]::Info);"
+                "Start-Sleep -Seconds 6;$n.Dispose()"
+            )
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=0x08000000
+            )
+    except Exception:
+        pass
 
 def _backup_stage1_prepare(engine, raw_url, force_skip):
     bdir = engine.state["backup_dir"]
@@ -525,6 +560,9 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
         tot_fmt = format_duration(total_sec, engine.state.get("lang", "en"))
         engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
+        from core.i18n import tr as _tr_n
+        _lng_n = engine.state.get("lang", "en")
+        _desktop_notify("HomeGrid Backup", _tr_n(f"Резервну копію створено: {final_name} ({total_mb:.1f} МБ)", _lng_n))
         engine.state["all_time_cnt"] = max(int(engine.state.get("all_time_cnt", 0)), 0) + 1
         engine.state["all_time_mb"] = round(max(float(engine.state.get("all_time_mb", 0.0)), 0.0) + total_mb, 1)
         commit_state(engine.state)
@@ -537,6 +575,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
     except Exception as exc:
         engine.exit_code = 1
         engine.log(f"ПОМИЛКА: {exc}", "err")
+        from core.i18n import tr as _tr_e
+        _desktop_notify(_tr_e("HomeGrid Backup: помилка", engine.state.get("lang", "en")), str(exc)[:200])
         engine.set_pill("Помилка бекапу", "err")
         if hasattr(engine, "record_op_event"):
             engine.record_op_event("Помилка", str(exc), 0.0, dur_sec=round(time.time() - t_total_start, 1))
