@@ -99,23 +99,50 @@ jobs:
             --include-data-files="$TYPELIB_DIR/AyatanaAppIndicator3-0.1.typelib=girepository-1.0/AyatanaAppIndicator3-0.1.typelib" \
             --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build32 \
-            --output-filename=homegridBackup \
+            --output-filename=homegrid-backup \
             main.py
 
-      - name: Verify 32-bit binary
+      - name: Verify 32-bit binary and create shortcut helper
         run: |
-          test -f build32/homegridBackup || { echo "ERROR: build32/homegridBackup not created"; exit 1; }
+          test -f build32/homegrid-backup || { echo "ERROR: build32/homegrid-backup not created"; exit 1; }
           mkdir -p dist32
-          mv build32/homegridBackup dist32/homegridBackup
-          chmod +x dist32/homegridBackup
-          file dist32/homegridBackup
+          mv build32/homegrid-backup dist32/homegrid-backup
+          chmod +x dist32/homegrid-backup
+          file dist32/homegrid-backup
+
+          cat << 'EOF' > dist32/install_shortcut.sh
+          #!/usr/bin/env bash
+          set -e
+          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+          BIN_PATH="$APP_DIR/homegrid-backup"
+          chmod +x "$BIN_PATH"
+          mkdir -p "$HOME/.local/share/applications"
+          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
+          cat > "$DESKTOP_FILE" << EOD
+          [Desktop Entry]
+          Type=Application
+          Name=HomeGrid Backup
+          Comment=Inverter Data Backup Utility
+          Exec="$BIN_PATH" --gui
+          Icon=drive-harddisk
+          Terminal=false
+          Categories=Utility;Archiving;
+          EOD
+          chmod +x "$DESKTOP_FILE"
+          if [ -d "$HOME/Desktop" ]; then
+            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
+            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
+          fi
+          echo "[OK] Shortcut created: $DESKTOP_FILE"
+          EOF
+          chmod +x dist32/install_shortcut.sh
 
       - name: Package into .7z
         run: |
           cd dist32
-          7z a -t7z -mx=9 ../HomeGridBackup-Linux-i386-32bit.7z homegridBackup
+          7z a -t7z -mx=9 ../homegrid-backup-linux-i386.7z homegrid-backup install_shortcut.sh
           cd ..
-          ls -lh HomeGridBackup-Linux-i386-32bit.7z
+          ls -lh homegrid-backup-linux-i386.7z
 
       - name: Publish 32-bit .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -123,7 +150,8 @@ jobs:
           tag_name: linux-32bit-latest
           name: HomeGrid Backup — Linux 32-bit (i686 / Debian / Ubuntu)
           body: |
-            Одиничний 32-бітний виконуваний файл **homegridBackup** (`--onefile`, ELF 32-bit LSB i686) для старого та легкого ПК на Linux (Debian 12+, MX Linux, antiX, Ubuntu 32-bit).
-            Запуск: `chmod +x homegridBackup && ./homegridBackup`
-          files: HomeGridBackup-Linux-i386-32bit.7z
+            Одиничний 32-бітний виконуваний файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686) для старого та легкого ПК на Linux (Debian 12+, MX Linux, antiX, Ubuntu 32-bit).
+            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
+            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
+          files: homegrid-backup-linux-i386.7z
           make_latest: false
