@@ -33,7 +33,6 @@ jobs:
             -w /src \
             i386/ubuntu:18.04 bash -euo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
-              export CRYPTOGRAPHY_DONT_BUILD_RUST=1
               apt-get update
               apt-get install -y --no-install-recommends \
                 ca-certificates gcc g++ patchelf pkg-config \
@@ -44,9 +43,10 @@ jobs:
                 gir1.2-secret-1 libsecret-1-0
 
               python3.8 -m venv /opt/venv32
-              /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel
+              /opt/venv32/bin/python -m pip install --upgrade "pip<24.2" "setuptools<60" wheel cffi
+              /opt/venv32/bin/python -m pip install --no-cache-dir --no-build-isolation "cryptography==3.3.2"
               /opt/venv32/bin/python -m pip install --no-cache-dir \
-                "cryptography==3.4.8" "secretstorage==3.3.1" "keyring==23.13.1" \
+                "secretstorage==3.3.1" "keyring==23.13.1" \
                 "nuitka==2.5.9" ordered-set "pystray==0.19.5" "pillow<10.5" \
                 send2trash "pycairo==1.20.1" "PyGObject==3.40.1"
 
