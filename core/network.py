@@ -1,7 +1,7 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v2.00 | 21.11.2026 03:24) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v2.01 | 21.11.2026 05:25) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -190,27 +190,30 @@ def test_hgm_stage2(base_url, state, timeout=6.0):
     return False, 0.0
 
 def _linux_proc_net_hints():
+    """Шлюзы (из /proc/net/route) и IP соседей (из /proc/net/arp) — только строки IP-адресов."""
     gw_ips, arp_ips = [], []
     if os.name == "nt":
         return gw_ips, arp_ips
+    # /proc/net/route: Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT
     try:
         with open("/proc/net/route", "r", encoding="utf-8", errors="ignore") as f:
             next(f, None)
             for ln in f:
                 pt = ln.split()
-                if len(pt) >= 3 and pt != "00000000" and len(pt) == 8:
-                    gw = socket.inet_ntoa(int(pt, 16).to_bytes(4, "little"))
+                if len(pt) >= 3 and pt[1] == "00000000" and pt[2] != "00000000":
+                    gw = socket.inet_ntoa(int(pt[2], 16).to_bytes(4, "little"))
                     if gw not in gw_ips:
                         gw_ips.append(gw)
     except Exception:
         pass
+    # /proc/net/arp: IP address  HW type  Flags  HW address  Mask  Device
     try:
         with open("/proc/net/arp", "r", encoding="utf-8", errors="ignore") as f:
             next(f, None)
             for ln in f:
                 pt = ln.split()
-                if len(pt) >= 4 and pt != "0x0":
-                    arp_ips.append(pt)
+                if len(pt) >= 4 and pt[2] != "0x0":
+                    arp_ips.append(pt[0])
     except Exception:
         pass
     return gw_ips, arp_ips
