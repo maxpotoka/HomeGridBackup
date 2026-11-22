@@ -3,7 +3,8 @@
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/config.py (v2.22 | 22.11.2026 09:10) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: android-storage-fallback-2.23
+# [ФАЙЛ: core/config.py (v2.23 | 22.11.2026 08:51) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -13,6 +14,7 @@ import platform
 import threading
 import time
 import atexit
+import tempfile
 
 def is_wsl():
     if not sys.platform.startswith("linux"):
@@ -61,8 +63,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.22"
-BUILD_DATE = "22.11.2026 09:10"
+SCRIPT_VER = "2.23"
+BUILD_DATE = "22.11.2026 08:51"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -450,6 +452,18 @@ def load_state():
                 state[sk] = env_sec[sk]
         if env_sec or not HAS_KEYRING:
             state["storage_backend"] = "env"
+
+    if IS_ANDROID:
+        try:
+            os.makedirs(state["backup_dir"], exist_ok=True)
+            with tempfile.TemporaryFile(dir=state["backup_dir"]):
+                pass
+        except OSError:
+            private_dir = os.environ.get("ANDROID_PRIVATE") or os.path.expanduser("~")
+            state["backup_dir"] = os.path.join(private_dir, "BackupHGM")
+            os.makedirs(state["backup_dir"], exist_ok=True)
+            state["_android_storage_fallback"] = True
+            state["dirty"] = True
 
     if state["dirty"]:
         commit_state(state)

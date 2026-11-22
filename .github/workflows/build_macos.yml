@@ -39,6 +39,10 @@ jobs:
             python3 -c "from PIL import Image; Image.open('icon.ico').save('icon.icns')" || true
           fi
 
+      - name: Set build timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
       - name: Build macOS Intel .app bundle with Nuitka
         run: |
           ICON_ARG=""
@@ -94,9 +98,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: macos-intel-latest
-          name: HomeGrid Backup — macOS Intel (x86_64)
+          name: HomeGrid Backup — macOS Intel (x86_64) — ${{ steps.build_time.outputs.value }}
           body: |
             Чистий архів **HomeGridBackup_macOS_Intel.7z** без подвійного пакування.
             Працює без прав `root` (`sudo`). Після розпакування натисніть правою кнопкою по **HomeGridBackup.app** → **Відкрити** (або виконайте в Терміналі: `xattr -cr ~/Downloads/HomeGridBackup.app && open ~/Downloads/HomeGridBackup.app`).
           files: dist_mac/HomeGridBackup_macOS_Intel.7z
+          fail_on_unmatched_files: true
           make_latest: true

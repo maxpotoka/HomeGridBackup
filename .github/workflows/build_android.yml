@@ -11,6 +11,9 @@ on:
       - 'mobile/**'
       - '.github/workflows/build_android.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-android:
     runs-on: ubuntu-24.04
@@ -33,6 +36,10 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython==0.29.36 virtualenv setuptools wheel
 
+      - name: Set build timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
       - name: Build Android APK with Buildozer
         run: |
           yes | buildozer -v android debug
@@ -42,3 +49,21 @@ jobs:
         with:
           name: HomeGridBackup-Android-APK
           path: bin/*.apk
+          if-no-files-found: error
+
+      - name: Delete previous Android release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-apk-latest --yes || true
+          git push origin --delete android-apk-latest || true
+
+      - name: Publish Android APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-apk-latest
+          name: HomeGrid Backup — Android APK — ${{ steps.build_time.outputs.value }}
+          body: |
+            Android APK built at ${{ steps.build_time.outputs.value }}.
+          files: bin/*.apk
+          fail_on_unmatched_files: true

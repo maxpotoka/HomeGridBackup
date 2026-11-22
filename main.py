@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# [ФАЙЛ: main.py (v2.01 | 22.11.2026 00:54) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# patch-id: android-no-pip-install-2.02
+# [ФАЙЛ: main.py (v2.02 | 22.11.2026 08:51) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
 import os
 import sys
 import ctypes
 import subprocess
 from core.scheduler import is_compiled_app
+from core.config import IS_ANDROID
 
 _APP_MUTEX = None
 _SHOW_EVENT_NAME = "Global\\HomeGridBackup_ShowWindow_v1"
@@ -48,7 +50,7 @@ if not _IS_PY_CONSOLE_LAUNCHER:
         except Exception:
             pass
 
-if not is_compiled_app():
+if not is_compiled_app() and not IS_ANDROID:
     _missing_pkgs = []
     for _mod, _pkg in (("send2trash", "send2trash"), ("keyring", "keyring"), ("pystray", "pystray"), ("PIL", "pillow")):
         try:
@@ -66,7 +68,7 @@ if not is_compiled_app():
         except Exception:
             pass
 
-from core.config import GUI_MODE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN, IS_ANDROID
+from core.config import GUI_MODE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN
 from core.engine import BackupEngine
 from core.backup import run_backup_task
 

@@ -1,6 +1,7 @@
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/i18n.py (v2.12 | 22.11.2026 09:10) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# patch-id: android-storage-fallback-2.13
+# [ФАЙЛ: core/i18n.py (v2.13 | 22.11.2026 08:51) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 from functools import lru_cache
 
@@ -305,6 +306,7 @@ EN_SUBSTR = sorted([
     ("Обрано виявлений у мережі сервер:", "Selected discovered LAN server:"),
     ("Папку збереження змінено на:", "Backup folder changed to:"),
     ("Папку збереження встановлено:", "Backup folder set to:"),
+    ("Папка резервних копій недоступна; використовується внутрішнє сховище Android:", "Backup folder is unavailable; using Android app storage:"),
     ("Папку дзеркального копіювання увімкнено:", "Mirror backup folder enabled:"),
     ("Попередження: не вдалося скопіювати у дзеркальну папку", "Warning: failed to copy to mirror folder"),
     ("Сервер скинув завдання", "Server reset the job"),

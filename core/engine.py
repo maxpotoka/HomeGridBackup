@@ -3,7 +3,8 @@ from core.i18n import tr
 # patch-id: idle-ui-cache-2.19
 # patch-id: stage-window-2.21
 # patch-id: archive-scan-cache-2.04
-# [ФАЙЛ: core/engine.py (v2.05 | 22.11.2026 09:10) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: android-storage-fallback-2.06
+# [ФАЙЛ: core/engine.py (v2.06 | 22.11.2026 08:51) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -121,6 +122,11 @@ class BackupEngine:
         mode_lbl = "HIDDEN" if HIDDEN_MODE else ("SILENT" if SILENT_MODE else ("CLI" if CLI_MODE else "APP"))
         sec_lbl = "Keyring" if self.state["storage_backend"] == "keyring" else ".env"
         self.log(f"Систему запущено (v{SCRIPT_VER} від {BUILD_DATE}, {mode_lbl}, сховище: {sec_lbl}). Каталог: {self.state['backup_dir']}", "info")
+        if self.state.pop("_android_storage_fallback", False):
+            self.log(
+                f"Папка резервних копій недоступна; використовується внутрішнє сховище Android: {self.state['backup_dir']}",
+                "warn"
+            )
         self.log(f"ОС та залізо: {self.sys_summary}", "info")
         from core.config import AUTO_CLI_FALLBACK
         if AUTO_CLI_FALLBACK:
