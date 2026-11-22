@@ -81,6 +81,7 @@ jobs:
             "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
           PYSTRAY_BACKEND=dummy python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All 32-bit modules OK")'
+          python -c 'import gui.styles; print("Linux GUI styles import OK")'
 
           export CFLAGS="-O1 -march=i686 -mtune=generic -mno-avx -pipe --param ggc-min-expand=10 --param ggc-min-heapsize=32768"
           export CXXFLAGS="-O1 -march=i686 -mtune=generic -mno-avx -pipe --param ggc-min-expand=10 --param ggc-min-heapsize=32768"

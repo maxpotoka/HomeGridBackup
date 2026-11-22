@@ -4,8 +4,11 @@
 # ==============================================================================
 import os
 import ctypes
-from ctypes import wintypes
 import tkinter as tk
+
+if os.name == "nt":
+    from ctypes import wintypes
+
 from core.config import VALID_SCALES
 
 UI_SCALE_LABELS = [
