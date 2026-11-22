@@ -3,7 +3,8 @@ from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
-# [ФАЙЛ: gui/window.py (v2.09 | 22.11.2026 08:29) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: mirror-btn-sig-2.22
+# [ФАЙЛ: gui/window.py (v2.10 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -661,6 +662,10 @@ class HomeGridApp(DialogsMixin):
         fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         is_run = bool(getattr(self.engine, "is_running", False))
         checked = bool(self.engine.state.get("mirror_enabled", False))
+        _mir_sig = (checked, is_run, lang, is_lite, fs, self.engine.state.get("theme", "dark"))
+        if getattr(self, "_mir_btn_sig", None) == _mir_sig:
+            return
+        self._mir_btn_sig = _mir_sig
         self.var_mir_en.set(checked)
         f_state = "disabled" if (is_run or not checked) else "normal"
         self.chk_mir_tog.configure(
