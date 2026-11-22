@@ -65,25 +65,74 @@ jobs:
             --include-package=send2trash ^
             --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin ^
             --output-dir=dist_win10 ^
-            --output-filename=HomeGridBackup_Win10_x64.exe ^
+            --output-filename=HomeGridBackup.exe ^
             main.py
 
-      - name: Delete old Windows 10/11 release and tag
+      - name: Generate version tag
+        id: tag
+        shell: pwsh
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $runNumber = "${{ github.run_number }}"
+          $tag = "win10-x64-v$date.$runNumber"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Delete old Windows 10/11 releases
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
-          gh release delete windows10-x64-latest --yes 2>$null
-          git push origin --delete windows10-x64-latest 2>$null
+          $ErrorActionPreference = "Continue"
+          
+          # Отримуємо список релізів безпечно
+          $releasesJson = gh release list --json tagName 2>$null
+          if ([string]::IsNullOrWhiteSpace($releasesJson)) {
+            Write-Host "No releases found, skipping cleanup."
+            exit 0
+          }
+          
+          $releases = $releasesJson | ConvertFrom-Json
+          if ($null -eq $releases -or $releases.Count -eq 0) {
+            Write-Host "Release list is empty, skipping cleanup."
+            exit 0
+          }
+          
+          foreach ($release in $releases) {
+            if ($release.tagName -match "^win10-x64-v\d{4}\.\d{2}\.\d{2}") {
+              Write-Host "Deleting old release: $($release.tagName)"
+              
+              # Видаляємо реліз (ігноруємо помилки якщо вже видалено)
+              gh release delete $release.tagName --yes 2>$null
+              
+              # Видаляємо тег з remote (перевіряємо чи існує перед видаленням)
+              $tagExists = git ls-remote --tags origin $release.tagName 2>$null
+              if (-not [string]::IsNullOrWhiteSpace($tagExists)) {
+                git push origin --delete $release.tagName 2>$null
+                Write-Host "Deleted remote tag: $($release.tagName)"
+              } else {
+                Write-Host "Remote tag already deleted: $($release.tagName)"
+              }
+            }
+          }
+          
+          Write-Host "Cleanup completed successfully."
 
-      - name: Publish clean .exe to GitHub Releases (no zip wrapper)
+      - name: Publish clean .exe to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows10-x64-latest
-          name: HomeGrid Backup — Windows 10 / 11 (OneFile x64)
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: HomeGrid Backup — Windows 10/11 (OneFile x64)
           body: |
-            Чистий виконуваний файл **HomeGridBackup_Win10_x64.exe** без обгортки `.zip`.
+            ## HomeGrid Backup для Windows 10/11 (x64 OneFile)
+            
+            **Версія:** ${{ steps.tag.outputs.tag }}  
+            **Дата збірки:** $(Get-Date -Format "dd.MM.yyyy HH:mm")
+            
+            Чистий виконуваний файл **HomeGridBackup.exe** без обгортки `.zip`.
             Запускається напряму подвійним кліком без встановлення.
-          files: dist_win10/HomeGridBackup_Win10_x64.exe
+            
+            ### Системні вимоги:
+            - Windows 10 / 11 (64-bit)
+            - .NET Framework не потрібен
+          files: dist_win10/HomeGridBackup.exe
           make_latest: true
