@@ -427,6 +427,11 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
 
     date_eng = format_backup_dt(datetime.now())
     out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}.zip")
+    collision_id = 1
+    while os.path.exists(out_file):
+        out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}_{collision_id}.zip")
+        collision_id += 1
+    part_file = out_file + ".part"
     cli_tok = engine.state["client_token"] or DEFAULT_TOK
     ses_tok = engine.state["session_token"]
     dt_tok = st.get("download_token") or cli_tok
@@ -437,8 +442,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
     max_attempts = 7
     retry_delays = (10, 15, 20, 25, 25, 25)
     for attempt in range(1, max_attempts + 1):
-        if os.path.exists(out_file):
-            os.remove(out_file)
+        if os.path.exists(part_file):
+            os.remove(part_file)
         d0 = time.time()
         dl_ok = False
         dl_err = ""
@@ -453,7 +458,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                     handlers.append(urllib.request.ProxyHandler({}))
                 opener = urllib.request.build_opener(*handlers)
                 req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
-                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=1048576) as out_f:
+                with opener.open(req, timeout=300) as resp, open(part_file, "wb", buffering=1048576) as out_f:
                     srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
                     net_h = hashlib.sha256()
                     cb = 0
@@ -488,23 +493,24 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 break
             except Exception as e:
                 dl_err = str(e)
-                if os.path.exists(out_file):
-                    os.remove(out_file)
-        actual_sz = os.path.getsize(out_file) if os.path.exists(out_file) else 0
+                if os.path.exists(part_file):
+                    os.remove(part_file)
+        actual_sz = os.path.getsize(part_file) if os.path.exists(part_file) else 0
         size_valid = (actual_sz >= int(tot_b * 0.99)) if tot_b > 0 else (actual_sz >= 1024)
         net_sha_hex = net_h.hexdigest().lower() if (dl_ok and net_h is not None) else ""
         if dl_ok and size_valid and srv_sha and len(srv_sha) == 64 and net_sha_hex != srv_sha:
             dl_ok = False
             dl_err = "SHA-256 не збігається з контрольним хешем сервера"
-            if os.path.exists(out_file):
-                os.remove(out_file)
+            if os.path.exists(part_file):
+                os.remove(part_file)
         if dl_ok and size_valid:
+            os.replace(part_file, out_file)
             engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(time.time() - d0, 1)} с", "ok")
             return out_file, net_sha_hex
         if dl_ok and not size_valid:
             dl_err = f"завантажено лише {actual_sz/1048576.0:.1f} із {tot_b/1048576.0:.1f} МБ (обрив потоку)"
-            if os.path.exists(out_file):
-                os.remove(out_file)
+            if os.path.exists(part_file):
+                os.remove(part_file)
         if attempt < max_attempts:
             wait_s = retry_delays[min(attempt - 1, len(retry_delays) - 1)]
             engine.log(f"Збій завантаження ({dl_err}). Повтор {attempt + 1}/{max_attempts} через {wait_s} с...", "warn")
@@ -515,9 +521,10 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
             raise RuntimeError(f"Помилка завантаження після {max_attempts} спроб: {dl_err}")
 
 def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, auto_quiet=False):
-    if engine.is_running:
-        return
-    engine.is_running = True
+    with engine.lock:
+        if engine.is_running:
+            return
+        engine.is_running = True
     engine.set_pill("Резервне копіювання...", "work")
     t_total_start = time.time()
     ts_start_str = datetime.now().strftime("%H:%M:%S")

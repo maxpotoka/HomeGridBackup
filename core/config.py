@@ -494,7 +494,7 @@ def commit_state(state):
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
         "cloud_enabled", "cloud_remote", "cloud_path", "device_id",
-        "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
+        "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
         "sched_time", "sched_mode", "sched_missed", "sched_wake", "sched_prio"

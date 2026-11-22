@@ -116,7 +116,7 @@ _ENG_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "
 
 def format_backup_dt(dt):
     wday = _ENG_WEEKDAYS[dt.weekday()]
-    return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}_{wday}_{dt.hour:02d}-{dt.minute:02d}"
+    return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}_{wday}_{dt.hour:02d}-{dt.minute:02d}-{dt.second:02d}"
 
 def parse_backup_dt(filename, fallback_ts):
     m_num = re.search(r"(\d{4})-(\d{2})-(\d{2})_[^_]+_(\d{2})-(\d{2})", filename)
