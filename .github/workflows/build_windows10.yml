@@ -86,4 +86,4 @@ jobs:
             Чистий виконуваний файл **HomeGridBackup_Win10_x64.exe** без обгортки `.zip`.
             Запускається напряму подвійним кліком без встановлення.
           files: dist_win10/HomeGridBackup_Win10_x64.exe
-          make_latest: false
+          make_latest: true
