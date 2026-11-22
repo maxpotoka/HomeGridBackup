@@ -33,10 +33,6 @@ jobs:
           grep -qx "i386 32" /tmp/arch.txt || { echo "ERROR: userspace контейнера не 32-битный"; cat /tmp/arch.txt; exit 1; }
           echo "[OK] Userspace контейнера 32-битный (i386, LONG_BIT=32)"
 
-      - name: Set build timestamp
-        id: build_time
-        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
-
       - name: Build 32-bit onefile on Ubuntu 18.04 i386 (glibc 2.27)
         run: |
           docker run -i --rm --platform linux/386 \
@@ -165,6 +161,17 @@ jobs:
           7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup install_shortcut.sh
           cd ..
           ls -lh homegrid-backup-linux-i386-legacy.7z
+
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
+      - name: Delete previous Linux 32-bit release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete linux-32bit-latest --yes || true
+          git push origin --delete linux-32bit-latest || true
 
       - name: Publish legacy 32-bit .7z to GitHub Releases
         uses: softprops/action-gh-release@v3

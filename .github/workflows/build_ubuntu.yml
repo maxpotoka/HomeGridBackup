@@ -61,10 +61,6 @@ jobs:
           grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не застосувався"; exit 1; }
           echo "pystray patch OK"
 
-      - name: Set build timestamp
-        id: build_time
-        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
-
       - name: Build with Nuitka (onefile)
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
@@ -148,6 +144,10 @@ jobs:
           7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup install_shortcut.sh
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
+
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
 
       - name: Delete old releases and tags
         env:

@@ -27,16 +27,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install nuitka pillow pystray keyring send2trash
 
-      - name: Set build timestamp
-        id: build_time
-        shell: pwsh
-        run: |
-          $utcNow = [DateTime]::UtcNow
-          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
-          $buildDate = $utcNow.ToString("yyyy.MM.dd")
-          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
-          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
-
       - name: Build single-file Windows 10/11 binary with Nuitka (minimal compression)
         shell: cmd
         run: |
@@ -77,6 +67,16 @@ jobs:
             --output-dir=dist_win10 ^
             --output-filename=HomeGridBackup.exe ^
             main.py
+
+      - name: Set build completion timestamp
+        id: build_time
+        shell: pwsh
+        run: |
+          $utcNow = [DateTime]::UtcNow
+          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+          $buildDate = $utcNow.ToString("yyyy.MM.dd")
+          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
+          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
 
       - name: Generate version tag
         id: tag

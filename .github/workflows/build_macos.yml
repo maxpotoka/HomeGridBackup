@@ -39,10 +39,6 @@ jobs:
             python3 -c "from PIL import Image; Image.open('icon.ico').save('icon.icns')" || true
           fi
 
-      - name: Set build timestamp
-        id: build_time
-        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
-
       - name: Build macOS Intel .app bundle with Nuitka
         run: |
           ICON_ARG=""
@@ -86,6 +82,10 @@ jobs:
           codesign --force --deep --sign - dist_mac/pack/HomeGridBackup.app
           cd dist_mac/pack
           7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app
+
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
 
       - name: Delete old macOS release and tag
         env:

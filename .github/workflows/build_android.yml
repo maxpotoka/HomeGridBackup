@@ -36,10 +36,6 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython==0.29.36 virtualenv setuptools wheel
 
-      - name: Set build timestamp
-        id: build_time
-        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
-
       - name: Build Android APK with Buildozer
         run: |
           yes | buildozer -v android debug
@@ -50,6 +46,10 @@ jobs:
           name: HomeGridBackup-Android-APK
           path: bin/*.apk
           if-no-files-found: error
+
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
 
       - name: Delete previous Android release and tag
         env:

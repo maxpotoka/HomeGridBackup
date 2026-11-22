@@ -27,16 +27,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nuitka<2.6" "pillow<11.0" pystray keyring send2trash
 
-      - name: Set build timestamp
-        id: build_time
-        shell: pwsh
-        run: |
-          $utcNow = [DateTime]::UtcNow
-          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
-          $buildDate = $utcNow.ToString("yyyy.MM.dd")
-          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
-          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
-
       - name: Build max-optimized Windows 7 standalone folder with Nuitka
         shell: cmd
         run: |
@@ -90,6 +80,16 @@ jobs:
             echo start "" "%%~dp0HomeGridBackup.exe" --hidden
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
+
+      - name: Set build completion timestamp
+        id: build_time
+        shell: pwsh
+        run: |
+          $utcNow = [DateTime]::UtcNow
+          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+          $buildDate = $utcNow.ToString("yyyy.MM.dd")
+          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
+          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
 
       - name: Generate version tag
         id: tag
