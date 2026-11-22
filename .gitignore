@@ -1,34 +1,48 @@
-cat > .gitignore << 'EOF'
-# Игнорировать всё по умолчанию
-*
+# 1) игнорируем ВСЁ в корне репозитория
+/*
 
-# Разрешённые файлы и папки проекта
-!.gitignore
-!main.py
-!icon.ico
-!buildozer.spec
-!.github/
-!.github/**
-!core/
-!core/**
-!gui/
-!gui/**
-!console/
-!console/**
-!mobile/
-!mobile/**
+# 2) сам .gitignore тоже должен быть в git
+!/.gitignore
 
-# Внутри разрешённых папок всё равно исключаем мусор
-__pycache__/
-*.pyc
-*.py[cod]
-*.log
-*.zip
-*.sha256
-*.tmp
-*.bak
-.env
-config.json
-EOF
-git add .gitignore
-git status --short
+# 3) разрешаем папки проекта, но их содержимое снова игнорируем
+#    (без строки /папка/* внутрь попадёт вообще всё)
+!/console/
+/console/*
+!/core/
+/core/*
+!/gui/
+/gui/*
+!/mobile/
+/mobile/*
+
+# 4) точечно разрешаем файлы из списка
+!/build_x86.bat
+!/getfiles.py
+!/main.py
+!/mergefiles.py
+!/sfx.bat
+!/wlsGUI.bat
+!/wlsconsol.bat
+
+!/console/__init__.py
+!/console/terminal.py
+
+!/core/__init__.py
+!/core/backup.py
+!/core/config.py
+!/core/engine.py
+!/core/files.py
+!/core/gfs.py
+!/core/i18n.py
+!/core/network.py
+!/core/scheduler.py
+
+!/gui/__init__.py
+!/gui/dialogs.py
+!/gui/styles.py
+!/gui/tray.py
+!/gui/widgets.py
+!/gui/window.py
+
+!/mobile/__init__.py
+!/mobile/android_app.py
