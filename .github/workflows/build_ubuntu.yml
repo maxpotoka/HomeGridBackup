@@ -12,6 +12,8 @@ on:
       - 'core/**'
       - 'console/**'
       - 'gui/**'
+      - 'icon.ico'
+      - 'icon.png'
       - '.github/workflows/build_ubuntu.yml'
 
 permissions:
@@ -46,12 +48,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install "nuitka==4.3.5" ordered-set
-          pip install "pystray==0.19.5" pillow keyring secretstorage jeepney send2trash "PyGObject==3.48.2" pycairo
+          pip install "pystray==0.19.5" python-xlib pillow keyring secretstorage jeepney send2trash "PyGObject==3.48.2" pycairo
 
       - name: Verify GI namespaces
         run: |
           python -c "import gi; gi.require_version('Secret', '1'); from gi.repository import Secret; print('Secret GI namespace OK')"
           python -c "import gi; gi.require_version('AyatanaAppIndicator3', '0.1'); from gi.repository import AyatanaAppIndicator3; print('AyatanaAppIndicator3 GI namespace OK')"
+          python -c "import gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk; print('GTK tray backend OK')"
+          python -c "import Xlib.display; print('XEmbed X11 backend OK')"
 
       - name: Patch pystray for AyatanaAppIndicator3
         run: |
@@ -87,7 +91,9 @@ jobs:
             --include-module=gi._gi \
             --include-module=pystray \
             --include-module=pystray._appindicator \
+            --include-module=pystray._gtk \
             --include-module=pystray._xorg \
+            --include-package=Xlib \
             --include-package=keyring \
             --include-package=secretstorage \
             --include-package=jeepney \
@@ -96,6 +102,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
+            --include-data-files=icon.ico=icon.ico \
             --include-data-files="$TYPELIB_DIR/Secret-1.typelib=girepository-1.0/Secret-1.typelib" \
             --include-data-files="$TYPELIB_DIR/AyatanaAppIndicator3-0.1.typelib=girepository-1.0/AyatanaAppIndicator3-0.1.typelib" \
             --nofollow-import-to=gi.repository,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
@@ -125,7 +132,7 @@ jobs:
           Name=HomeGrid Backup
           Comment=Inverter Data Backup Utility
           Exec="$BIN_PATH" --gui
-          Icon=drive-harddisk
+          Icon=homegrid-backup
           Terminal=false
           Categories=Utility;Archiving;
           EOD
@@ -134,14 +141,19 @@ jobs:
             cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
             chmod +x "$HOME/Desktop/homegrid-backup.desktop"
           fi
+          ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+          mkdir -p "$ICON_DIR"
+          cp "$APP_DIR/homegrid-backup.png" "$ICON_DIR/homegrid-backup.png"
           echo "[OK] Shortcut created: $DESKTOP_FILE"
           EOF
           chmod +x dist/install_shortcut.sh
+          cp icon.png dist/homegrid-backup.png
+          cp icon.ico dist/icon.ico
 
       - name: Package application into single .7z
         run: |
           cd dist
-          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup install_shortcut.sh
+          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup install_shortcut.sh homegrid-backup.png icon.ico
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
@@ -165,7 +177,8 @@ jobs:
             Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
             - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
             - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
-            Вимоги: Ubuntu 24.04 або новіша, для іконки в треї потрібен AppIndicator.
+            Вимоги: Ubuntu 24.04 або новіша.
+            Трей підтримується через StatusNotifier/AppIndicator та XEmbed у X11-панелях. У XFCE можна додати плагін Status Notifier або область сповіщень; у KDE Plasma увімкнути віджет «Системний лоток». Сумісні панелі також є в Cinnamon, MATE, Budgie і LXQt.
           files: homegrid-backup-ubuntu-x86_64.7z
           fail_on_unmatched_files: true
           make_latest: true

@@ -7,6 +7,7 @@ import time
 import ctypes
 import threading
 
+
 def _clean_sys_env():
     env = os.environ.copy()
     env["LC_ALL"] = "C"
@@ -36,8 +37,95 @@ def _has_appindicator_gi():
         pass
     return False
 
+
+def _has_gtk_gi():
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk
+        return Gtk is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _has_sni_watcher(env):
+    import re
+    import shutil
+    import subprocess
+
+    commands = (
+        ("dbus-send", [
+            "--session", "--dest=org.freedesktop.DBus", "--type=method_call",
+            "--print-reply", "/org/freedesktop/DBus",
+            "org.freedesktop.DBus.NameHasOwner",
+            "string:org.kde.StatusNotifierWatcher",
+        ]),
+        ("gdbus", [
+            "call", "--session", "--dest", "org.freedesktop.DBus",
+            "--object-path", "/org/freedesktop/DBus", "--method",
+            "org.freedesktop.DBus.NameHasOwner",
+            "org.kde.StatusNotifierWatcher",
+        ]),
+        ("busctl", [
+            "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus",
+            "org.freedesktop.DBus", "NameHasOwner", "s",
+            "org.kde.StatusNotifierWatcher",
+        ]),
+    )
+    for executable, args in commands:
+        if not shutil.which(executable, path=env.get("PATH")):
+            continue
+        try:
+            out = subprocess.check_output(
+                [executable, *args],
+                env=env,
+                stderr=subprocess.DEVNULL,
+                timeout=0.9,
+            ).decode("utf-8", errors="ignore")
+            if re.search(r"\btrue\b", out, re.I):
+                return True
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return False
+
+
+def _has_x11_tray_manager():
+    if not os.environ.get("DISPLAY"):
+        return False
+    try:
+        from ctypes.util import find_library
+        x11_path = find_library("X11")
+        if not x11_path:
+            return False
+        x11 = ctypes.CDLL(x11_path)
+    except OSError:
+        return False
+
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
+    x11.XDefaultScreen.restype = ctypes.c_int
+    x11.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+    x11.XInternAtom.restype = ctypes.c_ulong
+    x11.XGetSelectionOwner.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    x11.XGetSelectionOwner.restype = ctypes.c_ulong
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    x11.XCloseDisplay.restype = ctypes.c_int
+
+    display = x11.XOpenDisplay(os.environ["DISPLAY"].encode("utf-8"))
+    if not display:
+        return False
+    try:
+        screen = x11.XDefaultScreen(display)
+        selection = f"_NET_SYSTEM_TRAY_S{screen}".encode("ascii")
+        atom = x11.XInternAtom(display, selection, 0)
+        return bool(atom and x11.XGetSelectionOwner(display, atom))
+    finally:
+        x11.XCloseDisplay(display)
+
+
 def _detect_linux_tray_backend():
-    import sys, re as _re, subprocess
+    import sys
     if not sys.platform.startswith("linux"):
         return "native"
     from core.config import IS_WSL
@@ -47,31 +135,14 @@ def _detect_linux_tray_backend():
         if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
             os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
     sys_env = _clean_sys_env()
-    has_sni = False
-    for cmd in (
-        ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call", "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner", "string:org.kde.StatusNotifierWatcher"],
-        ["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus", "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner", "org.kde.StatusNotifierWatcher"],
-        ["busctl", "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", "s", "org.kde.StatusNotifierWatcher"],
-    ):
-        try:
-            out = subprocess.check_output(cmd, env=sys_env, stderr=subprocess.DEVNULL, timeout=0.9).decode("utf-8", errors="ignore")
-            if _re.search(r"\btrue\b", out, _re.I):
-                has_sni = True
-                break
-        except Exception:
-            pass
-    if has_sni:
+    if _has_sni_watcher(sys_env):
         return "appindicator" if _has_appindicator_gi() else "auto"
-    try:
-        out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], env=sys_env, stderr=subprocess.DEVNULL, timeout=0.6).decode("utf-8", errors="ignore")
-        if "window id #" in out_x and "0x0" not in out_x:
-            return "xorg"
-    except Exception:
-        pass
+    if _has_x11_tray_manager():
+        return "gtk" if _has_gtk_gi() else "xorg"
     return ""
 
 _LNX_TRAY_BE = _detect_linux_tray_backend()
-if _LNX_TRAY_BE in ("appindicator", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
+if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
     os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
 
 try:
@@ -170,7 +241,7 @@ def _tray_problem():
             return "Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель"
         if "GNOME" in de or "UNITY" in de:
             return "Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support"
-        if "KDE" in de:
+        if "KDE" in de or "PLASMA" in de:
             return "Трей KDE: перевірте, що увімкнено віджет «Системний лоток»"
         return "Панель не підтримує трей (потрібен StatusNotifier або XEmbed)"
     return "Системний трей недоступний"
