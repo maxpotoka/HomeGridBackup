@@ -1,6 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v2.04 | 22.11.2026 02:00)
-# patch-id: fix-ubuntu-tray-menu-2.16
+# [ФАЙЛ: gui/tray.py (v2.05 | 22.11.2026 02:07)
+# patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
 import os
 import time
@@ -141,14 +141,15 @@ def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
 
 def _force_quit_app(engine):
     _TRAY_STOP.set()
-    try:
-        if engine.tray_icon is not None:
-            engine.tray_icon.visible = False
-            engine.tray_icon.stop()
-            engine.tray_icon = None
-            time.sleep(0.12)
-    except Exception:
-        pass
+    if os.sys.platform != "darwin":
+        try:
+            if engine.tray_icon is not None:
+                engine.tray_icon.visible = False
+                engine.tray_icon.stop()
+                engine.tray_icon = None
+                time.sleep(0.12)
+        except Exception:
+            pass
     try:
         if engine.app_ref is not None:
             engine.app_ref.root.quit()

@@ -1,7 +1,7 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.06 | 22.11.2026 00:54) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.07 | 22.11.2026 02:07) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -110,6 +110,7 @@ class HomeGridApp(DialogsMixin):
                 try:
                     self.root.createcommand("tk::mac::Quit", self.confirm_exit)
                     self.root.createcommand("tk::mac::ShowPreferences", self.open_settings)
+                    self.root.createcommand("tk::mac::ReopenApplication", self.show_window)
                 except Exception:
                     pass
 
@@ -827,9 +828,11 @@ class HomeGridApp(DialogsMixin):
                 )
 
             btn_state = "disabled" if self.engine.is_running else "normal"
+            btns_changed = False
             for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
                 if str(b.cget("state")) != btn_state:
                     b.configure(state=btn_state)
+                    btns_changed = True
             self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
@@ -837,8 +840,11 @@ class HomeGridApp(DialogsMixin):
                     self.btn_pick_lan.configure(text=tr(f"Виявлені ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
                     if not self.btn_pick_lan.winfo_ismapped():
                         self.btn_pick_lan.grid(row=0, column=5, sticky="ew", padx=(4, 0), pady=2)
+                    btns_changed = True
                 elif self.btn_pick_lan.winfo_ismapped():
                     self.btn_pick_lan.grid_remove()
+            if btns_changed:
+                fix_mac_buttons(self.root, self._get_palette())
 
             logs = self.engine.logs
             if not logs and self.last_log_len != 0:
