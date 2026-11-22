@@ -108,7 +108,6 @@ class HomeGridApp(DialogsMixin):
                 app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
                 app_menu.add_separator()
                 app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
-                app_menu.add_command(label=tr("Налаштування хмарного сховища...", lng), command=self.open_cloud_settings)
                 app_menu.add_separator()
                 app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
                 menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
@@ -139,7 +138,6 @@ class HomeGridApp(DialogsMixin):
             tools_menu.add_command(label=tr("Світла тема" if is_dk else "Темна тема", lng), command=self.toggle_theme_quick)
             if sys.platform != "darwin":
                 tools_menu.add_command(label=tr("Налаштування", lng), command=self.open_settings)
-                tools_menu.add_command(label=tr("Налаштування хмарного сховища...", lng), command=self.open_cloud_settings)
             menubar.add_cascade(label="Інструменти" if lng == "uk" else "Tools", menu=tools_menu)
 
             if sys.platform != "darwin":
@@ -444,11 +442,6 @@ class HomeGridApp(DialogsMixin):
         self.btn_start.pack(side="left", padx=(0, 10))
         self.btn_strat = tk.Button(self.footer, text="Налаштування", command=self.open_settings, padx=12, pady=5, cursor="hand2")
         self.btn_strat.pack(side="left", padx=8)
-        self.btn_cloud = tk.Button(
-            self.footer, text="☁ Хмарне сховище",
-            command=self.open_cloud_settings, padx=12, pady=5, cursor="hand2"
-        )
-        self.btn_cloud.pack(side="left", padx=8)
         self.btn_about = tk.Button(self.footer, text="Про програму", command=self.open_about, padx=12, pady=5, cursor="hand2")
         self.btn_about.pack(side="left", padx=8)
         self.btn_exit = tk.Button(self.footer, text="Вихід", command=self.confirm_exit, padx=14, pady=5, cursor="hand2")
@@ -469,7 +462,6 @@ class HomeGridApp(DialogsMixin):
             (self.btn_clear_log, "Очистити поточні повідомлення у вікні системного логу"),
             (self.btn_start, "Запустити створення та перевірку нової резервної копії зараз"),
             (self.btn_strat, "Налаштування глибини GFS, розкладу, трею, мови та теми"),
-            (self.btn_cloud, tr("Відкрити налаштування хмарного сховища", self.engine.state.get("lang", "en"))),
             (self.btn_about, "Інформація про версію та можливості програми"),
             (self.btn_exit, "Завершити роботу програми та вийти"),
         ):

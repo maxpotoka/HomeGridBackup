@@ -60,4 +60,5 @@ __pycache__/
 !/tests/test_linux_tray.py
 !/tests/test_app_icon.py
 !/tests/test_cloud.py
+!/tests/test_last_backup_info.py
 !/tests/test_tray_platforms.py

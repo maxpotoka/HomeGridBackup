@@ -317,6 +317,7 @@ class BackupEngine:
             not force
             and getattr(self, "_last_backup_cache", None) is not None
             and getattr(self, "_last_backup_cache_dir", None) == bdir
+            and getattr(self, "_last_backup_cache_lang", None) == self.state.get("lang", "en")
             and (now - getattr(self, "_last_backup_cache_time", 0.0)) < 12.0
         )
         if cache_valid:
@@ -333,15 +334,39 @@ class BackupEngine:
                     dt_s = datetime.fromtimestamp(latest["mtime"]).strftime("%H:%M  (%d.%m.%Y)")
                     mb_s = round(latest["size"] / 1048576.0, 1)
                     has_sha = os.path.exists(latest["path"] + ".sha256")
+                    archive_name = os.path.basename(latest["path"])
+                    duration_sec = next(
+                        (
+                            item.get("dur_sec")
+                            for item in self.state.get("op_history", [])
+                            if isinstance(item, dict)
+                            and item.get("status") == "Успішно"
+                            and item.get("detail") == archive_name
+                            and item.get("dur_sec") is not None
+                        ),
+                        None
+                    )
+                    duration_label = ""
+                    if duration_sec is not None:
+                        try:
+                            duration_value = max(0, int(round(float(duration_sec))))
+                            minutes, seconds = divmod(duration_value, 60)
+                            if self.state.get("lang") == "uk":
+                                duration_label = f"  •  Час створення: {minutes} хв {seconds:02d} с"
+                            else:
+                                duration_label = f"  •  Creation time: {minutes} min {seconds:02d} sec"
+                        except (TypeError, ValueError, OverflowError):
+                            pass
                     if has_sha:
-                        res = (f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok")
+                        res = (f"{dt_s}  •  {mb_s} МБ{duration_label}  •  SHA-256 ✔", "ok")
                     else:
-                        res = (f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn")
+                        res = (f"{dt_s}  •  {mb_s} МБ{duration_label}  •  Без .sha256", "warn")
             except Exception:
                 res = ("Невідомо", "idle")
         self._last_backup_cache = res
         self._last_backup_cache_time = now
         self._last_backup_cache_dir = bdir
+        self._last_backup_cache_lang = self.state.get("lang", "en")
         return res
 
     def get_detailed_stats(self):

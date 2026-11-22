@@ -21,13 +21,11 @@ from core.files import pretty_phase, format_duration, format_backup_dt
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
 
 def _record_cloud_event(engine, operation_id, event, **details):
-    if not engine.state.get("cloud_enabled"):
-        return
     try:
         from core.cloud import record_operation_event
         record_operation_event(engine, operation_id, event, **details)
     except Exception as exc:
-        engine.log(f"Попередження: не вдалося записати хмарний звіт: {exc}", "warn")
+        engine.log(f"Попередження: не вдалося записати локальний звіт: {exc}", "warn")
 
 def _sync_cloud_reports(engine):
     if not engine.state.get("cloud_enabled"):
@@ -386,12 +384,12 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 phase_duration = max(0.0, time.time() - phase_start_t)
                 srv_times[last_phase if last_phase in srv_times else "processing"] += phase_duration
                 _record_cloud_event(
-                    engine, operation_id, "stage",
+                    engine, operation_id, "stage_completed",
                     stage=f"server_{last_phase}", duration_sec=phase_duration
                 )
             last_phase = ph
             phase_start_t = time.time()
-            _record_cloud_event(engine, operation_id, "stage", stage=f"server_{ph}")
+            _record_cloud_event(engine, operation_id, "stage_started", stage=f"server_{ph}")
             engine.log(f"Етап сервера ({srv_label}): {pretty_phase(ph)}", "info")
 
         elapsed_ph = max(0.05, time.time() - phase_start_t)
@@ -415,7 +413,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 phase_duration = max(0.0, time.time() - phase_start_t)
                 srv_times[last_phase if last_phase in srv_times else "processing"] += phase_duration
                 _record_cloud_event(
-                    engine, operation_id, "stage",
+                    engine, operation_id, "stage_completed",
                     stage=f"server_{last_phase}", duration_sec=phase_duration
                 )
             engine._last_srv_timings = {k: round(v, 1) for k, v in srv_times.items()}
@@ -438,6 +436,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
     du = f"{srv}{st['download_url']}" if st.get("download_url") else f"{srv}/api/migration/export?_t={int(time.time()*1000)}&job_id={job_id}&_download_token={dt_tok}"
 
     engine.log(f"Завантаження ZIP-архіву з {srv_label}...", "info")
+    download_started = time.time()
+    _record_cloud_event(engine, operation_id, "stage_started", stage="archive_download")
     eb = float(tot_b) if tot_b > 0 else 0.0
     max_attempts = 7
     retry_delays = (10, 15, 20, 25, 25, 25)
@@ -505,7 +505,14 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 os.remove(part_file)
         if dl_ok and size_valid:
             os.replace(part_file, out_file)
-            engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(time.time() - d0, 1)} с", "ok")
+            download_duration = time.time() - download_started
+            engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(download_duration, 1)} с", "ok")
+            _record_cloud_event(
+                engine, operation_id, "stage_completed", stage="archive_download",
+                archive=out_file, size_mb=actual_sz / 1048576.0,
+                size_bytes=actual_sz, duration_sec=download_duration,
+                speed_mbps=(actual_sz / 1048576.0) / max(download_duration, 0.001)
+            )
             return out_file, net_sha_hex
         if dl_ok and not size_valid:
             dl_err = f"завантажено лише {actual_sz/1048576.0:.1f} із {tot_b/1048576.0:.1f} МБ (обрив потоку)"
@@ -532,25 +539,27 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
     operation_id = new_operation_id()
     out_file = ""
     total_mb = 0.0
-    _record_cloud_event(engine, operation_id, "started", stage="server_preparation")
+    _record_cloud_event(
+        engine, operation_id, "started", stage="server_connection",
+        archive_sequence=max(0, int(engine.state.get("all_time_cnt", 0))) + 1
+    )
     try:
         bdir = engine.state["backup_dir"]
         t_prep0 = time.time()
+        _record_cloud_event(engine, operation_id, "stage_started", stage="server_connection_and_preparation")
         srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
-        t_dl0 = time.time()
-        _record_cloud_event(engine, operation_id, "stage", stage="server_job_ready")
-        _record_cloud_event(engine, operation_id, "stage", stage="archive_downloading")
-        download_started = time.time()
-        out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id)
         _record_cloud_event(
-            engine, operation_id, "stage", stage="archive_downloaded",
-            archive=out_file, duration_sec=time.time() - download_started
+            engine, operation_id, "stage_completed", stage="server_connection_and_preparation",
+            duration_sec=time.time() - t_prep0, result="success"
         )
+        t_dl0 = time.time()
+        _record_cloud_event(engine, operation_id, "milestone", stage="server_job_ready")
+        out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id)
         t_ver0 = time.time()
 
         total_bytes = os.path.getsize(out_file)
         total_mb = total_bytes / 1048576.0
-        _record_cloud_event(engine, operation_id, "stage", stage="archive_crc32_verification", archive=out_file)
+        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_crc32_verification", archive=out_file)
         engine.set_progress(None, f"Перевірка CRC32 ({total_mb:.1f} МБ)...")
         with zipfile.ZipFile(out_file, "r") as zf:
             infos = zf.infolist()
@@ -567,8 +576,14 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
                     os.remove(out_file)
                     raise RuntimeError(f"Пошкоджений файл в архіві: {info.filename}")
         t_sha0 = time.time()
-        crc_sec = round(max(0.1, t_sha0 - t_ver0), 1)
+        crc_duration = max(0.001, t_sha0 - t_ver0)
+        crc_sec = round(max(0.1, crc_duration), 1)
+        _record_cloud_event(
+            engine, operation_id, "stage_completed", stage="archive_crc32_verification",
+            archive=out_file, duration_sec=crc_duration, files_count=cnt
+        )
 
+        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_sha256_verification", archive=out_file)
         h = hashlib.sha256()
         processed = 0
         last_ui = time.time()
@@ -589,21 +604,28 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         sha_file = out_file + ".sha256"
         with open(sha_file, "w", encoding="utf-8") as f_sha:
             f_sha.write(f"{zip_hash.lower()}  {os.path.basename(out_file)}\n")
-        sha_sec = round(max(0.1, time.time() - t_sha0), 1)
+        sha_duration = max(0.001, time.time() - t_sha0)
+        sha_sec = round(max(0.1, sha_duration), 1)
         ver_sec = round(crc_sec + sha_sec, 1)
         engine.log(f"Цілісність перевірено ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
         _record_cloud_event(
-            engine, operation_id, "stage", stage="archive_sha256_verified",
-            archive=out_file, size_mb=total_mb, duration_sec=ver_sec
+            engine, operation_id, "stage_completed", stage="archive_sha256_verification",
+            archive=out_file, size_mb=total_mb, duration_sec=sha_duration, files_count=cnt,
+            size_bytes=total_bytes
         )
 
         mir_active = bool(engine.state.get("mirror_enabled", False)) and bool((engine.state.get("mirror_dir") or "").strip())
         mir_sec = 0.0
         if mir_active:
             t_mir0 = time.time()
-            _record_cloud_event(engine, operation_id, "stage", stage="local_mirror", archive=out_file)
+            _record_cloud_event(engine, operation_id, "stage_started", stage="local_mirror", archive=out_file)
             _copy_to_mirror(engine, out_file, sha_file)
-            mir_sec = round(max(0.1, time.time() - t_mir0), 1)
+            mir_duration = max(0.001, time.time() - t_mir0)
+            mir_sec = round(max(0.1, mir_duration), 1)
+            _record_cloud_event(
+                engine, operation_id, "stage_completed", stage="local_mirror",
+                archive=out_file, duration_sec=mir_duration
+            )
 
         if engine.state["dirty"]:
             commit_state(engine.state)
@@ -611,19 +633,24 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
 
         from core.gfs import compute_gfs_plan, apply_gfs_cleanup
         engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
-        _record_cloud_event(engine, operation_id, "stage", stage="gfs_rotation", archive=out_file)
+        gfs_started = time.time()
+        _record_cloud_event(engine, operation_id, "stage_started", stage="gfs_rotation", archive=out_file)
         _, _, del_it = compute_gfs_plan(engine.state)
         old_cnt_before = len(del_it)
         gfs_cleanup_applied = False
         if not skip_cleanup and not NO_CLEAN and (auto_quiet or bool(engine.state.get("silent_cleanup", False))):
             deleted_count, _, _ = apply_gfs_cleanup(engine, skip_prompt=True, sync_cloud=False)
             gfs_cleanup_applied = deleted_count == len(del_it)
+        _record_cloud_event(
+            engine, operation_id, "stage_completed", stage="gfs_rotation",
+            archive=out_file, duration_sec=time.time() - gfs_started
+        )
         cloud_sync_started = time.time()
         cloud_synced = _sync_cloud_backups(engine, prune=gfs_cleanup_applied)
         _record_cloud_event(
-            engine, operation_id, "stage",
-            stage="cloud_archive_sync" if cloud_synced else "cloud_archive_sync_failed",
-            archive=out_file, duration_sec=time.time() - cloud_sync_started
+            engine, operation_id, "stage_completed", stage="cloud_archive_sync",
+            archive=out_file, duration_sec=time.time() - cloud_sync_started,
+            result="success" if cloud_synced else ("disabled" if not engine.state.get("cloud_enabled") else "failed")
         )
 
         t_end = time.time()
@@ -636,7 +663,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         srv_pack_s = round(_st_t.get("packing", 0.0), 1)
         srv_proc_s = round(_st_t.get("processing", 0.0), 1)
         srv_chk_s = round(_st_t.get("checking", 0.0), 1)
-        total_sec = round(max(0.1, srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s + srv_proc_s + dl_sec + ver_sec + mir_sec), 1)
+        total_sec = round(max(0.1, t_end - t_total_start), 1)
         srv_sec = round(srv_prep_s + srv_copy_s + srv_proc_s + srv_pack_s + srv_chk_s, 1)
         spd_mbs = round(total_mb / max(0.1, dl_sec), 1)
         final_name = os.path.basename(out_file)
@@ -655,7 +682,9 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
         _record_cloud_event(
             engine, operation_id, "success", archive=final_name,
-            size_mb=total_mb, duration_sec=time.time() - t_total_start
+            size_mb=total_mb, size_bytes=total_bytes, files_count=cnt,
+            duration_sec=t_end - t_total_start,
+            speed_mbps=total_mb / max(t_end - t_total_start, 0.001)
         )
         _sync_cloud_reports(engine)
         if not SILENT_MODE and not auto_quiet:
@@ -672,7 +701,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             engine.record_op_event("Помилка", str(exc), 0.0, dur_sec=round(time.time() - t_total_start, 1))
         _record_cloud_event(
             engine, operation_id, "error", archive=out_file,
-            size_mb=total_mb, duration_sec=time.time() - t_total_start
+            size_mb=total_mb, duration_sec=time.time() - t_total_start,
+            result="error", error_type=type(exc).__name__
         )
         _sync_cloud_reports(engine)
         engine.set_progress(0, f"Помилка: {exc}")

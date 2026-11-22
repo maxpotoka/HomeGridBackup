@@ -1,12 +1,23 @@
 import os
+import json
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 from core import cloud
 
 
 class RcloneExecutableTests(unittest.TestCase):
+    def test_run_disables_stdin_and_console_window(self):
+        expected = mock.Mock(returncode=0, stdout="", stderr="")
+        with mock.patch.object(cloud, "_NO_WINDOW", 0x08000000), \
+             mock.patch.object(cloud.subprocess, "run", return_value=expected) as run:
+            result = cloud._run(["rclone", "listremotes"], 15)
+        self.assertIs(result, expected)
+        self.assertIs(run.call_args.kwargs["stdin"], cloud.subprocess.DEVNULL)
+        self.assertEqual(run.call_args.kwargs["creationflags"], 0x08000000)
+
     def test_prefers_bundled_rclone(self):
         executable_name = "rclone.exe" if os.name == "nt" else "rclone"
         with tempfile.TemporaryDirectory() as app_dir:
@@ -22,6 +33,89 @@ class RcloneExecutableTests(unittest.TestCase):
             with mock.patch.object(cloud.sys, "executable", os.path.join(app_dir, "HomeGridBackup.exe")), \
                  mock.patch.object(cloud.shutil, "which", return_value="system-rclone"):
                 self.assertEqual(cloud._rclone_executable(), "system-rclone")
+
+    def test_setup_starts_interactive_rclone_without_a_console_window(self):
+        process = mock.Mock()
+        with mock.patch.object(cloud, "list_rclone_remotes", return_value=[]), \
+             mock.patch.object(cloud, "_rclone_executable", return_value="rclone"), \
+             mock.patch.object(cloud.subprocess, "Popen", return_value=process) as popen:
+            self.assertIs(cloud.start_rclone_remote_setup("mydrive", "drive"), process)
+        self.assertEqual(popen.call_args.args[0], ["rclone", "config", "create", "mydrive", "drive"])
+        self.assertIs(popen.call_args.kwargs["stdin"], cloud.subprocess.PIPE)
+        self.assertIs(popen.call_args.kwargs["stderr"], cloud.subprocess.STDOUT)
+        self.assertEqual(popen.call_args.kwargs["creationflags"], cloud._NO_WINDOW)
+
+    def test_setup_rejects_invalid_remote_and_backend(self):
+        with self.assertRaises(ValueError):
+            cloud.start_rclone_remote_setup("../bad", "drive")
+        with self.assertRaises(ValueError):
+            cloud.start_rclone_remote_setup("valid", "unsupported")
+        with mock.patch.object(cloud, "list_rclone_remotes", return_value=["valid"]):
+            with self.assertRaises(ValueError):
+                cloud.start_rclone_remote_setup("valid", "drive")
+
+    def test_remote_test_falls_back_to_listing_when_about_is_unsupported(self):
+        with mock.patch.object(cloud, "_rclone", side_effect=[RuntimeError("no about"), ""] ) as rclone:
+            cloud.test_rclone_remote("mydrive:")
+        self.assertEqual(rclone.call_args_list, [
+            mock.call("about", "mydrive:"),
+            mock.call("lsd", "mydrive:", "--max-depth", "1")
+        ])
+
+    def test_operation_reports_are_local_and_include_comparison_metadata(self):
+        device_id = "a" * 32
+        state = {
+            "backup_dir": tempfile.mkdtemp(),
+            "device_id": device_id,
+            "all_time_cnt": 4,
+            "cloud_enabled": False,
+        }
+        engine = SimpleNamespace(state=state)
+        try:
+            with mock.patch.object(cloud, "_rclone_version", return_value="rclone v1.76.0"):
+                cloud.record_operation_event(
+                    engine, "operation-1", "stage_completed",
+                    stage="archive_download", archive="backup.zip",
+                    size_mb=12.5, size_bytes=13107200, duration_sec=2.34567,
+                    files_count=9, archive_sequence=5, speed_mbps=5.34
+                )
+            report_dir = os.path.join(state["backup_dir"], "reports", device_id)
+            report_path = os.path.join(report_dir, cloud.datetime.now().strftime("%Y-%m-%d") + ".jsonl")
+            with open(report_path, encoding="utf-8") as report:
+                record = json.loads(report.readline())
+            self.assertEqual(record["device_id"], device_id)
+            self.assertEqual(record["archives_total"], 4)
+            self.assertEqual(record["archive_sequence"], 5)
+            self.assertEqual(record["files_count"], 9)
+            self.assertEqual(record["duration_ms"], 2346)
+            self.assertEqual(record["rclone_version"], "rclone v1.76.0")
+            self.assertTrue(os.path.isfile(report_path + ".pending"))
+        finally:
+            import shutil
+            shutil.rmtree(state["backup_dir"])
+
+    def test_sync_reports_uploads_local_reports_and_clears_pending_marker(self):
+        device_id = "b" * 32
+        with tempfile.TemporaryDirectory() as backup_dir:
+            report_dir = os.path.join(backup_dir, "reports", device_id)
+            os.makedirs(report_dir)
+            report_path = os.path.join(report_dir, "2025-01-02.jsonl")
+            with open(report_path, "w", encoding="utf-8") as report:
+                report.write("{}\n")
+            marker_path = report_path + ".pending"
+            open(marker_path, "w").close()
+            engine = SimpleNamespace(state={
+                "backup_dir": backup_dir, "device_id": device_id,
+                "cloud_enabled": True, "cloud_remote": "drive",
+                "cloud_path": "HomeGridBackup",
+            })
+            with mock.patch.object(cloud, "_rclone") as rclone:
+                cloud.sync_cloud_reports(engine)
+            rclone.assert_called_once_with(
+                "copyto", report_path,
+                "drive:HomeGridBackup/operations/{}/2025-01-02.jsonl".format(device_id)
+            )
+            self.assertFalse(os.path.exists(marker_path))
 
 
 if __name__ == "__main__":

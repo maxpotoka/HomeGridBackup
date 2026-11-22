@@ -82,6 +82,17 @@ jobs:
           mv "$APP_BUNDLE" dist_mac/pack/HomeGridBackup.app
           chmod -R u+rwX,go+rX dist_mac/pack/HomeGridBackup.app
           chmod +x dist_mac/pack/HomeGridBackup.app/Contents/MacOS/HomeGridBackup
+          asset="rclone-v1.76.0-osx-amd64.zip"
+          curl -fsSL "https://downloads.rclone.org/v1.76.0/$asset" -o "$asset"
+          echo "4f5835733d52b818340f97b1fc0348a70461534d123363a183ca2b660219595a  $asset" | shasum -a 256 -c -
+          mkdir -p rclone-macos
+          unzip -q "$asset" -d rclone-macos
+          rclone_path=$(find rclone-macos -type f -name rclone -print -quit)
+          test -n "$rclone_path"
+          cp "$rclone_path" dist_mac/pack/HomeGridBackup.app/Contents/MacOS/rclone
+          chmod +x dist_mac/pack/HomeGridBackup.app/Contents/MacOS/rclone
+          curl -fsSL https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING \
+            -o dist_mac/pack/HomeGridBackup.app/Contents/Resources/rclone-LICENSE.txt
           codesign --force --deep --sign - dist_mac/pack/HomeGridBackup.app
           cd dist_mac/pack
           7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app

@@ -69,6 +69,20 @@ jobs:
             --output-filename=HomeGridBackup.exe ^
             main.py
 
+      - name: Bundle verified rclone for Windows x64
+        shell: pwsh
+        run: |
+          $asset = "rclone-v1.76.0-windows-amd64.zip"
+          Invoke-WebRequest "https://downloads.rclone.org/v1.76.0/$asset" -OutFile $asset
+          $expected = "8b4fd2737ade4e70c057ef4a49deb7cffe94b0fb9d7587c189d149823f21a1dc"
+          $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "rclone SHA-256 mismatch" }
+          Expand-Archive $asset -DestinationPath rclone-win -Force
+          $rcloneDir = Get-ChildItem rclone-win -Directory | Select-Object -First 1
+          Copy-Item "$($rcloneDir.FullName)/rclone.exe" dist_win10/rclone.exe
+          Invoke-WebRequest "https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING" -OutFile dist_win10/rclone-LICENSE.txt
+          Compress-Archive -Path "dist_win10/*" -DestinationPath HomeGridBackup_win10_x64.zip -Force
+
       - name: Set build completion timestamp
         id: build_time
         shell: pwsh
@@ -130,12 +144,14 @@ jobs:
             **Версія:** ${{ steps.tag.outputs.tag }}  
             **Дата збірки:** ${{ steps.build_time.outputs.value }}
             
-            Чистий виконуваний файл **HomeGridBackup.exe** без обгортки `.zip`.
-            Запускається напряму подвійним кліком без встановлення.
+            Портативний комплект **HomeGridBackup_win10_x64.zip** містить програму та перевірений rclone 1.76.0.
+            Окремий **HomeGridBackup.exe** доступний для запуску без комплектного rclone.
             
             ### Системні вимоги:
             - Windows 10 / 11 (64-bit)
             - .NET Framework не потрібен
-          files: dist_win10/HomeGridBackup.exe
+          files: |
+            dist_win10/HomeGridBackup.exe
+            HomeGridBackup_win10_x64.zip
           fail_on_unmatched_files: true
           make_latest: true
