@@ -119,22 +119,27 @@ jobs:
             main.py
           CONTAINER_EOF
 
-      - name: Verify 32-bit binary and create shortcut helper
+      - name: Verify 32-bit binary and create per-user installer
         run: |
           sudo apt-get update && sudo apt-get install -y p7zip-full
           sudo chown -R "$USER:$USER" build32
           test -f build32/homegrid-backup || { echo "ERROR: build32/homegrid-backup not created"; exit 1; }
           mkdir -p dist32
-          mv build32/homegrid-backup dist32/homegrid-backup
-          chmod +x dist32/homegrid-backup
-          file dist32/homegrid-backup
+          mv build32/homegrid-backup dist32/HomeGridBackup
+          chmod +x dist32/HomeGridBackup
+          file dist32/HomeGridBackup
 
-          cat << 'EOF' > dist32/install_shortcut.sh
+          cat << 'INSTALL_EOF' > dist32/install.sh
           #!/usr/bin/env bash
-          set -e
-          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-          BIN_PATH="$APP_DIR/homegrid-backup"
-          chmod +x "$BIN_PATH"
+          set -euo pipefail
+          SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+          DEST="$HOME/.local/opt/HomeGridBackup"
+          mkdir -p "$DEST"
+          cp "$SCRIPT_DIR/HomeGridBackup" "$DEST/HomeGridBackup"
+          cp "$SCRIPT_DIR/rclone" "$DEST/rclone"
+          cp "$SCRIPT_DIR/rclone-LICENSE.txt" "$DEST/rclone-LICENSE.txt"
+          cp "$SCRIPT_DIR/homegrid-backup.png" "$DEST/homegrid-backup.png"
+          chmod +x "$DEST/HomeGridBackup" "$DEST/rclone"
           mkdir -p "$HOME/.local/share/applications"
           DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
           cat > "$DESKTOP_FILE" << EOD
@@ -142,22 +147,16 @@ jobs:
           Type=Application
           Name=HomeGrid Backup
           Comment=Inverter Data Backup Utility
-          Exec="$BIN_PATH" --gui
-          Icon=homegrid-backup
+          TryExec="$DEST/HomeGridBackup"
+          Exec="$DEST/HomeGridBackup" --gui
+          Icon="$DEST/homegrid-backup.png"
           Terminal=false
           Categories=Utility;Archiving;
           EOD
-          chmod +x "$DESKTOP_FILE"
-          if [ -d "$HOME/Desktop" ]; then
-            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
-            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
-          fi
-          ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
-          mkdir -p "$ICON_DIR"
-          cp "$APP_DIR/homegrid-backup.png" "$ICON_DIR/homegrid-backup.png"
-          echo "[OK] Shortcut created: $DESKTOP_FILE"
-          EOF
-          chmod +x dist32/install_shortcut.sh
+          chmod 644 "$DESKTOP_FILE"
+          printf 'HomeGrid Backup installed to %s\n' "$DEST"
+          INSTALL_EOF
+          chmod +x dist32/install.sh
           cp icon.png dist32/homegrid-backup.png
           cp icon.ico dist32/icon.ico
 
@@ -172,11 +171,12 @@ jobs:
           cp "$rclone_path" dist32/rclone
           chmod +x dist32/rclone
           curl -fsSL https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING -o dist32/rclone-LICENSE.txt
+          bash -n dist32/install.sh
 
       - name: Package into .7z
         run: |
           cd dist32
-          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup rclone rclone-LICENSE.txt install_shortcut.sh homegrid-backup.png icon.ico
+          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z HomeGridBackup rclone rclone-LICENSE.txt install.sh homegrid-backup.png icon.ico
           cd ..
           ls -lh homegrid-backup-linux-i386-legacy.7z
 
@@ -197,10 +197,10 @@ jobs:
           tag_name: linux-32bit-latest
           name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+) — ${{ steps.build_time.outputs.value }}
           body: |
-            Комплект містить виконуваний файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, Ubuntu 18.04 / glibc 2.27) і rclone 1.76.0 для MX Linux 32-bit, antiX, Debian 10+, Ubuntu 18.04+.
+            Комплект містить 32-бітний виконуваний файл **HomeGridBackup** (ELF i686, Ubuntu 18.04 / glibc 2.27) і rclone 1.76.0.
 
-            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
-            - Создать ярлык в меню программ и на рабочем столе: `./install_shortcut.sh`
+            - Запустіть `./install.sh` для встановлення поточному користувачу в `~/.local/opt/HomeGridBackup` і створення ярлика меню.
+            - Права адміністратора не потрібні; сумісно з MX Linux 32-bit, antiX, Debian 10+ та Ubuntu 18.04+.
 
           files: homegrid-backup-linux-i386-legacy.7z
           overwrite_files: true

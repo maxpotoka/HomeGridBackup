@@ -85,6 +85,7 @@ class BackupEngine:
     def __init__(self):
         self.state = load_state()
         self.lock = threading.Lock()
+        self.cloud_sync_worker_lock = threading.Lock()
         self.is_running = False
         self.show_hw_notice = bool(self.state.get("hw_auto_notice"))
         self.progress = 0

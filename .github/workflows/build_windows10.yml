@@ -83,6 +83,17 @@ jobs:
           Invoke-WebRequest "https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING" -OutFile dist_win10/rclone-LICENSE.txt
           Compress-Archive -Path "dist_win10/*" -DestinationPath HomeGridBackup_win10_x64.zip -Force
 
+      - name: Build per-user Windows 10 installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          New-Item -ItemType Directory -Force -Path "packaging\installer_payload" | Out-Null
+          Copy-Item -Path "dist_win10\*" -Destination "packaging\installer_payload" -Recurse -Force
+          $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
+          & $compiler /DAppVersion=2.25 /DOutputBaseFilename=HomeGridBackup_Win10_x64_Setup packaging\windows_user_setup.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed: $LASTEXITCODE" }
+
       - name: Set build completion timestamp
         id: build_time
         shell: pwsh
@@ -144,8 +155,8 @@ jobs:
             **Версія:** ${{ steps.tag.outputs.tag }}  
             **Дата збірки:** ${{ steps.build_time.outputs.value }}
             
-            Портативний комплект **HomeGridBackup_win10_x64.zip** містить програму та перевірений rclone 1.76.0.
-            Окремий **HomeGridBackup.exe** доступний для запуску без комплектного rclone.
+            Установщик **HomeGridBackup_Win10_x64_Setup.exe** устанавливает приложение и rclone 1.76.0 для текущего пользователя в `%LOCALAPPDATA%\Programs\HomeGridBackup`. Права администратора не нужны.
+            Портативные варианты **HomeGridBackup.exe** и **HomeGridBackup_win10_x64.zip** также сохранены.
             
             ### Системні вимоги:
             - Windows 10 / 11 (64-bit)
@@ -153,5 +164,6 @@ jobs:
           files: |
             dist_win10/HomeGridBackup.exe
             HomeGridBackup_win10_x64.zip
+            packaging/installer_output/HomeGridBackup_Win10_x64_Setup.exe
           fail_on_unmatched_files: true
           make_latest: true

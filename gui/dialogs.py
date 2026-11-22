@@ -2,6 +2,7 @@ import re
 import os
 import time
 from core.i18n import tr, apply_widget_i18n
+from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
@@ -434,6 +435,8 @@ class DialogsMixin:
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
         v_cloud_remote = tk.StringVar(value=st.get("cloud_remote", ""))
         v_cloud_path = tk.StringVar(value=st.get("cloud_path", "HomeGridBackup"))
+        v_google_client_id = tk.StringVar(value="")
+        v_google_client_secret = tk.StringVar(value="")
         from core.cloud import RCLONE_PROVIDERS
         cloud_provider_names = [provider[0] for provider in RCLONE_PROVIDERS]
         cloud_provider_by_name = {provider[0]: provider[1] for provider in RCLONE_PROVIDERS}
@@ -509,10 +512,50 @@ class DialogsMixin:
             fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs), width=16
         ).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
+        google_oauth_frame = tk.Frame(f_cloud, bg=p["card"])
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            google_oauth_frame.pack(fill="x", pady=4)
+            google_id_row = tk.Frame(google_oauth_frame, bg=p["card"])
+            google_id_row.pack(fill="x", pady=2)
+            tk.Label(
+                google_id_row, text=tr("Google OAuth Client ID:", st.get("lang", "en")),
+                width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
+            ).pack(side="left")
+            tk.Entry(
+                google_id_row, textvariable=v_google_client_id, bg=p["inp_bg"],
+                fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
+            ).pack(side="left", fill="x", expand=True)
+            google_secret_row = tk.Frame(google_oauth_frame, bg=p["card"])
+            google_secret_row.pack(fill="x", pady=2)
+            tk.Label(
+                google_secret_row, text=tr("Google OAuth Client Secret:", st.get("lang", "en")),
+                width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
+            ).pack(side="left")
+            tk.Entry(
+                google_secret_row, textvariable=v_google_client_secret, show="*",
+                bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
+            ).pack(side="left", fill="x", expand=True)
+            tk.Label(
+                google_oauth_frame,
+                text=tr(
+                    "Для Google Drive рекомендуються власні OAuth Client ID і Secret. Залиште обидва поля порожніми, щоб ввести їх у майстрі rclone.",
+                    st.get("lang", "en"),
+                ),
+                bg=p["card"], fg=p["muted"], justify="left",
+                wraplength=780, font=("Segoe UI", max(8, fs - 1)),
+            ).pack(anchor="w", pady=(2, 0))
+
         cloud_actions = tk.Frame(f_cloud, bg=p["card"])
         cloud_actions.pack(fill="x", pady=(4, 2))
         cloud_msg = tk.Label(f_cloud, text="", bg=p["card"], fg=p["muted"], font=("Segoe UI", fs - 1))
         cloud_msg.pack(anchor="w", pady=(2, 4))
+        cloud_queue_label = None
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            cloud_queue_label = tk.Label(
+                f_cloud, text="", bg=p["card"], fg=p["muted"],
+                font=("Segoe UI", fs - 1),
+            )
+            cloud_queue_label.pack(anchor="w", pady=(0, 4))
 
         cloud_path_row = tk.Frame(f_cloud, bg=p["card"])
         cloud_path_row.pack(fill="x", pady=4)
@@ -576,6 +619,11 @@ class DialogsMixin:
         def _select_cloud_provider(_event=None):
             provider = v_cloud_provider.get()
             v_cloud_new_remote.set(cloud_default_remote_by_name.get(provider, "cloud"))
+            if WINDOWS7_CLOUD_SYNC_PREVIEW:
+                if cloud_provider_by_name.get(provider) == "drive":
+                    google_oauth_frame.pack(fill="x", pady=4, before=cloud_actions)
+                else:
+                    google_oauth_frame.pack_forget()
 
         def _open_cloud_setup():
             import queue
@@ -584,8 +632,16 @@ class DialogsMixin:
 
             remote = v_cloud_new_remote.get().strip()
             backend = cloud_provider_by_name.get(v_cloud_provider.get())
+            client_id = v_google_client_id.get().strip()
+            client_secret = v_google_client_secret.get()
             if not backend:
                 cloud_msg.configure(text=tr("Оберіть хмарний сервіс.", st.get("lang", "en")), fg=p["red"])
+                return
+            if backend == "drive" and bool(client_id) != bool(client_secret):
+                cloud_msg.configure(
+                    text=tr("Введіть обидва значення OAuth Client ID та Client Secret.", st.get("lang", "en")),
+                    fg=p["red"],
+                )
                 return
             if remote in (cb_cloud_remote.cget("values") or ()):
                 cloud_msg.configure(text=tr("Підключення з таким ім'ям уже існує.", st.get("lang", "en")), fg=p["red"])
@@ -601,9 +657,18 @@ class DialogsMixin:
             wizard.geometry("760x500")
             wizard.transient(self.root)
             wizard.configure(bg=p["panel"])
+            wizard_hint = tr(
+                "Відповідайте на запити rclone. Для OAuth може відкритися браузер.",
+                st.get("lang", "en"),
+            )
+            if WINDOWS7_CLOUD_SYNC_PREVIEW and backend == "drive":
+                wizard_hint += " " + tr(
+                    "Для Google Drive рекомендується власний OAuth Client ID та Secret, щоб уникнути спільного ліміту rclone.",
+                    st.get("lang", "en"),
+                )
             tk.Label(
                 wizard,
-                text=tr("Відповідайте на запити rclone. Для OAuth може відкритися браузер.", st.get("lang", "en")),
+                text=wizard_hint,
                 bg=p["panel"], fg=p["text"], font=("Segoe UI", fs), wraplength=710, justify="left"
             ).pack(fill="x", padx=12, pady=(12, 6))
             output = tk.Text(wizard, wrap="word", state="disabled", bg=p["log_bg"], fg=p["text"], font=("Consolas", max(8, fs - 1)))
@@ -622,6 +687,8 @@ class DialogsMixin:
 
             output_queue = queue.Queue()
             reader_done = threading.Event()
+            prompt_tail = ""
+            sent_client_credentials = set()
 
             def _read_rclone_output():
                 try:
@@ -672,6 +739,7 @@ class DialogsMixin:
             wizard.protocol("WM_DELETE_WINDOW", _close_rclone_wizard)
 
             def _poll_rclone_output():
+                nonlocal prompt_tail
                 if not wizard.winfo_exists():
                     return
                 chunks = []
@@ -682,13 +750,31 @@ class DialogsMixin:
                         break
                     chunks.append(item)
                 if chunks:
+                    prompt_tail = (prompt_tail + "".join(chunks).lower())[-256:]
                     output.configure(state="normal")
                     output.insert("end", "".join(chunks))
                     output.see("end")
                     output.configure(state="disabled")
+                    if WINDOWS7_CLOUD_SYNC_PREVIEW and backend == "drive" and client_id and client_secret:
+                        prompts = (
+                            ("client_id", "client_id>", client_id),
+                            ("client_secret", "client_secret>", client_secret),
+                        )
+                        for key, prompt, value in prompts:
+                            if key not in sent_client_credentials and prompt in prompt_tail:
+                                try:
+                                    process.stdin.write(value + "\n")
+                                    process.stdin.flush()
+                                except (OSError, ValueError) as exc:
+                                    cloud_msg.configure(text=str(exc), fg=p["red"])
+                                else:
+                                    sent_client_credentials.add(key)
+                                prompt_tail = prompt_tail.split(prompt, 1)[-1]
                 if reader_done.is_set() and process.poll() is not None:
                     if process.returncode == 0:
                         v_cloud_remote.set(remote)
+                        v_google_client_secret.set("")
+                        v_google_client_id.set("")
                         cloud_msg.configure(text=tr("Підключення створено.", st.get("lang", "en")), fg=p["green"])
                         _refresh_cloud_remotes()
                     else:
@@ -775,6 +861,73 @@ class DialogsMixin:
 
             threading.Thread(target=_worker, daemon=True).start()
 
+        def _refresh_cloud_queue():
+            if cloud_queue_label is None:
+                return
+            try:
+                from core.cloud import cloud_sync_queue_state
+                queue_state = cloud_sync_queue_state(self.engine)
+                message = tr(
+                    "Черга синхронізації: архіви {archives}, звіти {reports}",
+                    st.get("lang", "en"),
+                ).format(**queue_state)
+                color = p["amber"] if queue_state["total"] else p["green"]
+            except Exception as exc:
+                message = str(exc)
+                color = p["red"]
+            cloud_queue_label.configure(text=message, fg=color)
+
+        def _retry_cloud_sync():
+            if not v_cloud_enabled.get():
+                cloud_msg.configure(
+                    text=tr("Увімкніть хмарне сховище, щоб повторити синхронізацію.", st.get("lang", "en")),
+                    fg=p["amber"],
+                )
+                return
+            if not st.get("cloud_enabled"):
+                cloud_msg.configure(
+                    text=tr("Спочатку збережіть налаштування хмарного сховища.", st.get("lang", "en")),
+                    fg=p["amber"],
+                )
+                return
+            from core.cloud import cloud_sync_error_text, start_cloud_sync_worker
+            retry_cloud_button.configure(state="disabled")
+            cloud_msg.configure(text=tr("Синхронізацію запущено...", st.get("lang", "en")), fg=p["muted"])
+
+            def _completed(error):
+                def _update():
+                    if not dlg.winfo_exists():
+                        return
+                    retry_cloud_button.configure(state="normal")
+                    _refresh_cloud_queue()
+                    if error:
+                        cloud_msg.configure(
+                            text=cloud_sync_error_text(error, st.get("lang", "en")),
+                            fg=p["red"],
+                        )
+                    else:
+                        cloud_msg.configure(
+                            text=tr("Синхронізацію завершено.", st.get("lang", "en")),
+                            fg=p["green"],
+                        )
+                try:
+                    self.root.after(0, _update)
+                except tk.TclError:
+                    pass
+
+            if not start_cloud_sync_worker(self.engine, force=True, on_complete=_completed):
+                retry_cloud_button.configure(state="normal")
+                cloud_msg.configure(
+                    text=tr("Синхронізація вже виконується.", st.get("lang", "en")),
+                    fg=p["amber"],
+                )
+
+        def _schedule_cloud_queue_refresh():
+            if cloud_queue_label is None or not dlg.winfo_exists():
+                return
+            _refresh_cloud_queue()
+            dlg.after(30000, _schedule_cloud_queue_refresh)
+
         cb_cloud_provider.bind("<<ComboboxSelected>>", _select_cloud_provider)
         tk.Button(
             cloud_actions, text=tr("Додати та підключити", st.get("lang", "en")),
@@ -791,6 +944,14 @@ class DialogsMixin:
             command=_remove_cloud_remote, bg=p["card"], fg=p["red"],
             font=("Segoe UI", fs), padx=10, cursor="hand2"
         ).pack(side="left", padx=6)
+        retry_cloud_button = None
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            retry_cloud_button = tk.Button(
+                cloud_actions, text=tr("Повторити синхронізацію", st.get("lang", "en")),
+                command=_retry_cloud_sync, bg=p["card"], fg=p["amber"],
+                font=("Segoe UI", fs), padx=10, cursor="hand2",
+            )
+            retry_cloud_button.pack(side="left", padx=6)
         tk.Button(
             cloud_remote_row, text="Оновити список",
             command=_refresh_cloud_remotes, bg=p["card"], fg=p["cyan"],
@@ -804,6 +965,8 @@ class DialogsMixin:
             bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))
         ).pack(anchor="w", pady=(4, 2))
         _refresh_cloud_remotes()
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            dlg.after(0, _schedule_cloud_queue_refresh)
 
         top_grid = tk.Frame(tab_bkp, bg=p["panel"])
         top_grid.pack(fill="x", padx=12, pady=(6, 2))
@@ -974,15 +1137,17 @@ class DialogsMixin:
         def _commit_settings(close_after):
             selected_tab = nb.index(nb.select())
             cloud_remote = v_cloud_remote.get().strip()
-            cloud_path = v_cloud_path.get().strip() or "HomeGridBackup"
+            cloud_path = v_cloud_path.get().strip()
             if v_cloud_enabled.get():
                 try:
                     from core.cloud import validate_cloud_settings
                     cloud_path = validate_cloud_settings(cloud_remote, cloud_path)
                 except ValueError as exc:
-                    cloud_msg.configure(text=str(exc), fg=p["red"])
+                    cloud_msg.configure(text=tr(str(exc), lang_map.get(cb_lang.get(), "en")), fg=p["red"])
                     nb.select(tab_cloud)
                     return
+            else:
+                cloud_path = cloud_path or "HomeGridBackup"
             st["keep_last_count"] = max(1, int(v_keep_n.get()))
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))

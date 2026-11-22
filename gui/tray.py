@@ -236,15 +236,16 @@ def _tray_backend_available():
 
 
 def _tray_status_text(engine, language, elapsed_sec=0):
-    from core.files import format_duration
     from core.i18n import tr
 
     if not engine.is_running:
         return tr("Готовий до резервного копіювання", language)
-    stage = tr(engine.stage, language) if engine.stage else ""
     progress = int(engine.progress)
-    elapsed = format_duration(elapsed_sec, language)
-    return f"{tr('Резервне копіювання...', language)} {progress}% | {stage} | {elapsed}"
+    elapsed_sec = max(0, int(elapsed_sec))
+    hours, remainder = divmod(elapsed_sec, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    elapsed = f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+    return f"{tr('Архівація', language)} · {elapsed} · {progress}%"
 
 
 def _tray_problem():
@@ -442,10 +443,10 @@ def _start_tray_thread(engine):
                 sig = (cur_pct, engine.is_running, engine.pill_type)
                 elapsed_sec = _elapsed_seconds()
                 lng_s = engine.state.get("lang", "en")
-                if os.sys.platform == "darwin" and engine.is_running:
-                    new_title = f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
-                else:
-                    new_title = f"HomeGrid Backup ({cur_pct}%): {(engine.stage or '')[:45]}" if engine.is_running else "HomeGrid Backup"
+                new_title = (
+                    f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
+                    if engine.is_running else "HomeGrid Backup"
+                )
                 if os.sys.platform == "darwin":
                     sig_changed = sig != last_sig
                     if sig_changed:

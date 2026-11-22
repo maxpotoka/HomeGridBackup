@@ -91,11 +91,38 @@ jobs:
           test -n "$rclone_path"
           cp "$rclone_path" dist_mac/pack/HomeGridBackup.app/Contents/MacOS/rclone
           chmod +x dist_mac/pack/HomeGridBackup.app/Contents/MacOS/rclone
+          mkdir -p dist_mac/pack/HomeGridBackup.app/Contents/Resources
           curl -fsSL https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING \
             -o dist_mac/pack/HomeGridBackup.app/Contents/Resources/rclone-LICENSE.txt
           codesign --force --deep --sign - dist_mac/pack/HomeGridBackup.app
+          cat <<'INSTALL_EOF' > "dist_mac/pack/Install HomeGridBackup.command"
+          #!/bin/bash
+          set -euo pipefail
+          SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+          APP_SOURCE="$SCRIPT_DIR/HomeGridBackup.app"
+          DEST="$HOME/Applications/HomeGridBackup.app"
+          mkdir -p "$HOME/Applications"
+          ditto "$APP_SOURCE" "$DEST"
+          printf 'HomeGrid Backup installed to %s\n' "$DEST"
+          INSTALL_EOF
+          chmod +x "dist_mac/pack/Install HomeGridBackup.command"
           cd dist_mac/pack
-          7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app
+          7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app "Install HomeGridBackup.command"
+          cd ../..
+
+      - name: Create per-user macOS installation image
+        run: |
+          icon_args=()
+          if [ -f icon.icns ]; then
+            icon_args=(-volicon icon.icns)
+          fi
+          hdiutil create \
+            -volname "HomeGridBackup" \
+            -srcfolder dist_mac/pack \
+            "${icon_args[@]}" \
+            -ov \
+            -format UDZO \
+            dist_mac/HomeGridBackup_macOS_Intel.dmg
 
       - name: Set build completion timestamp
         id: build_time
@@ -114,8 +141,10 @@ jobs:
           tag_name: macos-intel-latest
           name: HomeGrid Backup — macOS Intel (x86_64) — ${{ steps.build_time.outputs.value }}
           body: |
-            Чистий архів **HomeGridBackup_macOS_Intel.7z** без подвійного пакування.
-            Працює без прав `root` (`sudo`). Після розпакування натисніть правою кнопкою по **HomeGridBackup.app** → **Відкрити** (або виконайте в Терміналі: `xattr -cr ~/Downloads/HomeGridBackup.app && open ~/Downloads/HomeGridBackup.app`).
-          files: dist_mac/HomeGridBackup_macOS_Intel.7z
+            Архів **HomeGridBackup_macOS_Intel.7z** збережений. Також доданий пер-користувацький образ **HomeGridBackup_macOS_Intel.dmg**.
+            В образі запустіть `Install HomeGridBackup.command`; програма встановиться в `~/Applications/HomeGridBackup.app` без прав адміністратора. Rclone 1.76.0 входить у комплект.
+          files: |
+            dist_mac/HomeGridBackup_macOS_Intel.7z
+            dist_mac/HomeGridBackup_macOS_Intel.dmg
           fail_on_unmatched_files: true
           make_latest: true

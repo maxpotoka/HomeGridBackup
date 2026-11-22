@@ -27,6 +27,14 @@ def _record_cloud_event(engine, operation_id, event, **details):
     except Exception as exc:
         engine.log(f"Попередження: не вдалося записати локальний звіт: {exc}", "warn")
 
+def _cloud_sync_warning(engine, prefix, exc):
+    from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+    from core.cloud import CloudRateLimitError, cloud_sync_error_text
+    if WINDOWS7_CLOUD_SYNC_PREVIEW and isinstance(exc, CloudRateLimitError):
+        engine.log(cloud_sync_error_text(exc, engine.state.get("lang", "en")), "warn")
+    else:
+        engine.log(f"{prefix}{exc}", "warn")
+
 def _sync_cloud_reports(engine):
     if not engine.state.get("cloud_enabled"):
         return
@@ -34,17 +42,24 @@ def _sync_cloud_reports(engine):
         from core.cloud import sync_cloud_reports
         sync_cloud_reports(engine)
     except Exception as exc:
-        engine.log(f"Попередження: не вдалося передати хмарний звіт: {exc}", "warn")
+        _cloud_sync_warning(engine, "Попередження: не вдалося передати хмарний звіт: ", exc)
+        from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            from core.cloud import start_cloud_sync_worker
+            start_cloud_sync_worker(engine)
 
 def _sync_cloud_backups(engine, prune=False):
     if not engine.state.get("cloud_enabled"):
         return False
     try:
         from core.cloud import sync_cloud_backups
-        sync_cloud_backups(engine, prune=prune)
-        return True
+        return sync_cloud_backups(engine, prune=prune) is not False
     except Exception as exc:
-        engine.log(f"Попередження: не вдалося синхронізувати хмарні архіви: {exc}", "warn")
+        _cloud_sync_warning(engine, "Попередження: не вдалося синхронізувати хмарні архіви: ", exc)
+        from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+        if WINDOWS7_CLOUD_SYNC_PREVIEW:
+            from core.cloud import start_cloud_sync_worker
+            start_cloud_sync_worker(engine)
         return False
 
 def _desktop_notify(title, text):

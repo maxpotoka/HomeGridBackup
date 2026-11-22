@@ -65,7 +65,7 @@ jobs:
           grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не застосувався"; exit 1; }
           echo "pystray patch OK"
 
-      - name: Build with Nuitka (onefile)
+      - name: Build with Nuitka (standalone folder)
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
@@ -73,7 +73,7 @@ jobs:
         run: |
           TYPELIB_DIR="/usr/lib/x86_64-linux-gnu/girepository-1.0"
           python -m nuitka \
-            --onefile \
+            --standalone \
             --enable-plugin=tk-inter \
             --disable-plugin=gi \
             --clang \
@@ -110,20 +110,29 @@ jobs:
             --output-filename=homegrid-backup \
             main.py
 
-      - name: Verify build output and create shortcut helper
+      - name: Assemble per-user install package
         run: |
-          test -f build/homegrid-backup || { echo "ERROR: Nuitka не створив виконуваний файл build/homegrid-backup"; exit 1; }
+          app_dist="$(find build -mindepth 1 -maxdepth 1 -type d -name '*.dist' -print -quit)"
+          test -n "$app_dist" || { echo "ERROR: Nuitka standalone folder not found"; exit 1; }
+          test -f "$app_dist/homegrid-backup" || { echo "ERROR: standalone executable not found"; exit 1; }
           mkdir -p dist
-          mv build/homegrid-backup dist/homegrid-backup
-          chmod +x dist/homegrid-backup
-          file dist/homegrid-backup
+          mkdir -p dist/HomeGridBackup
+          cp -a "$app_dist/." dist/HomeGridBackup/
+          mv dist/HomeGridBackup/homegrid-backup dist/HomeGridBackup/HomeGridBackup
+          chmod +x dist/HomeGridBackup/HomeGridBackup
+          cp icon.png dist/HomeGridBackup/homegrid-backup.png
+          cp icon.ico dist/HomeGridBackup/icon.ico
+          file dist/HomeGridBackup/HomeGridBackup
 
-          cat << 'EOF' > dist/install_shortcut.sh
+          cat << 'INSTALL_EOF' > dist/install.sh
           #!/usr/bin/env bash
-          set -e
-          APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-          BIN_PATH="$APP_DIR/homegrid-backup"
-          chmod +x "$BIN_PATH"
+          set -euo pipefail
+          SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+          APP_SOURCE="$SCRIPT_DIR/HomeGridBackup"
+          DEST="$HOME/.local/opt/HomeGridBackup"
+          mkdir -p "$DEST"
+          cp -a "$APP_SOURCE/." "$DEST/"
+          chmod +x "$DEST/HomeGridBackup" "$DEST/rclone"
           mkdir -p "$HOME/.local/share/applications"
           DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
           cat > "$DESKTOP_FILE" << EOD
@@ -131,24 +140,16 @@ jobs:
           Type=Application
           Name=HomeGrid Backup
           Comment=Inverter Data Backup Utility
-          Exec="$BIN_PATH" --gui
-          Icon=homegrid-backup
+          TryExec="$DEST/HomeGridBackup"
+          Exec="$DEST/HomeGridBackup" --gui
+          Icon="$DEST/homegrid-backup.png"
           Terminal=false
           Categories=Utility;Archiving;
           EOD
-          chmod +x "$DESKTOP_FILE"
-          if [ -d "$HOME/Desktop" ]; then
-            cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
-            chmod +x "$HOME/Desktop/homegrid-backup.desktop"
-          fi
-          ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
-          mkdir -p "$ICON_DIR"
-          cp "$APP_DIR/homegrid-backup.png" "$ICON_DIR/homegrid-backup.png"
-          echo "[OK] Shortcut created: $DESKTOP_FILE"
-          EOF
-          chmod +x dist/install_shortcut.sh
-          cp icon.png dist/homegrid-backup.png
-          cp icon.ico dist/icon.ico
+          chmod 644 "$DESKTOP_FILE"
+          printf 'HomeGrid Backup installed to %s\n' "$DEST"
+          INSTALL_EOF
+          chmod +x dist/install.sh
 
       - name: Bundle verified rclone for Linux x86_64
         run: |
@@ -158,14 +159,15 @@ jobs:
           7z x "$asset" -orclone-linux >/dev/null
           rclone_path="$(find rclone-linux -type f -name rclone -print -quit)"
           test -n "$rclone_path"
-          cp "$rclone_path" dist/rclone
-          chmod +x dist/rclone
-          curl -fsSL https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING -o dist/rclone-LICENSE.txt
+          cp "$rclone_path" dist/HomeGridBackup/rclone
+          chmod +x dist/HomeGridBackup/rclone
+          curl -fsSL https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING -o dist/HomeGridBackup/rclone-LICENSE.txt
+          bash -n dist/install.sh
 
-      - name: Package application into single .7z
+      - name: Package standalone folder into .7z
         run: |
           cd dist
-          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup rclone rclone-LICENSE.txt install_shortcut.sh homegrid-backup.png icon.ico
+          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z HomeGridBackup install.sh
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
@@ -186,9 +188,9 @@ jobs:
           tag_name: ubuntu-x64-latest
           name: HomeGrid Backup — Ubuntu (Linux x86_64) — ${{ steps.build_time.outputs.value }}
           body: |
-            Комплект містить виконуваний файл **homegrid-backup** (onefile) та rclone 1.76.0 для Linux x86_64.
-            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
-            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
+            Комплект містить standalone-папку **HomeGridBackup** з rclone 1.76.0 — запуск без розпакування onefile у тимчасовий каталог.
+            - Розпакуйте архів і запустіть `./install.sh`; програма встановиться для поточного користувача в `~/.local/opt/HomeGridBackup`.
+            - Установщик створить ярлик у меню програм. Права адміністратора не потрібні.
             Вимоги: Ubuntu 24.04 або новіша.
             Трей підтримується через StatusNotifier/AppIndicator та XEmbed у X11-панелях. У XFCE можна додати плагін Status Notifier або область сповіщень; у KDE Plasma увімкнути віджет «Системний лоток». Сумісні панелі також є в Cinnamon, MATE, Budgie і LXQt.
           files: homegrid-backup-ubuntu-x86_64.7z

@@ -16,12 +16,15 @@ __pycache__/
 /console/*
 !/core/
 /core/*
+!/core/build_variant.py
 !/gui/
 /gui/*
 !/mobile/
 /mobile/*
 !/tests/
 /tests/*
+!/packaging/
+/packaging/*
 
 # 4) точечно разрешаем файлы из списка
 !/build_x86.bat
@@ -62,3 +65,5 @@ __pycache__/
 !/tests/test_cloud.py
 !/tests/test_last_backup_info.py
 !/tests/test_tray_platforms.py
+
+!/packaging/windows_user_setup.iss

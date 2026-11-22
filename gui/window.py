@@ -12,6 +12,7 @@ import os
 import threading
 import tkinter as tk
 from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY
+from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 from core.files import open_folder_native, choose_folder_native, get_app_icon_path
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
@@ -94,6 +95,8 @@ class HomeGridApp(DialogsMixin):
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
+        if WINDOWS7_CLOUD_SYNC_PREVIEW and self.engine.state.get("cloud_enabled"):
+            self.root.after(5000, self._retry_pending_cloud_sync)
 
     def _setup_native_menubar(self):
         import sys
@@ -806,6 +809,16 @@ class HomeGridApp(DialogsMixin):
         self.engine.state["mirror_enabled"] = bool(self.var_mir_en.get()) and bool(self.engine.state["mirror_dir"])
         commit_state(self.engine.state)
         self._update_mirror_btn()
+    def _retry_pending_cloud_sync(self):
+        if not WINDOWS7_CLOUD_SYNC_PREVIEW or not self.engine.state.get("cloud_enabled"):
+            return
+        try:
+            from core.cloud import cloud_sync_queue_state, start_cloud_sync_worker
+            if cloud_sync_queue_state(self.engine)["total"]:
+                start_cloud_sync_worker(self.engine)
+        except Exception as exc:
+            self.engine.log(f"Не вдалося перевірити чергу хмарної синхронізації: {exc}", "warn")
+
     def _poll_ui(self):
         try:
             if self.root.state() in ("iconic", "withdrawn"):
