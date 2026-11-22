@@ -2,7 +2,8 @@ from core.i18n import tr
 # ==============================================================================
 # patch-id: idle-ui-cache-2.19
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/engine.py (v2.03 | 22.11.2026 09:10) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: archive-scan-cache-2.04
+# [ФАЙЛ: core/engine.py (v2.05 | 22.11.2026 09:10) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -112,6 +113,9 @@ class BackupEngine:
         self._last_backup_cache = None
         self._last_backup_cache_time = 0.0
         self._last_backup_cache_dir = None
+        self._archive_snapshot_cache = None
+        self._archive_snapshot_cache_time = 0.0
+        self._archive_snapshot_cache_dir = None
 
         os.makedirs(self.state["backup_dir"], exist_ok=True)
         mode_lbl = "HIDDEN" if HIDDEN_MODE else ("SILENT" if SILENT_MODE else ("CLI" if CLI_MODE else "APP"))
@@ -143,21 +147,32 @@ class BackupEngine:
 
     def set_progress(self, pct, stage_text=None):
         with self.lock:
+            changed = False
             if pct is None:
-                self.indeterminate = True
+                if not self.indeterminate:
+                    self.indeterminate = True
+                    changed = True
             else:
+                new_progress = max(0, min(100, int(pct)))
+                if self.indeterminate or new_progress != self.progress:
+                    changed = True
                 self.indeterminate = False
-                self.progress = max(0, min(100, int(pct)))
+                self.progress = new_progress
             if stage_text is not None:
-                self.stage = tr(stage_text, self.state.get("lang", "en"))
-        if not HIDDEN_MODE and (CLI_MODE or SILENT_MODE):
+                new_stage = tr(stage_text, self.state.get("lang", "en"))
+                if new_stage != self.stage:
+                    changed = True
+                    self.stage = new_stage
+        if changed and not HIDDEN_MODE and (CLI_MODE or SILENT_MODE):
             from console.terminal import _print_cli_line
             _print_cli_line(self)
 
     def set_pill(self, text, state_type="idle"):
         with self.lock:
-            self.pill_text = tr(text, self.state.get("lang", "en"))
-            self.pill_type = state_type
+            new_text = tr(text, self.state.get("lang", "en"))
+            if new_text != self.pill_text or state_type != self.pill_type:
+                self.pill_text = new_text
+                self.pill_type = state_type
 
     def ask_modal(self, mtype, title, text, default_val=""):
         lang = self.state.get("lang", "en")
@@ -193,23 +208,51 @@ class BackupEngine:
             not force
             and self._storage_stats_cache is not None
             and self._storage_stats_cache_dir == bdir
-            and (now - self._storage_stats_cache_time) < 8.0
+            and (now - self._storage_stats_cache_time) < 12.0
         )
         if cache_valid:
             return self._storage_stats_cache
-        os.makedirs(bdir, exist_ok=True)
-        zips = [os.path.join(bdir, f) for f in os.listdir(bdir) if not f.startswith(".") and f.lower().endswith(".zip")]
-        total_mb = round(sum(os.path.getsize(p) for p in zips) / 1048576.0, 1)
+        snapshot = self.get_archive_snapshot(force=True)
+        total_mb = round(sum(item["size"] for item in snapshot) / 1048576.0, 1)
         try:
             _, _, free_b = shutil.disk_usage(bdir)
             free_gb = round(free_b / 1073741824.0, 1)
         except Exception:
             free_gb = -1.0
-        result = (len(zips), total_mb, free_gb)
+        result = (len(snapshot), total_mb, free_gb)
         self._storage_stats_cache = result
         self._storage_stats_cache_time = now
         self._storage_stats_cache_dir = bdir
         return result
+
+    def get_archive_snapshot(self, force=False):
+        bdir = self.state["backup_dir"]
+        now = time.time()
+        cache_valid = (
+            not force
+            and self._archive_snapshot_cache is not None
+            and self._archive_snapshot_cache_dir == bdir
+            and (now - self._archive_snapshot_cache_time) < 12.0
+        )
+        if cache_valid:
+            return self._archive_snapshot_cache
+        os.makedirs(bdir, exist_ok=True)
+        snapshot = []
+        try:
+            with os.scandir(bdir) as entries:
+                for entry in entries:
+                    if entry.name.startswith(".") or not entry.name.lower().endswith(".zip"):
+                        continue
+                    if entry.is_file(follow_symlinks=False):
+                        st = entry.stat(follow_symlinks=False)
+                        snapshot.append({"path": entry.path, "name": entry.name, "size": st.st_size, "mtime": st.st_mtime})
+        except Exception:
+            pass
+        snapshot.sort(key=lambda item: item["mtime"], reverse=True)
+        self._archive_snapshot_cache = snapshot
+        self._archive_snapshot_cache_time = now
+        self._archive_snapshot_cache_dir = bdir
+        return snapshot
 
     def _seed_op_history_from_disk(self):
         bdir = self.state.get("backup_dir", "")
@@ -254,6 +297,7 @@ class BackupEngine:
         self.state["op_history"] = self.op_history
         self._storage_stats_cache_time = 0.0
         self._last_backup_cache_time = 0.0
+        self._archive_snapshot_cache_time = 0.0
         try:
             commit_state(self.state)
         except Exception:
@@ -267,7 +311,7 @@ class BackupEngine:
             not force
             and getattr(self, "_last_backup_cache", None) is not None
             and getattr(self, "_last_backup_cache_dir", None) == bdir
-            and (now - getattr(self, "_last_backup_cache_time", 0.0)) < 8.0
+            and (now - getattr(self, "_last_backup_cache_time", 0.0)) < 12.0
         )
         if cache_valid:
             return self._last_backup_cache
@@ -275,18 +319,14 @@ class BackupEngine:
             res = ("Ще немає створених копій", "idle")
         else:
             try:
-                zips = [
-                    os.path.join(bdir, f) for f in os.listdir(bdir)
-                    if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
-                ]
+                zips = self.get_archive_snapshot(force=force)
                 if not zips:
                     res = ("Ще немає створених копій", "idle")
                 else:
-                    latest = max(zips, key=os.path.getmtime)
-                    st = os.stat(latest)
-                    dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%H:%M  (%d.%m.%Y)")
-                    mb_s = round(st.st_size / 1048576.0, 1)
-                    has_sha = os.path.exists(latest + ".sha256")
+                    latest = zips[0]
+                    dt_s = datetime.fromtimestamp(latest["mtime"]).strftime("%H:%M  (%d.%m.%Y)")
+                    mb_s = round(latest["size"] / 1048576.0, 1)
+                    has_sha = os.path.exists(latest["path"] + ".sha256")
                     if has_sha:
                         res = (f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok")
                     else:

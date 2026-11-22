@@ -1,7 +1,8 @@
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/backup.py (v2.10 | 22.11.2026 09:10) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: adaptive-status-poll-2.11
+# [ФАЙЛ: core/backup.py (v2.12 | 22.11.2026 09:10) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -172,7 +173,7 @@ def _backup_stage1_prepare(engine, raw_url, force_skip):
 
 VERIFY_PAUSE_LITE = 0.012  # пауза в LITE, с на каждые 4 МБ (подбирается замером)
 
-def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=131072, cancel_flag=None, io_pause=0.0):
+def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=1048576, cancel_flag=None, io_pause=0.0):
     name = os.path.basename(zip_path)
     if not os.path.isfile(zip_path):
         return {"name": name, "status": "err", "detail": "Файл не знайдено"}
@@ -247,7 +248,7 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
     except Exception as e:
         return {"name": name, "status": "err", "detail": f"Помилка перевірки SHA-256: {e}"}
 
-def verify_all_archives(state, progress_callback=None, buf_size=131072, cancel_flag=None):
+def verify_all_archives(state, progress_callback=None, buf_size=1048576, cancel_flag=None):
     t0 = time.time()
     io_pause = VERIFY_PAUSE_LITE if state.get("lite_mode") else 0.0
     bdir = state["backup_dir"]
@@ -294,8 +295,9 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
     tot_b = 0
     job_retries = 0
     bad_json_cnt = 0
+    poll_interval = 1.5
     while True:
-        time.sleep(2.5)
+        time.sleep(poll_interval)
         _, sr_code, sr_body, _, sr_err, _ = invoke_http(f"{srv}/api/migration/export/status?job_id={job_id}", engine.state, timeout=45.0)
         if not sr_body or not sr_body.strip():
             bad_json_cnt += 1
@@ -347,6 +349,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
 
         pct = int(st.get("progress", 0))
         ph = st.get("phase") or "working"
+        poll_interval = 1.5 if ph in ("preparing", "ready") else (4.0 if ph in ("checking", "packing") else 2.5)
         tot_b = st.get("total_bytes", 0) or 0
         proc_b = st.get("processed_bytes", 0) or 0
         if ph != last_phase:
@@ -410,7 +413,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     handlers.append(urllib.request.ProxyHandler({}))
                 opener = urllib.request.build_opener(*handlers)
                 req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
-                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=131072) as out_f:
+                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=1048576) as out_f:
                     srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
                     net_h = hashlib.sha256()
                     cb = 0
@@ -419,7 +422,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     last_speed_bytes = 0
                     smooth_speed = None
                     while True:
-                        chunk = resp.read(131072)
+                        chunk = resp.read(1048576)
                         if not chunk:
                             break
                         out_f.write(chunk)
@@ -498,7 +501,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             for info in infos:
                 crc = 0
                 with zf.open(info, "r") as member:
-                    for chunk in iter(lambda: member.read(131072), b""):
+                    for chunk in iter(lambda: member.read(1048576), b""):
                         crc = zlib.crc32(chunk, crc)
                 if (crc & 0xFFFFFFFF) != info.CRC:
                     os.remove(out_file)
@@ -510,7 +513,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         processed = 0
         last_ui = time.time()
         with open(out_file, "rb") as f_in:
-            for blk in iter(lambda: f_in.read(131072), b""):
+            for blk in iter(lambda: f_in.read(1048576), b""):
                 h.update(blk)
                 processed += len(blk)
                 if time.time() - last_ui >= 0.8:

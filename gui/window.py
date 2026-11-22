@@ -4,7 +4,9 @@ from core.i18n import tr, apply_widget_i18n
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: mirror-btn-sig-2.22
-# [ФАЙЛ: gui/window.py (v2.10 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: adaptive-ui-poll-2.11
+# patch-id: ui-widget-signatures-2.12
+# [ФАЙЛ: gui/window.py (v2.12 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -655,17 +657,18 @@ class HomeGridApp(DialogsMixin):
                     pass
 
     def _update_mirror_btn(self):
-        p = self._get_palette()
-        fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
         is_lite = bool(self.engine.state.get("lite_mode", False))
-        fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         is_run = bool(getattr(self.engine, "is_running", False))
         checked = bool(self.engine.state.get("mirror_enabled", False))
-        _mir_sig = (checked, is_run, lang, is_lite, fs, self.engine.state.get("theme", "dark"))
+        fs = self.metrics["font_sz"]
+        theme = self.engine.state.get("theme", "dark")
+        _mir_sig = (checked, is_run, lang, is_lite, fs, theme)
         if getattr(self, "_mir_btn_sig", None) == _mir_sig:
             return
         self._mir_btn_sig = _mir_sig
+        p = self._get_palette()
+        fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         self.var_mir_en.set(checked)
         f_state = "disabled" if (is_run or not checked) else "normal"
         self.chk_mir_tog.configure(
@@ -805,7 +808,7 @@ class HomeGridApp(DialogsMixin):
                     self.var_srv.set(srv_in_state)
 
             now_m = time.monotonic()
-            if now_m - getattr(self, '_last_disk_t', 0.0) >= 3.5 or not self.engine.is_running:
+            if now_m - getattr(self, '_last_disk_t', 0.0) >= 5.5 or not self.engine.is_running:
                 self._last_disk_t = now_m
                 self._cached_disk = self.engine.get_storage_stats()
             cur_lang = st.get("lang", "en")
@@ -865,10 +868,13 @@ class HomeGridApp(DialogsMixin):
 
             btn_state = "disabled" if self.engine.is_running else "normal"
             btns_changed = False
-            for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
-                if str(b.cget("state")) != btn_state:
-                    b.configure(state=btn_state)
-                    btns_changed = True
+            _action_btn_sig = (btn_state, cur_lang, cur_theme, cur_lite)
+            if getattr(self, '_last_action_btn_sig', None) != _action_btn_sig:
+                self._last_action_btn_sig = _action_btn_sig
+                for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
+                    if str(b.cget("state")) != btn_state:
+                        b.configure(state=btn_state)
+                        btns_changed = True
             self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
@@ -885,7 +891,8 @@ class HomeGridApp(DialogsMixin):
             if btns_changed:
                 fix_mac_buttons(self.root, self._get_palette())
 
-            logs = self.engine.logs
+            with self.engine.lock:
+                logs = list(self.engine.logs)
             if not logs and self.last_log_len != 0:
                 self.txt_log.configure(state="normal")
                 self.txt_log.delete("1.0", "end")
@@ -945,7 +952,7 @@ class HomeGridApp(DialogsMixin):
             pass
         lite = bool(self.engine.state.get("lite_mode", False))
         if self.engine.is_running:
-            delay = 500 if lite else 300
+            delay = 650 if lite else 450
         else:
-            delay = 1000 if lite else 600
+            delay = 1200 if lite else 800
         self.root.after(delay, self._poll_ui)
