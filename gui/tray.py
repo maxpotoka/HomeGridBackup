@@ -7,6 +7,7 @@ import time
 import ctypes
 import threading
 
+
 def _clean_sys_env():
     env = os.environ.copy()
     env["LC_ALL"] = "C"
@@ -36,8 +37,95 @@ def _has_appindicator_gi():
         pass
     return False
 
+
+def _has_gtk_gi():
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk
+        return Gtk is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _has_sni_watcher(env):
+    import re
+    import shutil
+    import subprocess
+
+    commands = (
+        ("dbus-send", [
+            "--session", "--dest=org.freedesktop.DBus", "--type=method_call",
+            "--print-reply", "/org/freedesktop/DBus",
+            "org.freedesktop.DBus.NameHasOwner",
+            "string:org.kde.StatusNotifierWatcher",
+        ]),
+        ("gdbus", [
+            "call", "--session", "--dest", "org.freedesktop.DBus",
+            "--object-path", "/org/freedesktop/DBus", "--method",
+            "org.freedesktop.DBus.NameHasOwner",
+            "org.kde.StatusNotifierWatcher",
+        ]),
+        ("busctl", [
+            "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus",
+            "org.freedesktop.DBus", "NameHasOwner", "s",
+            "org.kde.StatusNotifierWatcher",
+        ]),
+    )
+    for executable, args in commands:
+        if not shutil.which(executable, path=env.get("PATH")):
+            continue
+        try:
+            out = subprocess.check_output(
+                [executable, *args],
+                env=env,
+                stderr=subprocess.DEVNULL,
+                timeout=0.9,
+            ).decode("utf-8", errors="ignore")
+            if re.search(r"\btrue\b", out, re.I):
+                return True
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return False
+
+
+def _has_x11_tray_manager():
+    if not os.environ.get("DISPLAY"):
+        return False
+    try:
+        from ctypes.util import find_library
+        x11_path = find_library("X11")
+        if not x11_path:
+            return False
+        x11 = ctypes.CDLL(x11_path)
+    except OSError:
+        return False
+
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
+    x11.XDefaultScreen.restype = ctypes.c_int
+    x11.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+    x11.XInternAtom.restype = ctypes.c_ulong
+    x11.XGetSelectionOwner.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    x11.XGetSelectionOwner.restype = ctypes.c_ulong
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    x11.XCloseDisplay.restype = ctypes.c_int
+
+    display = x11.XOpenDisplay(os.environ["DISPLAY"].encode("utf-8"))
+    if not display:
+        return False
+    try:
+        screen = x11.XDefaultScreen(display)
+        selection = f"_NET_SYSTEM_TRAY_S{screen}".encode("ascii")
+        atom = x11.XInternAtom(display, selection, 0)
+        return bool(atom and x11.XGetSelectionOwner(display, atom))
+    finally:
+        x11.XCloseDisplay(display)
+
+
 def _detect_linux_tray_backend():
-    import sys, re as _re, subprocess
+    import sys
     if not sys.platform.startswith("linux"):
         return "native"
     from core.config import IS_WSL
@@ -47,27 +135,10 @@ def _detect_linux_tray_backend():
         if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
             os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
     sys_env = _clean_sys_env()
-    has_sni = False
-    for cmd in (
-        ["dbus-send", "--session", "--dest=org.freedesktop.DBus", "--type=method_call", "--print-reply", "/org/freedesktop/DBus", "org.freedesktop.DBus.NameHasOwner", "string:org.kde.StatusNotifierWatcher"],
-        ["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus", "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner", "org.kde.StatusNotifierWatcher"],
-        ["busctl", "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", "s", "org.kde.StatusNotifierWatcher"],
-    ):
-        try:
-            out = subprocess.check_output(cmd, env=sys_env, stderr=subprocess.DEVNULL, timeout=0.9).decode("utf-8", errors="ignore")
-            if _re.search(r"\btrue\b", out, _re.I):
-                has_sni = True
-                break
-        except Exception:
-            pass
-    if has_sni:
+    if _has_sni_watcher(sys_env):
         return "appindicator" if _has_appindicator_gi() else "auto"
-    try:
-        out_x = subprocess.check_output(["xprop", "-root", "_NET_SYSTEM_TRAY_S0"], env=sys_env, stderr=subprocess.DEVNULL, timeout=0.6).decode("utf-8", errors="ignore")
-        if "window id #" in out_x and "0x0" not in out_x:
-            return "xorg"
-    except Exception:
-        pass
+    if _has_x11_tray_manager():
+        return "gtk" if _has_gtk_gi() else "xorg"
     return ""
 
 _LNX_TRAY_BE = ""
@@ -157,6 +228,19 @@ def _force_quit_app(engine):
 def _can_dock_linux_tray():
     return bool(_LNX_TRAY_BE)
 
+
+def _tray_status_text(engine, language, elapsed_sec=0):
+    from core.files import format_duration
+    from core.i18n import tr
+
+    if not engine.is_running:
+        return tr("Готовий до резервного копіювання", language)
+    stage = tr(engine.stage, language) if engine.stage else ""
+    progress = int(engine.progress)
+    elapsed = format_duration(elapsed_sec, language)
+    return f"{tr('Резервне копіювання...', language)} {progress}% | {stage} | {elapsed}"
+
+
 def _tray_problem():
     import sys
     if not HAS_TRAY:
@@ -169,7 +253,7 @@ def _tray_problem():
             return "Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель"
         if "GNOME" in de or "UNITY" in de:
             return "Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support"
-        if "KDE" in de:
+        if "KDE" in de or "PLASMA" in de:
             return "Трей KDE: перевірте, що увімкнено віджет «Системний лоток»"
         return "Панель не підтримує трей (потрібен StatusNotifier або XEmbed)"
     return "Системний трей недоступний"
@@ -197,7 +281,7 @@ def _start_tray_thread(engine):
             global _LNX_TRAY_BE, _LNX_TRAY_PROBED
             _LNX_TRAY_BE = _detect_linux_tray_backend()
             _LNX_TRAY_PROBED = True
-            if _LNX_TRAY_BE in ("appindicator", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
+            if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
                 os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
             if not _LNX_TRAY_BE:
                 with _TRAY_LOCK:
@@ -271,17 +355,25 @@ def _start_tray_thread(engine):
                 engine.app_ref.root.after(0, _run_ui_dlg)
         return _cb
 
+    run_started_at = None
+
+    def _elapsed_seconds():
+        nonlocal run_started_at
+        if not engine.is_running:
+            run_started_at = None
+            return 0
+        if run_started_at is None:
+            run_started_at = time.monotonic()
+        return int(time.monotonic() - run_started_at)
+
     def _build_tray_menu():
         lng_s = engine.state.get("lang", "en")
-        st_txt = (
-            tr(f"Резервне копіювання... ({int(engine.progress)}%)", lng_s)
-            if engine.is_running else
-            tr("Готовий до резервного копіювання", lng_s)
-        )
+        elapsed_sec = _elapsed_seconds()
+        st_txt = _tray_status_text(engine, lng_s, elapsed_sec)
         return pystray.Menu(
-            pystray.MenuItem(st_txt, lambda i, it: None, enabled=False),
-            pystray.Menu.SEPARATOR,
             pystray.MenuItem(tr("Відкрити HomeGrid Backup", lng_s), _on_open, default=True, enabled=lambda item: engine.app_ref is not None),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(st_txt, lambda i, it: None, enabled=False),
             pystray.MenuItem(tr("▶ Запустити резервне копіювання", lng_s), _on_backup, enabled=lambda item: not engine.is_running),
             pystray.MenuItem(tr("Відкрити папку", lng_s), _on_open_folder),
             pystray.Menu.SEPARATOR,
@@ -321,6 +413,11 @@ def _start_tray_thread(engine):
             except Exception:
                 pass
 
+    def _refresh_tray_menu():
+        if engine.tray_icon is not None:
+            engine.tray_icon.menu = _build_tray_menu()
+            engine.tray_icon.update_menu()
+
     def _anim_loop():
         err_streak = 0
         last_sig, last_title = None, ""
@@ -337,26 +434,36 @@ def _start_tray_thread(engine):
                     continue
                 cur_pct = int(engine.progress) if engine.is_running else 0
                 sig = (cur_pct, engine.is_running, engine.pill_type)
-                new_title = f"HomeGrid Backup ({cur_pct}%): {(engine.stage or '')[:45]}" if engine.is_running else "HomeGrid Backup"
+                elapsed_sec = _elapsed_seconds()
+                lng_s = engine.state.get("lang", "en")
+                if os.sys.platform == "darwin" and engine.is_running:
+                    new_title = f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
+                else:
+                    new_title = f"HomeGrid Backup ({cur_pct}%): {(engine.stage or '')[:45]}" if engine.is_running else "HomeGrid Backup"
                 if os.sys.platform == "darwin":
-                    if sig != last_sig:
+                    sig_changed = sig != last_sig
+                    if sig_changed:
                         last_sig = sig
                         if engine.app_ref is not None:
                             _im_mac = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
                             engine.app_ref.root.after(0, lambda im=_im_mac: setattr(engine.tray_icon, "icon", im) if engine.tray_icon else None)
+                    if engine.is_running or sig_changed:
+                        if engine.app_ref is not None:
+                            engine.app_ref.root.after(0, _refresh_tray_menu)
+                        else:
+                            _refresh_tray_menu()
                     if new_title != last_title:
                         last_title = new_title
                         if engine.app_ref is not None:
                             engine.app_ref.root.after(0, lambda t=new_title: setattr(engine.tray_icon, "title", t) if engine.tray_icon else None)
                 else:
-                    if sig != last_sig:
+                    sig_changed = sig != last_sig
+                    if sig_changed:
                         engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
-                        try:
-                            engine.tray_icon.menu = _build_tray_menu()
-                            engine.tray_icon.update_menu()
-                        except Exception:
-                            pass
                         last_sig = sig
+                    if os.sys.platform != "darwin" or sig_changed:
+                        engine.tray_icon.menu = _build_tray_menu()
+                        engine.tray_icon.update_menu()
                     if new_title != last_title:
                         engine.tray_icon.title = new_title
                         last_title = new_title

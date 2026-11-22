@@ -112,6 +112,7 @@ jobs:
             --include-package-data=pystray \
             --include-package-data=PIL \
             --include-module=send2trash \
+            --include-data-files=icon.ico=icon.ico \
             --nofollow-import-to=gi,mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test \
             --output-dir=build32 \
             --output-filename=homegrid-backup \
@@ -142,7 +143,7 @@ jobs:
           Name=HomeGrid Backup
           Comment=Inverter Data Backup Utility
           Exec="$BIN_PATH" --gui
-          Icon=drive-harddisk
+          Icon=homegrid-backup
           Terminal=false
           Categories=Utility;Archiving;
           EOD
@@ -151,14 +152,19 @@ jobs:
             cp "$DESKTOP_FILE" "$HOME/Desktop/homegrid-backup.desktop"
             chmod +x "$HOME/Desktop/homegrid-backup.desktop"
           fi
+          ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+          mkdir -p "$ICON_DIR"
+          cp "$APP_DIR/homegrid-backup.png" "$ICON_DIR/homegrid-backup.png"
           echo "[OK] Shortcut created: $DESKTOP_FILE"
           EOF
           chmod +x dist32/install_shortcut.sh
+          cp icon.png dist32/homegrid-backup.png
+          cp icon.ico dist32/icon.ico
 
       - name: Package into .7z
         run: |
           cd dist32
-          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup install_shortcut.sh
+          7z a -t7z -mx=9 ../homegrid-backup-linux-i386-legacy.7z homegrid-backup install_shortcut.sh homegrid-backup.png icon.ico
           cd ..
           ls -lh homegrid-backup-linux-i386-legacy.7z
 

@@ -147,13 +147,22 @@ def format_duration(sec, lang="uk"):
 
 def get_app_icon_path():
     import sys
-    cands = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon.ico"),
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    compiled_dir = getattr(globals().get("__compiled__"), "containing_dir", "")
+    cands = []
+    if compiled_dir:
+        cands.extend((
+            os.path.join(compiled_dir, "icon.ico"),
+            os.path.join(os.path.dirname(compiled_dir), "Resources", "icon.ico"),
+        ))
+    cands.extend((
+        os.path.join(module_dir, "icon.ico"),
+        os.path.join(os.path.dirname(module_dir), "icon.ico"),
         os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "icon.ico"),
         os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "icon.ico"),
         os.path.join(getattr(sys, "_MEIPASS", ""), "icon.ico"),
         os.path.join(os.getcwd(), "icon.ico"),
-    ]
+    ))
     for c in cands:
         if c and os.path.isfile(c):
             return c
