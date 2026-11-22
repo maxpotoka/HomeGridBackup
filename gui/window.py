@@ -1,7 +1,9 @@
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/window.py (v2.07 | 22.11.2026 02:07) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: idle-ui-cache-2.19
+# patch-id: opt-log-i18n-ui-2.20
+# [ФАЙЛ: gui/window.py (v2.09 | 22.11.2026 08:29) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -176,7 +178,10 @@ class HomeGridApp(DialogsMixin):
         try:
             if not self.root.winfo_exists():
                 return
-            if time.time() >= getattr(self, "_ignore_resize_until", 0) and self.root.state() != "iconic":
+            if self.root.state() in ("iconic", "withdrawn"):
+                self.root.after(2000, self._watch_size)
+                return
+            if time.time() >= getattr(self, "_ignore_resize_until", 0):
                 w, h = self.root.winfo_width(), self.root.winfo_height()
                 if w >= 500 and h >= 350:
                     if (w, h) != self._last_live_wh:
@@ -779,6 +784,13 @@ class HomeGridApp(DialogsMixin):
         self._update_mirror_btn()
     def _poll_ui(self):
         try:
+            if self.root.state() in ("iconic", "withdrawn"):
+                if self.engine.modal and self.engine.modal.get("id") != self.last_modal_id:
+                    self.last_modal_id = self.engine.modal["id"]
+                    self.show_window()
+                    self._show_engine_modal(self.engine.modal)
+                self.root.after(2000, self._poll_ui)
+                return
             st = self.engine.state
             srv_in_state = (st.get("server") or "").strip()
             last_synced = getattr(self, "_last_synced_srv", srv_in_state)
@@ -791,29 +803,48 @@ class HomeGridApp(DialogsMixin):
             if now_m - getattr(self, '_last_disk_t', 0.0) >= 3.5 or not self.engine.is_running:
                 self._last_disk_t = now_m
                 self._cached_disk = self.engine.get_storage_stats()
+            cur_lang = st.get("lang", "en")
+            cur_theme = st.get("theme", "dark")
+            cur_lite = bool(st.get("lite_mode", False))
+            cur_fs = self.metrics["font_sz"]
+
             z_cnt, z_mb, free_gb = getattr(self, '_cached_disk', (0, 0.0, -1))
-            free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
-            self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", st.get("lang", "en")))
+            _disk_sig = (z_cnt, z_mb, free_gb, cur_lang)
+            if getattr(self, '_last_disk_sig', None) != _disk_sig:
+                self._last_disk_sig = _disk_sig
+                free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
+                self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", cur_lang))
 
             if hasattr(self.engine, "get_last_backup_info") and hasattr(self, "t3_val"):
                 lb_txt, lb_st = self.engine.get_last_backup_info()
-                self.var_last_bkp.set(tr(lb_txt, st.get("lang", "en")))
-                p_cur = self._get_palette()
-                self.t3_val.configure(fg=p_cur["green"] if lb_st == "ok" else (p_cur["amber"] if lb_st == "warn" else p_cur["muted"]))
+                _lb_sig = (lb_txt, lb_st, cur_lang, cur_theme, cur_lite)
+                if getattr(self, '_last_lb_sig', None) != _lb_sig:
+                    self._last_lb_sig = _lb_sig
+                    self.var_last_bkp.set(tr(lb_txt, cur_lang))
+                    p_cur = self._get_palette()
+                    self.t3_val.configure(fg=p_cur["green"] if lb_st == "ok" else (p_cur["amber"] if lb_st == "warn" else p_cur["muted"]))
 
             if hasattr(self, "lbl_pill"):
-                p_cur = self._get_palette()
                 ptype = getattr(self.engine, "pill_type", "idle")
                 ptxt = getattr(self.engine, "pill_text", "") or "Очікування"
                 if " | " in ptxt and ptype == "idle":
                     ptxt = "Очікування"
-                pill_fg = {"ok": p_cur.get("pill_ok_fg", p_cur["green"]), "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
-                pill_bg = p_cur.get("pill_ok_bg", p_cur["card"]) if ptype in ("ok", "idle") and "pill_ok_bg" in p_cur else p_cur["card"]
-                bd_pill = 0 if "pill_ok_bg" in p_cur else 1
-                self.lbl_pill.configure(text=tr(ptxt, st.get("lang", "en")), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=(self._base_fam, max(8, self.metrics["font_sz"] - 1), "bold"))
+                _pill_sig = (ptype, ptxt, cur_lang, cur_theme, cur_lite, cur_fs)
+                if getattr(self, '_last_pill_sig', None) != _pill_sig:
+                    self._last_pill_sig = _pill_sig
+                    p_cur = self._get_palette()
+                    pill_fg = {"ok": p_cur.get("pill_ok_fg", p_cur["green"]), "run": p_cur["cyan"], "warn": p_cur["amber"], "err": p_cur["red"]}.get(ptype, p_cur["muted"])
+                    pill_bg = p_cur.get("pill_ok_bg", p_cur["card"]) if ptype in ("ok", "idle") and "pill_ok_bg" in p_cur else p_cur["card"]
+                    bd_pill = 0 if "pill_ok_bg" in p_cur else 1
+                    self.lbl_pill.configure(text=tr(ptxt, cur_lang), bg=pill_bg, fg=pill_fg, bd=bd_pill, highlightbackground=p_cur["border"], font=(self._base_fam, max(8, cur_fs - 1), "bold"))
 
-            self.var_stage.set(self.engine.stage)
-            self.var_pct.set(tr("пошук...", st.get("lang", "en")) if self.engine.indeterminate else f"{self.engine.progress}%")
+            if getattr(self, '_last_stage_val', None) != self.engine.stage:
+                self._last_stage_val = self.engine.stage
+                self.var_stage.set(self.engine.stage)
+            _pct_sig = (self.engine.indeterminate, self.engine.progress, cur_lang)
+            if getattr(self, '_last_pct_sig', None) != _pct_sig:
+                self._last_pct_sig = _pct_sig
+                self.var_pct.set(tr("пошук...", cur_lang) if self.engine.indeterminate else f"{self.engine.progress}%")
             _psig = (self.engine.progress, self.engine.indeterminate, self.engine.stage, st.get('progress_style', 'v8'), bool(st.get('lite_mode', False)))
             if getattr(self, '_last_psig', None) != _psig or self.engine.indeterminate:
                 self._last_psig = _psig
@@ -836,13 +867,16 @@ class HomeGridApp(DialogsMixin):
             self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
-                if len(disc) >= 1 and not self.engine.is_running:
-                    self.btn_pick_lan.configure(text=tr(f"Виявлені ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
-                    if not self.btn_pick_lan.winfo_ismapped():
-                        self.btn_pick_lan.grid(row=0, column=5, sticky="ew", padx=(4, 0), pady=2)
-                    btns_changed = True
-                elif self.btn_pick_lan.winfo_ismapped():
-                    self.btn_pick_lan.grid_remove()
+                _lan_sig = (len(disc), self.engine.is_running, st.get("lang", "en"))
+                if getattr(self, '_last_lan_sig', None) != _lan_sig:
+                    self._last_lan_sig = _lan_sig
+                    if len(disc) >= 1 and not self.engine.is_running:
+                        self.btn_pick_lan.configure(text=tr(f"Виявлені ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
+                        if not self.btn_pick_lan.winfo_ismapped():
+                            self.btn_pick_lan.grid(row=0, column=5, sticky="ew", padx=(4, 0), pady=2)
+                        btns_changed = True
+                    elif self.btn_pick_lan.winfo_ismapped():
+                        self.btn_pick_lan.grid_remove()
             if btns_changed:
                 fix_mac_buttons(self.root, self._get_palette())
 

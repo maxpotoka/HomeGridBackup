@@ -4,7 +4,8 @@ import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
-# [ФАЙЛ: gui/dialogs.py (v2.08 | 22.11.2026 08:15)
+# patch-id: stage-window-2.21
+# [ФАЙЛ: gui/dialogs.py (v2.09 | 22.11.2026 09:10)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -279,6 +280,7 @@ class DialogsMixin:
                 ("Збір та копіювання даних на сервері:" if lang == "uk" else "Server data collection & copy:", d.get("srv_copy_sec", 0.0), p["text"]),
                 ("Стиснення та пакування ZIP на сервері:" if lang == "uk" else "Server ZIP archive packing:", d.get("srv_pack_sec", d.get("srv_sec", 0.0)), p["text"]),
                 ("Перевірка файлів на сервері:" if lang == "uk" else "Server file verification:", d.get("srv_chk_sec", 0.0), p["text"]),
+                ("Обробка на сервері:" if lang == "uk" else "Processing on server:", d.get("srv_proc_sec", 0.0), p["text"]),
                 (f"Скачування по мережі ({spd_s} {'МБ/с' if lang == 'uk' else 'MB/s'}):" if lang == "uk" else f"Network download ({spd_s} MB/s):", d.get("dl_sec", 0.0), p["cyan"]),
                 ("Перевірка архіву CRC32 (програма):" if lang == "uk" else "Local CRC32 integrity check:", d.get("crc_sec", d.get("ver_sec", 0.0)), p["text"]),
                 ("Розрахунок та звірка SHA-256:" if lang == "uk" else "Local SHA-256 hash verification:", d.get("sha_sec", 0.0), p["text"]),

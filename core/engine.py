@@ -1,6 +1,8 @@
 from core.i18n import tr
 # ==============================================================================
-# [ФАЙЛ: core/engine.py (v2.01 | 21.11.2026 22:30) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: idle-ui-cache-2.19
+# patch-id: stage-window-2.21
+# [ФАЙЛ: core/engine.py (v2.03 | 22.11.2026 09:10) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -15,6 +17,7 @@ from core.config import (
 )
 
 _CON_TR_MAP = (
+    ("Обробка на сервері", "Processing on server"),
     ("Систему запущено", "System started"),
     ("сховище:", "storage:"),
     ("Каталог:", "Dir:"),
@@ -106,6 +109,9 @@ class BackupEngine:
         self._storage_stats_cache = None
         self._storage_stats_cache_time = 0.0
         self._storage_stats_cache_dir = None
+        self._last_backup_cache = None
+        self._last_backup_cache_time = 0.0
+        self._last_backup_cache_dir = None
 
         os.makedirs(self.state["backup_dir"], exist_ok=True)
         mode_lbl = "HIDDEN" if HIDDEN_MODE else ("SILENT" if SILENT_MODE else ("CLI" if CLI_MODE else "APP"))
@@ -246,33 +252,51 @@ class BackupEngine:
         self.op_history.insert(0, entry)
         self.op_history = self.op_history[:25]
         self.state["op_history"] = self.op_history
+        self._storage_stats_cache_time = 0.0
+        self._last_backup_cache_time = 0.0
         try:
             commit_state(self.state)
         except Exception:
             pass
 
-    def get_last_backup_info(self):
+    def get_last_backup_info(self, force=False):
         from datetime import datetime
         bdir = self.state.get("backup_dir", "")
+        now = time.time()
+        cache_valid = (
+            not force
+            and getattr(self, "_last_backup_cache", None) is not None
+            and getattr(self, "_last_backup_cache_dir", None) == bdir
+            and (now - getattr(self, "_last_backup_cache_time", 0.0)) < 8.0
+        )
+        if cache_valid:
+            return self._last_backup_cache
         if not bdir or not os.path.isdir(bdir):
-            return "Ще немає створених копій", "idle"
-        try:
-            zips = [
-                os.path.join(bdir, f) for f in os.listdir(bdir)
-                if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
-            ]
-            if not zips:
-                return "Ще немає створених копій", "idle"
-            latest = max(zips, key=os.path.getmtime)
-            st = os.stat(latest)
-            dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%H:%M  (%d.%m.%Y)")
-            mb_s = round(st.st_size / 1048576.0, 1)
-            has_sha = os.path.exists(latest + ".sha256")
-            if has_sha:
-                return f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok"
-            return f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn"
-        except Exception:
-            return "Невідомо", "idle"
+            res = ("Ще немає створених копій", "idle")
+        else:
+            try:
+                zips = [
+                    os.path.join(bdir, f) for f in os.listdir(bdir)
+                    if not f.startswith(".") and f.lower().endswith(".zip") and os.path.isfile(os.path.join(bdir, f))
+                ]
+                if not zips:
+                    res = ("Ще немає створених копій", "idle")
+                else:
+                    latest = max(zips, key=os.path.getmtime)
+                    st = os.stat(latest)
+                    dt_s = datetime.fromtimestamp(st.st_mtime).strftime("%H:%M  (%d.%m.%Y)")
+                    mb_s = round(st.st_size / 1048576.0, 1)
+                    has_sha = os.path.exists(latest + ".sha256")
+                    if has_sha:
+                        res = (f"{dt_s}  •  {mb_s} МБ  •  SHA-256 ✔", "ok")
+                    else:
+                        res = (f"{dt_s}  •  {mb_s} МБ  •  Без .sha256", "warn")
+            except Exception:
+                res = ("Невідомо", "idle")
+        self._last_backup_cache = res
+        self._last_backup_cache_time = now
+        self._last_backup_cache_dir = bdir
+        return res
 
     def get_detailed_stats(self):
         import time

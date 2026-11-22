@@ -1,6 +1,9 @@
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
-# [ФАЙЛ: core/config.py (v2.18 | 22.11.2026 08:15) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: idle-ui-cache-2.19
+# patch-id: opt-log-i18n-ui-2.20
+# patch-id: stage-window-2.21
+# [ФАЙЛ: core/config.py (v2.21 | 22.11.2026 09:10) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -55,8 +58,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.18"
-BUILD_DATE = "22.11.2026 08:15"
+SCRIPT_VER = "2.21"
+BUILD_DATE = "22.11.2026 09:10"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -278,13 +281,20 @@ def _write_env_secrets(state):
             pass
     os.replace(tmp_env, ENV_FILE)
 
+_LOG_DIRS_READY = set()
+_LOG_WRITE_CNT = {}
+
 def write_file_log(text, target_dir=None):
     from datetime import datetime
     try:
         d = target_dir or DEFAULT_BACKUP_DIR
-        os.makedirs(d, exist_ok=True)
+        if d not in _LOG_DIRS_READY:
+            os.makedirs(d, exist_ok=True)
+            _LOG_DIRS_READY.add(d)
         log_path = os.path.join(d, "backup.log")
-        if os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
+        cnt = _LOG_WRITE_CNT.get(log_path, 0)
+        _LOG_WRITE_CNT[log_path] = cnt + 1
+        if cnt % 50 == 0 and os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
             try:
                 with open(log_path, "rb") as f_old:
                     f_old.seek(-512 * 1024, os.SEEK_END)

@@ -1,5 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: gui/styles.py (v2.01 | 22.11.2026 00:46) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# patch-id: stage-window-2.21
+# [ФАЙЛ: gui/styles.py (v2.02 | 22.11.2026 09:10) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import os
 import ctypes
@@ -119,8 +120,6 @@ def _calc_screen_metrics(root, scale_pref="auto", font_pref=0, live_outer_wh=Non
             rw_s, rh_s = sc.split("x", 1)
             outer_w = min(sw, int(rw_s))
             outer_h = min(sh, int(rh_s))
-        elif os.name == "nt":
-            outer_w, outer_h = sw, sh
         else:
             outer_w = min(sw, max(900, int(sw * 0.72)))
             outer_h = min(sh, max(600, int(sh * 0.75)))

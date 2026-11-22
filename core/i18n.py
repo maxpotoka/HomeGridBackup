@@ -1,5 +1,8 @@
-# [ФАЙЛ: core/i18n.py (v2.10 | 21.11.2026 22:30) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# patch-id: opt-log-i18n-ui-2.20
+# patch-id: stage-window-2.21
+# [ФАЙЛ: core/i18n.py (v2.12 | 22.11.2026 09:10) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
+from functools import lru_cache
 
 EN_EXACT = {
     "Січень": "January", "Лютий": "February", "Березень": "March", "Квітень": "April",
@@ -346,7 +349,7 @@ EN_SUBSTR = sorted([
     ("Перевірка сесії та авторизація...", "Checking session and auth..."),
     ("Запит на підготовку бекапу...", "Requesting backup preparation..."),
     ("Підготовка на сервері", "Preparing on server"), ("Копіювання бази та файлів", "Copying DB & files"),
-    ("Перевірка файлів", "Checking files"), ("Стиснення ZIP-архіву", "Packing ZIP"),
+    ("Перевірка файлів", "Checking files"), ("Обробка на сервері", "Processing on server"), ("Стиснення ZIP-архіву", "Packing ZIP"),
     ("Архів готовий (75%). Завантаження...", "Archive ready (75%). Downloading..."),
     ("Завантаження ZIP-архіву з", "Downloading ZIP archive from"), ("Завантаження", "Downloading"),
     ("Швидкість:", "Speed:"), ("Архів завантажено:", "Archive downloaded:"),
@@ -463,17 +466,36 @@ def _clean_linux_emoji(txt):
         return txt
     return re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]+\s*", "", txt)
 
-def tr(text, lang="en"):
-    if not text:
-        return text
-    s = _clean_linux_emoji(str(text))
+UK_SUBSTR = [(uk, en) for uk, en in sorted(EN_SUBSTR, key=lambda x: len(next(iter(reversed(x)))), reverse=True) if len(en) >= 3]
+
+@lru_cache(maxsize=2048)
+def _tr_cached(raw_s, lang):
+    s = _clean_linux_emoji(raw_s)
     if lang == "uk":
         if s in UK_EXACT:
             return UK_EXACT[s]
-        for uk, en in sorted(EN_SUBSTR, key=lambda x: len(x[1]), reverse=True):
-            if len(en) >= 3 and en in s:
+        for uk, en in UK_SUBSTR:
+            if en in s:
                 s = s.replace(en, uk)
         return s
+    if s in EN_EXACT:
+        return EN_EXACT[s]
+    for uk, en in EN_SUBSTR:
+        if uk in s:
+            s = s.replace(uk, en)
+    s = re.sub(r"(\d+)\s*хв\s*([\d.]+)\s*с", r"\1m \2s", s)
+    s = re.sub(r"(?<=\d)\s*с(?=\b|\)|\.)", " s", s)
+    s = re.sub(r"\bза\s+(?=\d)", "in ", s)
+    s = re.sub(r"\bіз\s+(?=\d)", "of ", s)
+    s = re.sub(r"\bо\s+(?=\d{2}:\d{2})", "at ", s)
+    return s
+
+def tr(text, lang="en"):
+    if not text:
+        return text
+    return _tr_cached(str(text), lang)
+
+def _tr_unused_tail(s, lang):
     if s in EN_EXACT:
         return EN_EXACT[s]
     for uk, en in EN_SUBSTR:

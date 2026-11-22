@@ -1,7 +1,8 @@
 import os
 import sys
 # ==============================================================================
-# [ФАЙЛ: core/network.py (v2.01 | 21.11.2026 05:25) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# patch-id: lan-scan-2.19
+# [ФАЙЛ: core/network.py (v2.02 | 22.11.2026 08:40) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
 import json
@@ -165,6 +166,42 @@ def test_tcp_port(host, port, timeout=2.5):
     except Exception:
         return False, 0.0
 
+def _tcp_probe(host, port, timeout):
+    # (статус, мс): open / refused / timeout / error. Повтор нужен только при timeout.
+    t0 = time.time()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return "open", round((time.time() - t0) * 1000, 1)
+    except socket.timeout:
+        return "timeout", 0.0
+    except ConnectionRefusedError:
+        return "refused", 0.0
+    except OSError:
+        return "error", 0.0
+
+def _os_gateway_and_arp():
+    # Шлюзы и соседи (ARP): Linux/WSL из /proc, macOS через route/arp, Windows через route print/arp -a.
+    if sys.platform.startswith("linux"):
+        return _linux_proc_net_hints()
+    gw_ips, arp_ips = [], []
+    kw = dict(stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=3)
+    if os.name == "nt":
+        kw["creationflags"] = 0x08000000
+    try:
+        if os.name == "nt":
+            out = subprocess.run(["route", "print", "0.0.0.0"], **kw).stdout or ""
+            gw_ips = re.findall(r"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d+\.\d+\.\d+\.\d+)", out, re.M)
+            out = subprocess.run(["arp", "-a"], **kw).stdout or ""
+            arp_ips = re.findall(r"^\s*(\d+\.\d+\.\d+\.\d+)\s+[0-9a-fA-F-]{17}\s+dynamic", out, re.M | re.I)
+        else:
+            out = subprocess.run(["route", "-n", "get", "default"], **kw).stdout or ""
+            gw_ips = re.findall(r"gateway:\s*(\d+\.\d+\.\d+\.\d+)", out)
+            out = subprocess.run(["arp", "-an"], **kw).stdout or ""
+            arp_ips = re.findall(r"\((\d+\.\d+\.\d+\.\d+)\) at ", out)
+    except Exception:
+        pass
+    return gw_ips, arp_ips
+
 def test_hgm_stage2(base_url, state, timeout=6.0):
     ts = int(time.time() * 1000)
     ok, code, body, _, _, lat = invoke_http(
@@ -243,8 +280,8 @@ def _local_ipv4_with_prefix():
                 res.append((m.group(1), ipaddress.IPv4Network("0.0.0.0/" + mask).prefixlen))
         except Exception:
             pass
-    gw_ips, arp_ips = _linux_proc_net_hints()
-    for ip_h in gw_ips + arp_ips:
+    gw_ips, _arp = _os_gateway_and_arp()
+    for ip_h in gw_ips:
         res.append((ip_h, 24))
     return res
 
@@ -403,54 +440,65 @@ def scan_lan_servers(engine):
     found = []
     with engine.lock:
         base_state = dict(engine.state)
-    _, arp_h = _linux_proc_net_hints()
-    prio = set(arp_h)
+    gw_ips, arp_ips = _os_gateway_and_arp()
+    prio = set(arp_ips)
     for u in [base_state.get("server", "")] + list(base_state.get("server_history") or []):
         hp = urlparse((u or "").strip().rstrip("!")).hostname
         if hp:
             prio.add(hp)
+    # Полный скан только подсети шлюза. Остальные подсети: только адреса из ARP и истории.
+    gw_pref = {g.rsplit(".", 1)[0] for g in gw_ips}
+    full_subs = [s for s in subs if s in gw_pref] or subs[:1]
+    targets = []
     for pref in subs:
-        engine.set_progress(None, f"Сканування {pref}.1-254...")
         raw = [f"{pref}.{i}" for i in range(1, 255)]
-        ips = [x for x in raw if x in prio] + [x for x in raw if x not in prio]
+        if pref in full_subs:
+            targets += [x for x in raw if x in prio] + [x for x in raw if x not in prio]
+        else:
+            targets += [x for x in raw if x in prio]
+    engine.set_progress(None, f"Сканування {len(targets)} адрес...")
+    # Один разогрев ARP на все цели.
+    try:
+        us = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        us.setblocking(False)
+        for t in targets:
+            try: us.sendto(b"\x00", (t, 9))
+            except Exception: pass
+        us.close()
+        time.sleep(0.3)
+    except Exception:
+        pass
+
+    def check_ip(ip_addr):
         try:
-            us = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            us.setblocking(False)
-            for t in ips:
-                try: us.sendto(b"\x00", (t, 9))
-                except Exception: pass
-            us.close()
-            time.sleep(0.12)
-        except Exception:
-            pass
-        def check_ip(ip_addr):
-            try:
-                ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=0.85)
-                if not ok_tcp:
-                    time.sleep(0.15)
-                    ok_tcp, tcp_ms = test_tcp_port(ip_addr, 18899, timeout=1.85)
-                if ok_tcp:
-                    temp_state = dict(base_state)
-                    temp_state["_jar"] = None
-                    ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=5.0)
-                    if ok_api:
-                        return ip_addr, temp_state.get("client_token", ""), tcp_ms, api_ms
-            except Exception:
+            st, tcp_ms = _tcp_probe(ip_addr, 18899, 0.85)
+            if st == "timeout" and ip_addr in prio:
+                st, tcp_ms = _tcp_probe(ip_addr, 18899, 1.5)
+            if st != "open":
                 return None
+            temp_state = dict(base_state)
+            temp_state["_jar"] = None
+            ok_api, api_ms = test_hgm_stage2(f"http://{ip_addr}:18899", temp_state, timeout=5.0)
+            if ok_api:
+                return ip_addr, temp_state.get("client_token", ""), tcp_ms, api_ms
+            engine.log(f"[TRACE] {ip_addr}:18899 TCP відкрито, API не відповів", "warn")
+        except Exception:
             return None
-        with ThreadPoolExecutor(max_workers=32) as ex:
-            for res in ex.map(check_ip, ips):
-                if res:
-                    f_ip, f_tok, t_ms, a_ms = res
-                    if not any(ip_item == f_ip for ip_item, _, _ in found):
-                        found.append((f_ip, t_ms, a_ms))
-                        f_url = f"http://{f_ip}:18899"
-                        engine.discovered_servers = [(f"http://{x}:18899", tm, am) for x, tm, am in found]
-                        engine.log(f"Знайдено сервер: {f_url} (TCP: {t_ms} мс, API: {a_ms} мс)", "ok")
-                        engine.set_pill(f"Знайдено: {len(found)}", "work")
-                        if f_tok and f_tok != engine.state["client_token"]:
-                            engine.state["client_token"] = f_tok
-                            engine.state["dirty"] = True
+        return None
+
+    with ThreadPoolExecutor(max_workers=32) as ex:
+        for res in ex.map(check_ip, targets):
+            if res:
+                f_ip, f_tok, t_ms, a_ms = res
+                if not any(ip_item == f_ip for ip_item, _, _ in found):
+                    found.append((f_ip, t_ms, a_ms))
+                    f_url = f"http://{f_ip}:18899"
+                    engine.discovered_servers = [(f"http://{x}:18899", tm, am) for x, tm, am in found]
+                    engine.log(f"Знайдено сервер: {f_url} (TCP: {t_ms} мс, API: {a_ms} мс)", "ok")
+                    engine.set_pill(f"Знайдено: {len(found)}", "work")
+                    if f_tok and f_tok != engine.state["client_token"]:
+                        engine.state["client_token"] = f_tok
+                        engine.state["dirty"] = True
     return found
 
 def run_connect_task(engine, raw_url, force_skip=False):

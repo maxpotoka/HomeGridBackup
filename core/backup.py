@@ -1,6 +1,7 @@
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
-# [ФАЙЛ: core/backup.py (v2.09 | 22.11.2026 08:15) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: stage-window-2.21
+# [ФАЙЛ: core/backup.py (v2.10 | 22.11.2026 09:10) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -289,7 +290,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
     engine.log(f"Збірка архіву на сервері {srv_label}...", "info")
     last_phase = ""
     phase_start_t = time.time()
-    srv_times = {"preparing": 0.0, "copying": 0.0, "packing": 0.0, "checking": 0.0}
+    srv_times = {"preparing": 0.0, "copying": 0.0, "processing": 0.0, "packing": 0.0, "checking": 0.0}
     tot_b = 0
     job_retries = 0
     bad_json_cnt = 0
@@ -350,7 +351,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
         proc_b = st.get("processed_bytes", 0) or 0
         if ph != last_phase:
             if last_phase:
-                srv_times[last_phase if last_phase in srv_times else "packing"] += max(0.0, time.time() - phase_start_t)
+                srv_times[last_phase if last_phase in srv_times else "processing"] += max(0.0, time.time() - phase_start_t)
             last_phase = ph
             phase_start_t = time.time()
             engine.log(f"Етап сервера ({srv_label}): {pretty_phase(ph)}", "info")
@@ -366,14 +367,14 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
         if ph == "checking":
             engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({elapsed_ph:.1f} с)...")
         else:
-            phase_ranges = {"preparing": (25, 30), "copying": (30, 55), "packing": (55, 75), "ready": (75, 75)}
+            phase_ranges = {"preparing": (25, 30), "copying": (30, 55), "processing": (55, 60), "packing": (60, 75), "ready": (75, 75)}
             p_start, p_end = phase_ranges.get(ph, (25, 75))
             overall_pct = p_start + int((pct / 100.0) * (p_end - p_start))
             engine.set_progress(overall_pct, f"[{srv_label}] {pretty_phase(ph)}: {pct}%{sz_txt}")
 
         if ph == "ready" or st.get("ready") is True:
             if last_phase and last_phase != "ready":
-                srv_times[last_phase if last_phase in srv_times else "packing"] += max(0.0, time.time() - phase_start_t)
+                srv_times[last_phase if last_phase in srv_times else "processing"] += max(0.0, time.time() - phase_start_t)
             engine._last_srv_timings = {k: round(v, 1) for k, v in srv_times.items()}
             engine._last_srv_timings["dl_t0"] = time.time()
             engine.set_progress(75, f"[{srv_label}] Архів готовий (75%). Завантаження...")
@@ -555,9 +556,10 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         srv_prep_s = round(_st_t.get("preparing", 0.0), 1)
         srv_copy_s = round(_st_t.get("copying", 0.0), 1)
         srv_pack_s = round(_st_t.get("packing", 0.0), 1)
+        srv_proc_s = round(_st_t.get("processing", 0.0), 1)
         srv_chk_s = round(_st_t.get("checking", 0.0), 1)
-        total_sec = round(max(0.1, srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s + dl_sec + ver_sec + mir_sec), 1)
-        srv_sec = round(srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s, 1)
+        total_sec = round(max(0.1, srv_prep_s + srv_copy_s + srv_pack_s + srv_chk_s + srv_proc_s + dl_sec + ver_sec + mir_sec), 1)
+        srv_sec = round(srv_prep_s + srv_copy_s + srv_proc_s + srv_pack_s + srv_chk_s, 1)
         spd_mbs = round(total_mb / max(0.1, dl_sec), 1)
         final_name = os.path.basename(out_file)
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
@@ -575,7 +577,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
         if not SILENT_MODE and not auto_quiet:
             z_cnt, z_mb, free_gb = engine.get_storage_stats()
-            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
+            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_proc_sec": srv_proc_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
             engine.ask_modal("backup_report", "Звіт про резервне копіювання", json.dumps(rep, ensure_ascii=False))
     except Exception as exc:
         engine.exit_code = 1
