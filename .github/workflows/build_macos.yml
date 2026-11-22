@@ -99,4 +99,4 @@ jobs:
             Чистий архів **HomeGridBackup_macOS_Intel.7z** без подвійного пакування.
             Працює без прав `root` (`sudo`). Після розпакування натисніть правою кнопкою по **HomeGridBackup.app** → **Відкрити** (або виконайте в Терміналі: `xattr -cr ~/Downloads/HomeGridBackup.app && open ~/Downloads/HomeGridBackup.app`).
           files: dist_mac/HomeGridBackup_macOS_Intel.7z
-          make_latest: false
+          make_latest: true
