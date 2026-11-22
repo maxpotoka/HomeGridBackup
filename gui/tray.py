@@ -1,6 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v2.03 | 22.11.2026 00:54)
-# patch-id: menubar-and-tray-2.15 — СИСТЕМНЫЙ ТРЕЙ WINDOWS (PYSTRAY) И СЛУШАТЕЛЬ ОКНА]
+# [ФАЙЛ: gui/tray.py (v2.04 | 22.11.2026 02:00)
+# patch-id: fix-ubuntu-tray-menu-2.16
 # ==============================================================================
 import os
 import time
@@ -235,27 +235,28 @@ def _start_tray_thread(engine):
                 engine.app_ref.root.after(0, _run_ui_dlg)
         return _cb
 
-    def _status_label(item):
+    def _build_tray_menu():
         lng_s = engine.state.get("lang", "en")
-        if engine.is_running:
-            return tr(f"Резервне копіювання... ({int(engine.progress)}%)", lng_s)
-        return tr("Готовий до резервного копіювання", lng_s)
+        st_txt = (
+            tr(f"Резервне копіювання... ({int(engine.progress)}%)", lng_s)
+            if engine.is_running else
+            tr("Готовий до резервного копіювання", lng_s)
+        )
+        return pystray.Menu(
+            pystray.MenuItem(st_txt, lambda i, it: None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(tr("Відкрити HomeGrid Backup", lng_s), _on_open, default=True, enabled=lambda item: engine.app_ref is not None),
+            pystray.MenuItem(tr("▶ Запустити резервне копіювання", lng_s), _on_backup, enabled=lambda item: not engine.is_running),
+            pystray.MenuItem(tr("Відкрити папку", lng_s), _on_open_folder),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(tr("Статистика", lng_s), _on_open_dialog("open_stats_modal"), enabled=lambda item: engine.app_ref is not None),
+            pystray.MenuItem(tr("Аналіз GFS / SHA-256", lng_s), _on_open_dialog("open_analyze"), enabled=lambda item: engine.app_ref is not None),
+            pystray.MenuItem(tr("Налаштування", lng_s), _on_open_dialog("open_settings"), enabled=lambda item: engine.app_ref is not None),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(tr("✖ Вихід", lng_s), _on_exit)
+        )
 
-    _lng = engine.state.get("lang", "en")
-    menu = pystray.Menu(
-        pystray.MenuItem(_status_label, None, enabled=False),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(tr("Відкрити HomeGrid Backup", _lng), _on_open, default=True, enabled=lambda item: engine.app_ref is not None),
-        pystray.MenuItem(tr("▶ Запустити резервне копіювання", _lng), _on_backup, enabled=lambda item: not engine.is_running),
-        pystray.MenuItem(tr("Відкрити папку", _lng), _on_open_folder),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(tr("Статистика", _lng), _on_open_dialog("open_stats_modal"), enabled=lambda item: engine.app_ref is not None),
-        pystray.MenuItem(tr("Аналіз GFS / SHA-256", _lng), _on_open_dialog("open_analyze"), enabled=lambda item: engine.app_ref is not None),
-        pystray.MenuItem(tr("Налаштування", _lng), _on_open_dialog("open_settings"), enabled=lambda item: engine.app_ref is not None),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(tr("✖ Вихід", _lng), _on_exit)
-    )
-    icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", menu)
+    icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", _build_tray_menu())
     engine.tray_icon = icon
 
     def _anim_loop():
@@ -286,6 +287,11 @@ def _start_tray_thread(engine):
                 else:
                     if sig != last_sig:
                         engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
+                        try:
+                            engine.tray_icon.menu = _build_tray_menu()
+                            engine.tray_icon.update_menu()
+                        except Exception:
+                            pass
                         last_sig = sig
                     if new_title != last_title:
                         engine.tray_icon.title = new_title
