@@ -686,7 +686,9 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
         tot_fmt = format_duration(total_sec, engine.state.get("lang", "en"))
         engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
-        engine.log(f"[SUMMARY] v{SCRIPT_VER} | {get_fast_sysinfo()} | download {spd_mbs} MB/s ({dl_sec} s) | server {srv_sec} s | total {total_sec} s | files {cnt}", "info")
+        system_info = get_fast_sysinfo()
+        summary = f"v{SCRIPT_VER} | {system_info} | download {spd_mbs} MB/s ({dl_sec} s) | server {srv_sec} s | total {total_sec} s | files {cnt}"
+        engine.log(f"[SUMMARY] {summary}", "info")
         from core.i18n import tr as _tr_n
         _lng_n = engine.state.get("lang", "en")
         _desktop_notify("HomeGrid Backup", _tr_n(f"Резервну копію створено: {final_name} ({total_mb:.1f} МБ)", _lng_n))
@@ -699,7 +701,22 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             engine, operation_id, "success", archive=final_name,
             size_mb=total_mb, size_bytes=total_bytes, files_count=cnt,
             duration_sec=t_end - t_total_start,
-            speed_mbps=total_mb / max(t_end - t_total_start, 0.001)
+            speed_mbps=total_mb / max(t_end - t_total_start, 0.001),
+            download_speed_mbps=spd_mbs,
+            download_duration_sec=dl_sec,
+            server_duration_sec=srv_sec,
+            server_preparing_sec=srv_prep_s,
+            server_copying_sec=srv_copy_s,
+            server_processing_sec=srv_proc_s,
+            server_packing_sec=srv_pack_s,
+            server_checking_sec=srv_chk_s,
+            crc_duration_sec=crc_sec,
+            sha256_duration_sec=sha_sec,
+            mirror_enabled=mir_active,
+            mirror_duration_sec=mir_sec,
+            gfs_removed_count=old_cnt_before,
+            system_info=system_info,
+            summary=summary,
         )
         _sync_cloud_reports(engine)
         if not SILENT_MODE and not auto_quiet:

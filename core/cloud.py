@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import platform
@@ -5,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime
@@ -232,19 +234,36 @@ def sync_cloud_backups(engine, prune=False):
         from core.gfs import compute_gfs_plan
 
         device_id = _device_id(engine.state)
-        remote_dir = _remote_path(engine.state, "backups", device_id)
+        shared_user_folder = WINDOWS7_CLOUD_SYNC_PREVIEW
+        remote_dir = _remote_path(
+            engine.state, "backups"
+        ) if shared_user_folder else _remote_path(engine.state, "backups", device_id)
+        remote_device_prefix = device_id + "_" if shared_user_folder else ""
         _, keep_items, _ = compute_gfs_plan(engine.state)
         keep_names = set()
         for item in keep_items:
             path = item["path"]
             if not os.path.isfile(path):
                 continue
-            name = os.path.basename(path)
-            keep_names.add(name)
-            _rclone("copyto", path, f"{remote_dir}/{name}")
+            local_name = os.path.basename(path)
+            remote_name = remote_device_prefix + local_name
+            keep_names.add(remote_name)
+            _rclone("copyto", path, f"{remote_dir}/{remote_name}")
             sha_path = path + ".sha256"
             if os.path.isfile(sha_path):
-                _rclone("copyto", sha_path, f"{remote_dir}/{name}.sha256")
+                if shared_user_folder:
+                    with open(sha_path, "r", encoding="utf-8") as source:
+                        sha_parts = source.read().split()
+                    if not sha_parts or not re.fullmatch(r"[0-9a-fA-F]{64}", sha_parts[0]):
+                        raise ValueError(f"Invalid SHA-256 sidecar: {sha_path}")
+                    digest = sha_parts[0]
+                    with tempfile.TemporaryDirectory(prefix="homegrid-cloud-sha-") as temp_dir:
+                        cloud_sha_path = os.path.join(temp_dir, remote_name + ".sha256")
+                        with open(cloud_sha_path, "w", encoding="utf-8", newline="\n") as target:
+                            target.write(f"{digest.lower()}  {remote_name}\n")
+                        _rclone("copyto", cloud_sha_path, f"{remote_dir}/{remote_name}.sha256")
+                else:
+                    _rclone("copyto", sha_path, f"{remote_dir}/{remote_name}.sha256")
 
         if prune:
             names = _rclone("lsf", "--files-only", remote_dir).splitlines()
@@ -252,6 +271,7 @@ def sync_cloud_backups(engine, prune=False):
                 name for name in names
                 if name.lower().endswith(".zip")
                 and _ARCHIVE_RE.search(name)
+                and name.startswith(remote_device_prefix)
                 and name not in keep_names
             }
             for name in stale_archives:
@@ -300,6 +320,133 @@ def _recover_report_upload_markers(report_dir):
             os.replace(uploading_path, pending_path)
 
 
+def _collect_report_records(source_dirs, device_id=None):
+    records = {}
+    for source_dir in source_dirs:
+        if not os.path.isdir(source_dir):
+            continue
+        for root, dirs, names in os.walk(source_dir):
+            dirs.sort()
+            for name in sorted(names):
+                if not name.endswith(".jsonl"):
+                    continue
+                source_path = os.path.join(root, name)
+                relative_path = os.path.relpath(source_path, source_dir)
+                with open(source_path, "r", encoding="utf-8") as source:
+                    for line_number, line in enumerate(source, 1):
+                        try:
+                            record = json.loads(line)
+                        except (TypeError, ValueError) as exc:
+                            raise ValueError(
+                                f"Invalid JSON in cloud report source {relative_path}:{line_number}"
+                            ) from exc
+                        if not isinstance(record, dict):
+                            raise ValueError(
+                                f"Invalid cloud report event in {relative_path}:{line_number}"
+                            )
+                        if device_id is not None and record.get("device_id") != device_id:
+                            continue
+                        event_key = tuple(
+                            record.get(key, "")
+                            for key in ("device_id", "operation_id", "event", "timestamp", "stage")
+                        )
+                        if not all(event_key[:4]):
+                            event_key = (relative_path, line_number, line.rstrip("\r\n"))
+                        records[event_key] = record
+    return records
+
+
+def _ordered_report_records(records):
+    def sort_key(record):
+        timestamp = record.get("timestamp", "")
+        try:
+            timestamp_key = datetime.fromisoformat(timestamp).timestamp()
+        except (TypeError, ValueError, OverflowError):
+            timestamp_key = 0.0
+        return (
+            timestamp_key,
+            record.get("device_id", ""),
+            record.get("operation_id", ""),
+            record.get("event", ""),
+            record.get("stage", ""),
+        )
+
+    return sorted(records.values(), key=sort_key)
+
+
+def _write_jsonl_report(records, output_path):
+    ordered = _ordered_report_records(records)
+    with open(output_path, "w", encoding="utf-8", newline="\n") as output:
+        for record in ordered:
+            output.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    return len(ordered)
+
+
+def _write_plain_text_report(records, output_path):
+    ordered = _ordered_report_records(records)
+    fixed_fields = {
+        "timestamp", "device_id", "operation_id", "event",
+        "platform", "platform_version", "architecture",
+    }
+    with open(output_path, "w", encoding="utf-8", newline="\n") as output:
+        for record in ordered:
+            platform_name = " ".join(
+                str(record.get(key, "")).strip()
+                for key in ("platform", "platform_version", "architecture")
+                if record.get(key)
+            ) or "unknown"
+            fields = [
+                f"[{record.get('timestamp', 'unknown')}]",
+                f"OS={platform_name}",
+                f"device={record.get('device_id', 'unknown')}",
+                f"event={record.get('event', 'unknown')}",
+            ]
+            if record.get("operation_id"):
+                fields.append(f"operation={record['operation_id']}")
+            for key in sorted(record):
+                if key not in fixed_fields:
+                    value = json.dumps(record[key], ensure_ascii=False, sort_keys=True)
+                    fields.append(f"{key}={value}")
+            output.write(" | ".join(fields) + "\n")
+    return len(ordered)
+
+
+def _sync_shared_root_report(engine, device_id, report_dir):
+    source_remote_dir = _remote_path(engine.state, ".HomeGridBackup-sources")
+    legacy_remote_dir = _remote_path(engine.state, "operations")
+    remote = str(engine.state["cloud_remote"]).strip()
+    cloud_path = validate_cloud_settings(remote, engine.state.get("cloud_path", ""))
+    cache_key = hashlib.sha256(
+        (remote + "\0" + cloud_path).encode("utf-8")
+    ).hexdigest()[:16]
+    legacy_cache = os.path.join(
+        os.path.abspath(engine.state["backup_dir"]), ".cloud-report-cache", cache_key
+    )
+    os.makedirs(legacy_cache, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="homegrid-cloud-report-") as temp_dir:
+        source_dir = os.path.join(temp_dir, "sources")
+        os.makedirs(source_dir)
+        _rclone("mkdir", source_remote_dir)
+        _rclone("copy", source_remote_dir, source_dir, "--include", "*.jsonl")
+        _rclone("mkdir", legacy_remote_dir)
+        _rclone("copy", legacy_remote_dir, legacy_cache, "--include", "*.jsonl")
+
+        own_records = _collect_report_records(
+            (source_dir, report_dir, legacy_cache), device_id=device_id
+        )
+        own_source_path = os.path.join(source_dir, device_id + ".jsonl")
+        if own_records:
+            _write_jsonl_report(own_records, own_source_path)
+            _rclone(
+                "copyto", own_source_path,
+                _remote_path(engine.state, ".HomeGridBackup-sources", device_id + ".jsonl"),
+            )
+
+        all_records = _collect_report_records((source_dir, legacy_cache))
+        shared_log = os.path.join(temp_dir, "HomeGridBackup.log")
+        _write_plain_text_report(all_records, shared_log)
+        _rclone("copyto", shared_log, _remote_path(engine.state, "HomeGridBackup.log"))
 
 
 
@@ -337,7 +484,14 @@ def record_operation_event(engine, operation_id, event, stage="", archive="", si
         duration_sec = max(0.0, float(duration_sec))
         record["duration_sec"] = round(duration_sec, 3)
         record["duration_ms"] = round(duration_sec * 1000)
-    allowed_details = {"files_count", "archive_sequence", "speed_mbps", "result", "error_type"}
+    allowed_details = {
+        "files_count", "archive_sequence", "speed_mbps", "download_speed_mbps",
+        "download_duration_sec", "server_duration_sec", "server_preparing_sec",
+        "server_copying_sec", "server_processing_sec", "server_packing_sec",
+        "server_checking_sec", "crc_duration_sec", "sha256_duration_sec",
+        "mirror_enabled", "mirror_duration_sec", "gfs_removed_count",
+        "system_info", "summary", "result", "error_type",
+    }
     for key in allowed_details.intersection(details):
         value = details[key]
         if value is not None:
@@ -362,39 +516,54 @@ def sync_cloud_reports(engine):
 def _sync_cloud_reports(engine):
     device_id = _device_id(engine.state)
     report_dir = os.path.join(os.path.abspath(engine.state["backup_dir"]), "reports", device_id)
+    if WINDOWS7_CLOUD_SYNC_PREVIEW:
+        os.makedirs(report_dir, mode=0o700, exist_ok=True)
+        _recover_report_upload_markers(report_dir)
+        pending = sorted(
+            name for name in os.listdir(report_dir)
+            if name.endswith(".jsonl.pending")
+        )
+        uploading_markers = []
+        for marker in pending:
+            marker_path = os.path.join(report_dir, marker)
+            uploading_path = marker_path + ".uploading"
+            try:
+                os.replace(marker_path, uploading_path)
+            except FileNotFoundError:
+                continue
+            uploading_markers.append((marker_path, uploading_path))
+        try:
+            _sync_shared_root_report(engine, device_id, report_dir)
+        except Exception:
+            for marker_path, uploading_path in uploading_markers:
+                if not os.path.exists(uploading_path):
+                    continue
+                if os.path.exists(marker_path):
+                    os.remove(uploading_path)
+                else:
+                    os.replace(uploading_path, marker_path)
+            raise
+        for _, uploading_path in uploading_markers:
+            if os.path.exists(uploading_path):
+                os.remove(uploading_path)
+        return True
+
     if not os.path.isdir(report_dir):
         return
-    if WINDOWS7_CLOUD_SYNC_PREVIEW:
-        _recover_report_upload_markers(report_dir)
     pending = sorted(
         name for name in os.listdir(report_dir)
         if name.endswith(".jsonl.pending")
     )
     for marker in pending:
         marker_path = os.path.join(report_dir, marker)
-        uploading_path = None
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            uploading_path = marker_path + ".uploading"
-            try:
-                os.replace(marker_path, uploading_path)
-            except FileNotFoundError:
-                continue
         report_name = marker[:-len(".pending")]
         report_path = os.path.join(report_dir, report_name)
         if not os.path.isfile(report_path):
-            os.remove(uploading_path or marker_path)
+            os.remove(marker_path)
             continue
-        try:
-            target = _remote_path(engine.state, "operations", device_id, report_name)
-            _rclone("copyto", report_path, target)
-        except Exception:
-            if uploading_path and os.path.exists(uploading_path):
-                if os.path.exists(marker_path):
-                    os.remove(uploading_path)
-                else:
-                    os.replace(uploading_path, marker_path)
-            raise
-        os.remove(uploading_path or marker_path)
+        target = _remote_path(engine.state, "operations", device_id, report_name)
+        _rclone("copyto", report_path, target)
+        os.remove(marker_path)
     return True
 
 

@@ -93,6 +93,23 @@ class RcloneExecutableTests(unittest.TestCase):
         self.assertIs(popen.call_args.kwargs["stderr"], cloud.subprocess.STDOUT)
         self.assertEqual(popen.call_args.kwargs["creationflags"], cloud._NO_WINDOW)
 
+    def test_mega_uses_the_supported_rclone_backend_and_remote_path(self):
+        process = mock.Mock()
+        state = {
+            "cloud_remote": "mega",
+            "cloud_path": "HomeGridBackup",
+            "device_id": "a" * 32,
+        }
+        with mock.patch.object(cloud, "list_rclone_remotes", return_value=[]), \
+             mock.patch.object(cloud, "_rclone_executable", return_value="rclone"), \
+             mock.patch.object(cloud.subprocess, "Popen", return_value=process) as popen:
+            self.assertIs(cloud.start_rclone_remote_setup("mega", "mega"), process)
+        self.assertEqual(popen.call_args.args[0], ["rclone", "config", "create", "mega", "mega"])
+        self.assertEqual(
+            cloud._remote_path(state, "backups", state["device_id"]),
+            "mega:HomeGridBackup/backups/{}".format(state["device_id"]),
+        )
+
     def test_setup_rejects_invalid_remote_and_backend(self):
         with self.assertRaises(ValueError):
             cloud.start_rclone_remote_setup("../bad", "drive")
@@ -125,7 +142,10 @@ class RcloneExecutableTests(unittest.TestCase):
                     engine, "operation-1", "stage_completed",
                     stage="archive_download", archive="backup.zip",
                     size_mb=12.5, size_bytes=13107200, duration_sec=2.34567,
-                    files_count=9, archive_sequence=5, speed_mbps=5.34
+                    files_count=9, archive_sequence=5, speed_mbps=5.34,
+                    download_speed_mbps=7.3, download_duration_sec=29.9,
+                    server_duration_sec=219.6, system_info="Windows 7 64-bit",
+                    summary="v2.25 | Windows 7 64-bit | download 7.3 MB/s (29.9 s)",
                 )
             report_dir = os.path.join(state["backup_dir"], "reports", device_id)
             report_path = os.path.join(report_dir, cloud.datetime.now().strftime("%Y-%m-%d") + ".jsonl")
@@ -137,6 +157,11 @@ class RcloneExecutableTests(unittest.TestCase):
             self.assertEqual(record["files_count"], 9)
             self.assertEqual(record["duration_ms"], 2346)
             self.assertEqual(record["rclone_version"], "rclone v1.76.0")
+            self.assertTrue(record["platform"])
+            self.assertEqual(record["system_info"], "Windows 7 64-bit")
+            self.assertEqual(record["download_speed_mbps"], 7.3)
+            self.assertEqual(record["server_duration_sec"], 219.6)
+            self.assertIn("download 7.3 MB/s", record["summary"])
             self.assertTrue(os.path.isfile(report_path + ".pending"))
         finally:
             import shutil
@@ -165,6 +190,95 @@ class RcloneExecutableTests(unittest.TestCase):
             )
             self.assertFalse(os.path.exists(marker_path))
 
+    def test_preview_sync_merges_all_devices_into_one_plain_text_root_log(self):
+        device_id = "1" * 32
+        other_device_id = "2" * 32
+        with tempfile.TemporaryDirectory() as backup_dir:
+            report_dir = os.path.join(backup_dir, "reports", device_id)
+            os.makedirs(report_dir)
+            report_path = os.path.join(report_dir, "2025-01-02.jsonl")
+            own_event = {
+                "timestamp": "2025-01-02T10:00:00+00:00",
+                "device_id": device_id,
+                "operation_id": "operation-win7",
+                "event": "success",
+                "platform": "Windows",
+                "platform_version": "7",
+                "system_info": "Windows 7 64-bit",
+                "summary": "download 7.3 MB/s (29.9 s) | server 219.6 s | total 260.9 s | files 4",
+                "download_speed_mbps": 7.3,
+                "server_duration_sec": 219.6,
+                "files_count": 4,
+            }
+            other_event = {
+                "timestamp": "2025-01-02T11:00:00+00:00",
+                "device_id": other_device_id,
+                "operation_id": "operation-linux",
+                "event": "success",
+                "platform": "Linux",
+                "platform_version": "6.8",
+                "system_info": "Linux 64-bit",
+                "summary": "download 6.2 MB/s | server 180 s | total 190 s | files 3",
+                "download_speed_mbps": 6.2,
+                "server_duration_sec": 180,
+                "files_count": 3,
+            }
+            legacy_event = {
+                "timestamp": "2025-01-02T12:00:00+00:00",
+                "device_id": "3" * 32,
+                "operation_id": "operation-macos",
+                "event": "success",
+                "platform": "Darwin",
+                "platform_version": "24.0",
+                "summary": "download 5 MB/s | server 120 s | total 130 s | files 2",
+            }
+            with open(report_path, "w", encoding="utf-8") as report:
+                report.write(json.dumps(own_event) + "\n")
+            marker_path = report_path + ".pending"
+            open(marker_path, "w").close()
+            engine = SimpleNamespace(state={
+                "backup_dir": backup_dir, "device_id": device_id,
+                "cloud_enabled": True, "cloud_remote": "drive",
+                "cloud_path": "HomeGridBackup",
+            })
+            own_source_records = []
+            shared_log_lines = []
+
+            def rclone(*args):
+                if args[0] == "copy" and args[1] == "drive:HomeGridBackup/.HomeGridBackup-sources":
+                    with open(os.path.join(args[2], other_device_id + ".jsonl"), "w", encoding="utf-8") as source:
+                        source.write(json.dumps(other_event) + "\n")
+                elif args[0] == "copy" and args[1] == "drive:HomeGridBackup/operations":
+                    legacy_dir = os.path.join(args[2], "legacy", "2025-01-02")
+                    os.makedirs(legacy_dir)
+                    with open(os.path.join(legacy_dir, "2025-01-02.jsonl"), "w", encoding="utf-8") as source:
+                        source.write(json.dumps(legacy_event) + "\n")
+                elif args[0] == "copyto" and args[2] == (
+                    "drive:HomeGridBackup/.HomeGridBackup-sources/{}.jsonl".format(device_id)
+                ):
+                    with open(args[1], encoding="utf-8") as source:
+                        own_source_records.extend(json.loads(line) for line in source)
+                elif args[0] == "copyto" and args[2] == "drive:HomeGridBackup/HomeGridBackup.log":
+                    with open(args[1], encoding="utf-8") as merged:
+                        shared_log_lines.extend(merged.readlines())
+
+            with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
+                 mock.patch.object(cloud, "_rclone", side_effect=rclone):
+                self.assertTrue(cloud.sync_cloud_reports(engine))
+
+            self.assertEqual(
+                {record["device_id"] for record in own_source_records},
+                {device_id},
+            )
+            self.assertEqual(len(shared_log_lines), 3)
+            self.assertTrue(any("OS=Windows 7" in line for line in shared_log_lines))
+            self.assertTrue(any("OS=Linux 6.8" in line for line in shared_log_lines))
+            self.assertTrue(any("OS=Darwin 24.0" in line for line in shared_log_lines))
+            self.assertTrue(any("server_duration_sec=219.6" in line for line in shared_log_lines))
+            self.assertTrue(any("server_duration_sec=180" in line for line in shared_log_lines))
+            self.assertFalse(any(line.lstrip().startswith("{") for line in shared_log_lines))
+            self.assertFalse(os.path.exists(marker_path))
+
     def test_failed_report_upload_keeps_the_pending_marker_for_retry(self):
         device_id = "c" * 32
         with tempfile.TemporaryDirectory() as backup_dir:
@@ -172,7 +286,12 @@ class RcloneExecutableTests(unittest.TestCase):
             os.makedirs(report_dir)
             report_path = os.path.join(report_dir, "2025-01-02.jsonl")
             with open(report_path, "w", encoding="utf-8") as report:
-                report.write("{}\n")
+                report.write(json.dumps({
+                    "timestamp": "2025-01-02T10:00:00+00:00",
+                    "device_id": device_id,
+                    "operation_id": "operation-1",
+                    "event": "stage_started",
+                }) + "\n")
             marker_path = report_path + ".pending"
             open(marker_path, "w").close()
             engine = SimpleNamespace(state={
@@ -196,7 +315,12 @@ class RcloneExecutableTests(unittest.TestCase):
             os.makedirs(report_dir)
             report_path = os.path.join(report_dir, "2025-01-02.jsonl")
             with open(report_path, "w", encoding="utf-8") as report:
-                report.write("{}\n")
+                report.write(json.dumps({
+                    "timestamp": "2025-01-02T10:00:00+00:00",
+                    "device_id": device_id,
+                    "operation_id": "operation-1",
+                    "event": "stage_started",
+                }) + "\n")
             marker_path = report_path + ".pending"
             open(marker_path, "w").close()
             engine = SimpleNamespace(state={
@@ -205,9 +329,12 @@ class RcloneExecutableTests(unittest.TestCase):
                 "cloud_path": "HomeGridBackup",
             })
 
-            def append_during_upload(*_args):
-                with open(marker_path, "a", encoding="utf-8"):
-                    pass
+            def append_during_upload(*args):
+                if args[0] == "copyto" and args[2] == (
+                    "drive:HomeGridBackup/.HomeGridBackup-sources/{}.jsonl".format(device_id)
+                ):
+                    with open(marker_path, "a", encoding="utf-8"):
+                        pass
 
             with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
                  mock.patch.object(cloud, "_rclone", side_effect=append_during_upload):
@@ -238,6 +365,57 @@ class RcloneExecutableTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(backup_dir, ".cloud-archives.pending")))
             with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True):
                 self.assertEqual(cloud.cloud_sync_queue_state(engine)["archives"], 1)
+
+    def test_preview_archives_share_one_folder_without_cross_device_pruning(self):
+        device_id = "a" * 32
+        other_device_id = "b" * 32
+        archive_name = "homegrid_backup_DAILY_2025-01-02.zip"
+        own_stale = device_id + "_homegrid_backup_DAILY_old.zip"
+        other_stale = other_device_id + "_homegrid_backup_DAILY_old.zip"
+        with tempfile.TemporaryDirectory() as backup_dir:
+            archive_path = os.path.join(backup_dir, archive_name)
+            with open(archive_path, "wb") as archive:
+                archive.write(b"archive")
+            with open(archive_path + ".sha256", "w", encoding="utf-8") as sidecar:
+                sidecar.write("{}  {}\n".format("a" * 64, archive_name))
+            engine = SimpleNamespace(state={
+                "backup_dir": backup_dir, "device_id": device_id,
+                "cloud_enabled": True, "cloud_remote": "drive",
+                "cloud_path": "HomeGridBackup",
+            })
+
+            def rclone(*args):
+                if args[0] == "lsf":
+                    self.assertEqual(args[2], "drive:HomeGridBackup/backups")
+                    return "\n".join((
+                        own_stale, own_stale + ".sha256",
+                        other_stale, other_stale + ".sha256",
+                    ))
+                if args[0] == "copyto" and args[1].endswith(".sha256") and ".tmp" not in args[1]:
+                    with open(args[1], encoding="utf-8") as sidecar:
+                        self.assertEqual(
+                            sidecar.read(),
+                            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "
+                            "{}_{}\n".format(device_id, archive_name),
+                        )
+
+            with mock.patch("core.gfs.compute_gfs_plan", return_value=(None, [{"path": archive_path}], [])), \
+                 mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
+                 mock.patch.object(cloud, "_rclone", side_effect=rclone) as mocked_rclone:
+                self.assertTrue(cloud.sync_cloud_backups(engine, prune=True))
+
+            shared_dir = "drive:HomeGridBackup/backups"
+            mocked_rclone.assert_any_call(
+                "copyto", archive_path, "{}/{}_{}".format(shared_dir, device_id, archive_name)
+            )
+            delete_targets = {
+                call.args[1] for call in mocked_rclone.call_args_list
+                if call.args[0] == "deletefile"
+            }
+            self.assertEqual(delete_targets, {
+                "{}/{}".format(shared_dir, own_stale),
+                "{}/{}.sha256".format(shared_dir, own_stale),
+            })
 
     def test_archive_sync_is_queued_if_another_sync_is_active(self):
         with tempfile.TemporaryDirectory() as backup_dir:

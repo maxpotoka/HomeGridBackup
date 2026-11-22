@@ -567,10 +567,16 @@ class DialogsMixin:
             cloud_path_row, textvariable=v_cloud_path, bg=p["inp_bg"],
             fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
         ).pack(side="left", fill="x", expand=True)
+        cloud_storage_hint = (
+            "Архіви всіх пристроїв зберігаються у вибраній папці хмари в backups/; "
+            "назви містять ID пристрою. Спільний текстовий журнал у корені: HomeGridBackup.log. "
+            "На всіх пристроях виберіть той самий обліковий запис і папку."
+            if WINDOWS7_CLOUD_SYNC_PREVIEW else
+            "Архіви зберігаються у вибраній папці хмари в backups/<ID пристрою>/. "
+            "Журнал пристрою: operations/<ID пристрою>/<дата>.jsonl."
+        )
         tk.Label(
-            f_cloud,
-            text="Журнал зберігається локально у папці reports поруч з архівами та окремо синхронізується в хмару. "
-                 "Дані розділяються за ID пристрою та містять етапи, кількість файлів і системні версії.",
+            f_cloud, text=tr(cloud_storage_hint, st.get("lang", "en")),
             bg=p["card"], fg=p["muted"], justify="left", wraplength=780,
             font=("Segoe UI", max(8, fs - 1))
         ).pack(anchor="w", pady=(8, 4))
@@ -664,6 +670,11 @@ class DialogsMixin:
             if WINDOWS7_CLOUD_SYNC_PREVIEW and backend == "drive":
                 wizard_hint += " " + tr(
                     "Для Google Drive рекомендується власний OAuth Client ID та Secret, щоб уникнути спільного ліміту rclone.",
+                    st.get("lang", "en"),
+                )
+            elif backend == "mega":
+                wizard_hint += " " + tr(
+                    "Для MEGA введіть email і пароль свого облікового запису у відповідь на запити rclone.",
                     st.get("lang", "en"),
                 )
             tk.Label(
