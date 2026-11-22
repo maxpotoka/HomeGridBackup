@@ -112,14 +112,9 @@ jobs:
 
       - name: Create per-user macOS installation image
         run: |
-          icon_args=()
-          if [ -f icon.icns ]; then
-            icon_args=(-volicon icon.icns)
-          fi
           hdiutil create \
             -volname "HomeGridBackup" \
             -srcfolder dist_mac/pack \
-            "${icon_args[@]}" \
             -ov \
             -format UDZO \
             dist_mac/HomeGridBackup_macOS_Intel.dmg
