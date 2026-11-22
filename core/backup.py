@@ -1,5 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: core/backup.py (v2.08 | 21.11.2026 22:30) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: io-pause-buf128-2.18
+# [ФАЙЛ: core/backup.py (v2.09 | 22.11.2026 08:15) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -168,7 +169,9 @@ def _backup_stage1_prepare(engine, raw_url, force_skip):
     srv_label = f"{p_host}:{c_port}" if c_port not in (80, 443) else p_host
     return srv, srv_label, job_id
 
-def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=65536, cancel_flag=None):
+VERIFY_PAUSE_LITE = 0.012  # пауза в LITE, с на каждые 4 МБ (подбирается замером)
+
+def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=131072, cancel_flag=None, io_pause=0.0):
     name = os.path.basename(zip_path)
     if not os.path.isfile(zip_path):
         return {"name": name, "status": "err", "detail": "Файл не знайдено"}
@@ -206,9 +209,9 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
                         crc = zlib.crc32(chunk, crc)
                         processed += len(chunk)
                         since_sleep += len(chunk)
-                        if since_sleep >= 1048576:
+                        if io_pause and since_sleep >= 4194304:
                             since_sleep = 0
-                            time.sleep(0.008)
+                            time.sleep(io_pause)
                         report(f"CRC32 {processed / 1048576.0:.1f} МБ")
                 if (crc & 0xFFFFFFFF) != info.CRC:
                     return {"name": name, "status": "err", "detail": f"Пошкоджений CRC32 у файлі: {info.filename}"}
@@ -233,9 +236,9 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
                 h.update(blk)
                 processed += len(blk)
                 since_sleep += len(blk)
-                if since_sleep >= 1048576:
+                if io_pause and since_sleep >= 4194304:
                     since_sleep = 0
-                    time.sleep(0.008)
+                    time.sleep(io_pause)
                 report(f"SHA-256 {processed / 1048576.0:.1f} МБ")
         if h.hexdigest().lower() == expected_hash and expected_hash:
             return {"name": name, "status": "ok", "detail": f"Цілісність 100% підтверджена ({cnt} файлів)"}
@@ -243,8 +246,9 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
     except Exception as e:
         return {"name": name, "status": "err", "detail": f"Помилка перевірки SHA-256: {e}"}
 
-def verify_all_archives(state, progress_callback=None, buf_size=65536, cancel_flag=None):
+def verify_all_archives(state, progress_callback=None, buf_size=131072, cancel_flag=None):
     t0 = time.time()
+    io_pause = VERIFY_PAUSE_LITE if state.get("lite_mode") else 0.0
     bdir = state["backup_dir"]
     os.makedirs(bdir, exist_ok=True)
     zips = sorted([os.path.join(bdir, f) for f in os.listdir(bdir) if f.lower().endswith(".zip")], key=os.path.getmtime, reverse=True)
@@ -255,7 +259,7 @@ def verify_all_archives(state, progress_callback=None, buf_size=65536, cancel_fl
             break
         if progress_callback:
             progress_callback(int(completed_work * 100 / max(1, total_work)), f"Архів {index}/{len(zips)}: {os.path.basename(path)}")
-        results.append(verify_single_archive(path, progress_callback, completed_work, total_work, buf_size=buf_size, cancel_flag=cancel_flag))
+        results.append(verify_single_archive(path, progress_callback, completed_work, total_work, buf_size=buf_size, cancel_flag=cancel_flag, io_pause=io_pause))
         completed_work += work_sizes[index - 1]
     elapsed = max(0.001, time.time() - t0)
     total_mb = sum(os.path.getsize(p) for p in zips) / 1048576.0
@@ -405,7 +409,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     handlers.append(urllib.request.ProxyHandler({}))
                 opener = urllib.request.build_opener(*handlers)
                 req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
-                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=4194304) as out_f:
+                with opener.open(req, timeout=300) as resp, open(out_file, "wb", buffering=131072) as out_f:
                     srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
                     net_h = hashlib.sha256()
                     cb = 0
@@ -414,7 +418,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir):
                     last_speed_bytes = 0
                     smooth_speed = None
                     while True:
-                        chunk = resp.read(1048576)
+                        chunk = resp.read(131072)
                         if not chunk:
                             break
                         out_f.write(chunk)
@@ -493,7 +497,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             for info in infos:
                 crc = 0
                 with zf.open(info, "r") as member:
-                    for chunk in iter(lambda: member.read(4194304), b""):
+                    for chunk in iter(lambda: member.read(131072), b""):
                         crc = zlib.crc32(chunk, crc)
                 if (crc & 0xFFFFFFFF) != info.CRC:
                     os.remove(out_file)
@@ -505,7 +509,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         processed = 0
         last_ui = time.time()
         with open(out_file, "rb") as f_in:
-            for blk in iter(lambda: f_in.read(4194304), b""):
+            for blk in iter(lambda: f_in.read(131072), b""):
                 h.update(blk)
                 processed += len(blk)
                 if time.time() - last_ui >= 0.8:

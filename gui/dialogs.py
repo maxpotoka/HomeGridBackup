@@ -3,7 +3,8 @@ import os
 import time
 from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
-# [ФАЙЛ: gui/dialogs.py (v2.07 | 22.11.2026 00:46)
+# patch-id: io-pause-buf128-2.18
+# [ФАЙЛ: gui/dialogs.py (v2.08 | 22.11.2026 08:15)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -693,8 +694,8 @@ class DialogsMixin:
         def remove_file_smart(path_to_del, use_trash=True):
             remove_backup_file(path_to_del, "trash" if use_trash else "direct")
         _lng_a = self.engine.state.get("lang", "en")
-        buf_options = {tr(k, _lng_a): v for k, v in (("4 КБ", 4096), ("16 КБ", 16384), ("64 КБ", 65536), ("256 КБ", 262144), ("1 МБ", 1048576), ("4 МБ", 4194304), ("8 МБ", 8388608))}
-        v_buf = tk.StringVar(value=tr("64 КБ", _lng_a))
+        buf_options = {tr(k, _lng_a): v for k, v in (("4 КБ", 4096), ("16 КБ", 16384), ("128 КБ", 131072), ("256 КБ", 262144), ("1 МБ", 1048576), ("4 МБ", 4194304), ("8 МБ", 8388608))}
+        v_buf = tk.StringVar(value=tr("128 КБ", _lng_a))
         verify_state = {"running": False, "stop": False, "pct": 0, "stage": "", "res": None, "err": None, "status_map": {}}
 
         def _delete_archive_pair(fname):
@@ -759,7 +760,7 @@ class DialogsMixin:
             verify_state.update({"running": True, "stop": False, "pct": 0, "stage": tr("Запуск...", lng_v), "res": None, "err": None})
             btn_verify.configure(text=tr("Зупинити", lng_v))
             cb_buf.configure(state="disabled")
-            chosen_buf = buf_options.get(v_buf.get(), 65536)
+            chosen_buf = buf_options.get(v_buf.get(), 131072)
             lbl_ver.configure(text=tr(f"Перевірка архівів (буфер {v_buf.get()})…", lng_v), fg=p["cyan"])
             verify_bar["value"] = 0
 

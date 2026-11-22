@@ -1,5 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: core/config.py (v2.17 | 22.11.2026 02:07) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: io-pause-buf128-2.18
+# [ФАЙЛ: core/config.py (v2.18 | 22.11.2026 08:15) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -54,8 +55,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.17"
-BUILD_DATE = "22.11.2026 02:07"
+SCRIPT_VER = "2.18"
+BUILD_DATE = "22.11.2026 08:15"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
