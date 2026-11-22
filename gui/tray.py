@@ -229,6 +229,19 @@ def _force_quit_app(engine):
 def _can_dock_linux_tray():
     return bool(_LNX_TRAY_BE)
 
+
+def _tray_status_text(engine, language, elapsed_sec=0):
+    from core.files import format_duration
+    from core.i18n import tr
+
+    if not engine.is_running:
+        return tr("Готовий до резервного копіювання", language)
+    stage = tr(engine.stage, language) if engine.stage else ""
+    progress = int(engine.progress)
+    elapsed = format_duration(elapsed_sec, language)
+    return f"{tr('Резервне копіювання...', language)} {progress}% | {stage} | {elapsed}"
+
+
 def _tray_problem():
     import sys
     if not HAS_TRAY:
@@ -307,17 +320,25 @@ def _start_tray_thread(engine):
                 engine.app_ref.root.after(0, _run_ui_dlg)
         return _cb
 
+    run_started_at = None
+
+    def _elapsed_seconds():
+        nonlocal run_started_at
+        if not engine.is_running:
+            run_started_at = None
+            return 0
+        if run_started_at is None:
+            run_started_at = time.monotonic()
+        return int(time.monotonic() - run_started_at)
+
     def _build_tray_menu():
         lng_s = engine.state.get("lang", "en")
-        st_txt = (
-            tr(f"Резервне копіювання... ({int(engine.progress)}%)", lng_s)
-            if engine.is_running else
-            tr("Готовий до резервного копіювання", lng_s)
-        )
+        elapsed_sec = _elapsed_seconds()
+        st_txt = _tray_status_text(engine, lng_s, elapsed_sec)
         return pystray.Menu(
-            pystray.MenuItem(st_txt, lambda i, it: None, enabled=False),
-            pystray.Menu.SEPARATOR,
             pystray.MenuItem(tr("Відкрити HomeGrid Backup", lng_s), _on_open, default=True, enabled=lambda item: engine.app_ref is not None),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(st_txt, lambda i, it: None, enabled=False),
             pystray.MenuItem(tr("▶ Запустити резервне копіювання", lng_s), _on_backup, enabled=lambda item: not engine.is_running),
             pystray.MenuItem(tr("Відкрити папку", lng_s), _on_open_folder),
             pystray.Menu.SEPARATOR,
@@ -357,6 +378,11 @@ def _start_tray_thread(engine):
             except Exception:
                 pass
 
+    def _refresh_tray_menu():
+        if engine.tray_icon is not None:
+            engine.tray_icon.menu = _build_tray_menu()
+            engine.tray_icon.update_menu()
+
     def _anim_loop():
         err_streak = 0
         last_sig, last_title = None, ""
@@ -373,26 +399,36 @@ def _start_tray_thread(engine):
                     continue
                 cur_pct = int(engine.progress) if engine.is_running else 0
                 sig = (cur_pct, engine.is_running, engine.pill_type)
-                new_title = f"HomeGrid Backup ({cur_pct}%): {(engine.stage or '')[:45]}" if engine.is_running else "HomeGrid Backup"
+                elapsed_sec = _elapsed_seconds()
+                lng_s = engine.state.get("lang", "en")
+                if os.sys.platform == "darwin" and engine.is_running:
+                    new_title = f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
+                else:
+                    new_title = f"HomeGrid Backup ({cur_pct}%): {(engine.stage or '')[:45]}" if engine.is_running else "HomeGrid Backup"
                 if os.sys.platform == "darwin":
-                    if sig != last_sig:
+                    sig_changed = sig != last_sig
+                    if sig_changed:
                         last_sig = sig
                         if engine.app_ref is not None:
                             _im_mac = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
                             engine.app_ref.root.after(0, lambda im=_im_mac: setattr(engine.tray_icon, "icon", im) if engine.tray_icon else None)
+                    if engine.is_running or sig_changed:
+                        if engine.app_ref is not None:
+                            engine.app_ref.root.after(0, _refresh_tray_menu)
+                        else:
+                            _refresh_tray_menu()
                     if new_title != last_title:
                         last_title = new_title
                         if engine.app_ref is not None:
                             engine.app_ref.root.after(0, lambda t=new_title: setattr(engine.tray_icon, "title", t) if engine.tray_icon else None)
                 else:
-                    if sig != last_sig:
+                    sig_changed = sig != last_sig
+                    if sig_changed:
                         engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
-                        try:
-                            engine.tray_icon.menu = _build_tray_menu()
-                            engine.tray_icon.update_menu()
-                        except Exception:
-                            pass
                         last_sig = sig
+                    if os.sys.platform != "darwin" or sig_changed:
+                        engine.tray_icon.menu = _build_tray_menu()
+                        engine.tray_icon.update_menu()
                     if new_title != last_title:
                         engine.tray_icon.title = new_title
                         last_title = new_title
