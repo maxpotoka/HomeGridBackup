@@ -229,6 +229,12 @@ def _can_dock_linux_tray():
     return bool(_LNX_TRAY_BE)
 
 
+def _tray_backend_available():
+    return HAS_TRAY and (
+        not os.sys.platform.startswith("linux") or _can_dock_linux_tray()
+    )
+
+
 def _tray_status_text(engine, language, elapsed_sec=0):
     from core.files import format_duration
     from core.i18n import tr
@@ -310,7 +316,7 @@ def _start_tray_thread(engine):
             engine.tray_icon = None
             engine.log("Системний трей недоступний у середовищі WSL — робота продовжується без іконки в треї.", "info")
             return
-        if not HAS_TRAY or not _can_dock_linux_tray():
+        if not _tray_backend_available():
             _TRAY_STARTED = True
             engine.tray_icon = None
             engine.log(_tray_problem(), "warn")
