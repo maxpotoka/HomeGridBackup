@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: core/scheduler.py (v2.00 | 21.11.2026 03:24) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
+# [ФАЙЛ: core/scheduler.py (v2.01 | 22.11.2026 11:20) — ПЛАНИРОВЩИК ЗАДАЧ WINDOWS (SCHTASKS)]
 # ==============================================================================
 import os
 import re
@@ -59,8 +59,11 @@ def _sync_scheduler_from_windows(st):
             for ln in out.splitlines():
                 if "# HomeGridBackup" in ln:
                     pt = ln.split()
-                    if len(pt) >= 2 and pt.isdigit() and pt.isdigit():
-                        st["sched_time"] = f"{int(pt):02d}:{int(pt):02d}"
+                    if len(pt) >= 2 and pt[0].isdigit() and pt[1].isdigit():
+                        mm = int(pt[0])
+                        hh = int(pt[1])
+                        if 0 <= mm <= 59 and 0 <= hh <= 23:
+                            st["sched_time"] = f"{hh:02d}:{mm:02d}"
                     st["sched_mode"] = "--silent" if "--silent" in ln else "--hidden"
                     break
         except Exception:

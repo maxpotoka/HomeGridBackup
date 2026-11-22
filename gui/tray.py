@@ -1,5 +1,5 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v2.05 | 22.11.2026 02:07)
+# [ФАЙЛ: gui/tray.py (v2.06 | 22.11.2026 11:20)
 # patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
 import os
@@ -141,9 +141,8 @@ def _detect_linux_tray_backend():
         return "gtk" if _has_gtk_gi() else "xorg"
     return ""
 
-_LNX_TRAY_BE = _detect_linux_tray_backend()
-if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
-    os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
+_LNX_TRAY_BE = ""
+_LNX_TRAY_PROBED = False
 
 try:
     import pystray
@@ -260,7 +259,43 @@ def _tray_problem():
     return "Системний трей недоступний"
 
 def _start_tray_thread(engine):
-    global _TRAY_STARTED
+    global _TRAY_STARTED, _LNX_TRAY_BE, _LNX_TRAY_PROBED
+
+    if os.sys.platform == "darwin":
+        with _TRAY_LOCK:
+            if _TRAY_STARTED:
+                return
+            _TRAY_STARTED = True
+            engine.tray_icon = None
+            engine.tray_ready = True
+            engine.tray_error = ""
+            engine.tray_ready_event = threading.Event()
+            engine.tray_ready_event.set()
+        engine.log("Системний трей macOS не запускається — для керування використовується значок у Dock.", "info")
+        return
+
+    if os.sys.platform.startswith("linux") and not _LNX_TRAY_PROBED:
+        engine.tray_ready_event = threading.Event()
+
+        def _probe_linux_tray():
+            global _LNX_TRAY_BE, _LNX_TRAY_PROBED
+            _LNX_TRAY_BE = _detect_linux_tray_backend()
+            _LNX_TRAY_PROBED = True
+            if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
+                os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
+            if not _LNX_TRAY_BE:
+                with _TRAY_LOCK:
+                    _TRAY_STARTED = False
+                engine.tray_ready = False
+                engine.tray_icon = None
+                engine.tray_ready_event.set()
+                engine.log(_tray_problem(), "warn")
+                return
+            _start_tray_thread(engine)
+
+        threading.Thread(target=_probe_linux_tray, daemon=True).start()
+        return
+
     from core.config import IS_WSL, NO_TRAY
     with _TRAY_LOCK:
         if _TRAY_STARTED:
