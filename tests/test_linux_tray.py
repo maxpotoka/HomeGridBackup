@@ -62,6 +62,25 @@ class LinuxTrayBackendTests(unittest.TestCase):
                 mock.patch("gui.tray.ctypes.CDLL", return_value=x11):
             self.assertFalse(tray._has_x11_tray_manager())
 
+    def test_tray_menu_status_includes_progress_stage_and_elapsed_time(self):
+        engine = mock.Mock(
+            is_running=True,
+            progress=42.8,
+            stage="Копіювання бази та файлів",
+        )
+        text = tray._tray_status_text(engine, "en", 61)
+        self.assertIn("Backing up...", text)
+        self.assertIn("42%", text)
+        self.assertIn("Copying DB & files", text)
+        self.assertIn("1m 1s", text)
+
+    def test_tray_menu_status_shows_idle_state(self):
+        engine = mock.Mock(is_running=False)
+        self.assertEqual(
+            tray._tray_status_text(engine, "en"),
+            "Ready for backup",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
