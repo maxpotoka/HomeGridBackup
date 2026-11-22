@@ -50,6 +50,7 @@ jobs:
             --enable-plugin=tk-inter ^
             --company-name="HomeGrid" ^
             --product-name="HomeGrid Backup" ^
+            --include-data-files=icon.ico=icon.ico ^
             --file-version="1.0.55.0" ^
             --product-version="1.0.55.0" ^
             --file-description="HomeGrid Backup Utility (Windows 10/11 x64)" ^

@@ -20,6 +20,8 @@ __pycache__/
 /gui/*
 !/mobile/
 /mobile/*
+!/tests/
+/tests/*
 
 # 4) точечно разрешаем файлы из списка
 !/build_x86.bat
@@ -29,6 +31,7 @@ __pycache__/
 !/sfx.bat
 !/wlsGUI.bat
 !/wlsconsol.bat
+!/icon.png
 
 !/console/__init__.py
 !/console/terminal.py
@@ -53,3 +56,6 @@ __pycache__/
 
 !/mobile/__init__.py
 !/mobile/android_app.py
+
+!/tests/test_linux_tray.py
+!/tests/test_app_icon.py

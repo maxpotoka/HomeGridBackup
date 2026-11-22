@@ -5,6 +5,7 @@ package.domain = org.homegrid
 source.dir = .
 source.include_exts = py,png,jpg,ico,kv,json
 source.exclude_dirs = tests, bin, .git, .github, dist_x86, dist_mac, dist_ubuntu, build
+icon.filename = %(source.dir)s/icon.png
 version = 1.023
 requirements = hostpython3==3.11.9,python3==3.11.9,kivy==2.3.0
 orientation = portrait
