@@ -4,8 +4,9 @@
 # 2) сам .gitignore тоже должен быть в git
 !/.gitignore
 
-# кэш Python не должен попадать в репозиторий
+# кэш Python (включая /core/__pycache__/) не должен попадать в репозиторий
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *$py.class
 
