@@ -176,4 +176,4 @@ jobs:
           files: homegrid-backup-linux-i386-legacy.7z
           overwrite_files: true
           fail_on_unmatched_files: true
-          make_latest: false
+          make_latest: true
