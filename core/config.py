@@ -3,13 +3,19 @@
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/config.py (v2.21 | 22.11.2026 09:10) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: android-storage-fallback-2.23
+# [ФАЙЛ: core/config.py (v2.24 | 22.11.2026 09:42) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
 import sys
 import json
 import platform
+import threading
+import time
+import atexit
+import tempfile
+import uuid
 
 def is_wsl():
     if not sys.platform.startswith("linux"):
@@ -58,8 +64,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.21"
-BUILD_DATE = "22.11.2026 09:10"
+SCRIPT_VER = "2.24"
+BUILD_DATE = "22.11.2026 09:42"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -139,7 +145,12 @@ def _get_ram_summary():
         pass
     return ""
 
+_SYSINFO_CACHE = {"value": "", "time": 0.0}
+
 def get_fast_sysinfo():
+    now = time.monotonic()
+    if _SYSINFO_CACHE["value"] and (now - _SYSINFO_CACHE["time"]) < 30.0:
+        return _SYSINFO_CACHE["value"]
     import struct
     arch_os = "64-bit" if (os.environ.get("PROCESSOR_ARCHITEW6432") or "64" in platform.machine() or struct.calcsize("P") == 8) else "32-bit"
     app_bits = f"{struct.calcsize('P') * 8}-bit"
@@ -221,7 +232,10 @@ def get_fast_sysinfo():
     cpu_name = re.sub(r"\s+", " ", cpu_name).replace("(R)", "").replace("(TM)", "").replace("CPU ", "").strip()
     if len(cpu_name) > 42:
         cpu_name = cpu_name[:39] + "..."
-    return f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}{_get_ram_summary()}"
+    result = f"{os_label} [{arch_os}, app {app_bits}] | CPU: {cpu_name}{_get_ram_summary()}"
+    _SYSINFO_CACHE["value"] = result
+    _SYSINFO_CACHE["time"] = now
+    return result
 
 def _detect_low_end_or_win7():
     if os.name != "nt":
@@ -283,34 +297,54 @@ def _write_env_secrets(state):
 
 _LOG_DIRS_READY = set()
 _LOG_WRITE_CNT = {}
+_LOG_HANDLES = {}
+_LOG_LOCK = threading.Lock()
 
 def write_file_log(text, target_dir=None):
     from datetime import datetime
+    d = target_dir or DEFAULT_BACKUP_DIR
     try:
-        d = target_dir or DEFAULT_BACKUP_DIR
-        if d not in _LOG_DIRS_READY:
-            os.makedirs(d, exist_ok=True)
-            _LOG_DIRS_READY.add(d)
-        log_path = os.path.join(d, "backup.log")
-        cnt = _LOG_WRITE_CNT.get(log_path, 0)
-        _LOG_WRITE_CNT[log_path] = cnt + 1
-        if cnt % 50 == 0 and os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
-            try:
-                with open(log_path, "rb") as f_old:
-                    f_old.seek(-512 * 1024, os.SEEK_END)
-                    tail = f_old.read().decode("utf-8", errors="replace")
-                cut = tail.find("\n")
-                if cut != -1:
-                    tail = tail[cut + 1:]
-                with open(log_path, "w", encoding="utf-8") as f_new:
-                    f_new.write("[Лог автоматично скорочено при перевищенні 2 МБ]\n" + tail)
-            except Exception:
-                pass
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] {text}\n")
+        with _LOG_LOCK:
+            if d not in _LOG_DIRS_READY:
+                os.makedirs(d, exist_ok=True)
+                _LOG_DIRS_READY.add(d)
+            log_path = os.path.join(d, "backup.log")
+            cnt = _LOG_WRITE_CNT.get(log_path, 0)
+            _LOG_WRITE_CNT[log_path] = cnt + 1
+            if cnt % 50 == 0 and os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
+                if log_path in _LOG_HANDLES:
+                    _LOG_HANDLES.pop(log_path).close()
+                try:
+                    with open(log_path, "rb") as f_old:
+                        f_old.seek(-512 * 1024, os.SEEK_END)
+                        tail = f_old.read().decode("utf-8", errors="replace")
+                    cut = tail.find("\n")
+                    if cut != -1:
+                        tail = tail[cut + 1:]
+                    with open(log_path, "w", encoding="utf-8") as f_new:
+                        f_new.write("[Лог автоматично скорочено при перевищенні 2 МБ]\n" + tail)
+                except Exception:
+                    pass
+            handle = _LOG_HANDLES.get(log_path)
+            if handle is None:
+                handle = open(log_path, "a", encoding="utf-8", buffering=65536)
+                _LOG_HANDLES[log_path] = handle
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            handle.write(f"[{ts}] {text}\n")
+            if cnt % 16 == 0:
+                handle.flush()
     except Exception:
         pass
+
+def flush_file_logs():
+    with _LOG_LOCK:
+        for handle in _LOG_HANDLES.values():
+            try:
+                handle.flush()
+            except Exception:
+                pass
+
+atexit.register(flush_file_logs)
 
 def record_server_history(state, srv_url):
     u = (srv_url or "").strip().rstrip("/")
@@ -324,7 +358,9 @@ def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "keep_last_count": 5, "daily_days": 7, "today_max": 2,
+        "mirror_dir": "", "mirror_enabled": False, "cloud_enabled": False, "cloud_remote": "",
+        "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
+        "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
         "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True, "tray_enabled": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
@@ -354,6 +390,16 @@ def load_state():
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
+            if not IS_ANDROID and isinstance(data.get("cloud_enabled"), bool):
+                state["cloud_enabled"] = data["cloud_enabled"]
+            if isinstance(data.get("cloud_remote"), str):
+                state["cloud_remote"] = data["cloud_remote"].strip()
+            if isinstance(data.get("cloud_path"), str):
+                state["cloud_path"] = data["cloud_path"].strip() or "HomeGridBackup"
+            if isinstance(data.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{32}", data["device_id"]):
+                state["device_id"] = data["device_id"]
+            else:
+                state["dirty"] = True
             if data.get("lang") in ("en", "uk"):
                 state["lang"] = data["lang"]
             if data.get("theme") in VALID_THEMES:
@@ -420,6 +466,18 @@ def load_state():
         if env_sec or not HAS_KEYRING:
             state["storage_backend"] = "env"
 
+    if IS_ANDROID:
+        try:
+            os.makedirs(state["backup_dir"], exist_ok=True)
+            with tempfile.TemporaryFile(dir=state["backup_dir"]):
+                pass
+        except OSError:
+            private_dir = os.environ.get("ANDROID_PRIVATE") or os.path.expanduser("~")
+            state["backup_dir"] = os.path.join(private_dir, "BackupHGM")
+            os.makedirs(state["backup_dir"], exist_ok=True)
+            state["_android_storage_fallback"] = True
+            state["dirty"] = True
+
     if state["dirty"]:
         commit_state(state)
     return state
@@ -435,6 +493,7 @@ def commit_state(state):
         record_server_history(state, state["server"])
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
+        "cloud_enabled", "cloud_remote", "cloud_path", "device_id",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",

@@ -325,7 +325,8 @@ class DialogsMixin:
                 info_f = tk.Frame(row, bg=p["card"])
                 info_f.pack(side="left", fill="x", expand=True)
                 tk.Label(info_f, text=url, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs + 1, "bold")).pack(anchor="w")
-                tk.Label(info_f, text=f"TCP: {t_ms} ms  •  API: {a_ms} ms", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
+                ms_unit = "мс" if lang == "uk" else "ms"
+                tk.Label(info_f, text=f"TCP: {t_ms} {ms_unit}  •  API: {a_ms} {ms_unit}", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
                 btn_bkp_t = "🔌 Підключити та бекап" if lang == "uk" else "🔌 Connect & Backup"
                 btn_sav_t = "⭐ В Історію" if lang == "uk" else "⭐ Save to History"
                 tk.Button(row, text=btn_bkp_t, command=lambda u=url: _done({"action": "backup", "url": u}), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=10, pady=4, cursor="hand2").pack(side="right", padx=(6, 0))
@@ -410,7 +411,10 @@ class DialogsMixin:
         tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=12)
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
-    def open_settings(self):
+    def open_cloud_settings(self):
+        self.open_settings(initial_tab=2)
+
+    def open_settings(self, initial_tab=0):
         _sync_scheduler_from_windows(self.engine.state)
         st = self.engine.state
         fs = self.metrics["font_sz"]
@@ -430,6 +434,9 @@ class DialogsMixin:
         v_lang = tk.StringVar(value=st.get("lang", "en"))
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
+        v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
+        v_cloud_remote = tk.StringVar(value=st.get("cloud_remote", ""))
+        v_cloud_path = tk.StringVar(value=st.get("cloud_path", "HomeGridBackup"))
 
         sch_parts = (st.get("sched_time") or "03:00").split(":")
         v_sh = tk.StringVar(value=sch_parts[0] if len(sch_parts) > 0 else "03")
@@ -449,8 +456,107 @@ class DialogsMixin:
         nb.pack(fill="both", expand=True, padx=10, pady=(4, 4))
         tab_bkp = tk.Frame(nb, bg=p["panel"])
         tab_ui = tk.Frame(nb, bg=p["panel"])
+        tab_cloud = tk.Frame(nb, bg=p["panel"])
         nb.add(tab_bkp, text="  Резервне копіювання та Розклад  ")
         nb.add(tab_ui, text="  Вигляд та Інтерфейс  ")
+        nb.add(tab_cloud, text="  Хмарне сховище  ")
+        nb.select(initial_tab)
+
+        f_cloud = tk.LabelFrame(
+            tab_cloud, text="5. Налаштування хмарного сховища",
+            bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"),
+            padx=14, pady=10
+        )
+        f_cloud.pack(fill="x", padx=14, pady=12)
+        tk.Checkbutton(
+            f_cloud, text="Увімкнути хмарне дзеркало та звіт",
+            variable=v_cloud_enabled, bg=p["card"], fg=p["text"],
+            selectcolor=p["inp_bg"], font=("Segoe UI", fs)
+        ).pack(anchor="w", pady=(2, 8))
+
+        cloud_remote_row = tk.Frame(f_cloud, bg=p["card"])
+        cloud_remote_row.pack(fill="x", pady=4)
+        tk.Label(
+            cloud_remote_row, text="Вибір хмарного сховища:", width=24, anchor="w",
+            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
+        ).pack(side="left")
+        cb_cloud_remote = ttk.Combobox(
+            cloud_remote_row, textvariable=v_cloud_remote, state="readonly",
+            font=("Segoe UI", fs)
+        )
+        cb_cloud_remote.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        cloud_msg = tk.Label(f_cloud, text="", bg=p["card"], fg=p["muted"], font=("Segoe UI", fs - 1))
+        cloud_msg.pack(anchor="w", pady=(2, 4))
+
+        cloud_path_row = tk.Frame(f_cloud, bg=p["card"])
+        cloud_path_row.pack(fill="x", pady=4)
+        tk.Label(
+            cloud_path_row, text="Папка у хмарі:", width=18, anchor="w",
+            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
+        ).pack(side="left")
+        tk.Entry(
+            cloud_path_row, textvariable=v_cloud_path, bg=p["inp_bg"],
+            fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
+        ).pack(side="left", fill="x", expand=True)
+        tk.Label(
+            f_cloud,
+            text="Архіви та журнали розділяються за випадковим ID пристрою. "
+                 "Хмарні ZIP-копії повторюють GFS після очищення; журнали мають секундні часові мітки.",
+            bg=p["card"], fg=p["muted"], justify="left", wraplength=780,
+            font=("Segoe UI", max(8, fs - 1))
+        ).pack(anchor="w", pady=(8, 4))
+        tk.Label(
+            f_cloud, text=f"ID пристрою: {st.get('device_id', '')}",
+            bg=p["card"], fg=p["muted"], font=("Consolas", max(8, fs - 1))
+        ).pack(anchor="w", pady=(2, 6))
+
+        def _refresh_cloud_remotes():
+            import threading
+            cloud_msg.configure(text=tr("Завантаження списку rclone remotes...", st.get("lang", "en")), fg=p["muted"])
+
+            def _worker():
+                try:
+                    from core.cloud import list_rclone_remotes
+                    remotes = list_rclone_remotes()
+                    error = ""
+                except Exception as exc:
+                    remotes = []
+                    error = str(exc)
+
+                def _update():
+                    if not dlg.winfo_exists():
+                        return
+                    current = v_cloud_remote.get()
+                    values = list(remotes)
+                    if current and current not in values:
+                        values.append(current)
+                    cb_cloud_remote.configure(values=values)
+                    if current:
+                        v_cloud_remote.set(current)
+                    if error:
+                        cloud_msg.configure(text=error, fg=p["red"])
+                    elif remotes:
+                        cloud_msg.configure(text=tr("rclone remotes завантажено.", st.get("lang", "en")), fg=p["green"])
+                    else:
+                        cloud_msg.configure(text=tr("Налаштованих rclone remotes не знайдено.", st.get("lang", "en")), fg=p["amber"])
+
+                try:
+                    self.root.after(0, _update)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+        tk.Button(
+            cloud_remote_row, text="Оновити список",
+            command=_refresh_cloud_remotes, bg=p["card"], fg=p["cyan"],
+            font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
+        ).pack(side="right")
+        tk.Label(
+            f_cloud, text="Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config",
+            bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))
+        ).pack(anchor="w", pady=(4, 2))
+        _refresh_cloud_remotes()
 
         top_grid = tk.Frame(tab_bkp, bg=p["panel"])
         top_grid.pack(fill="x", padx=12, pady=(6, 2))
@@ -534,7 +640,7 @@ class DialogsMixin:
             from tkinter import filedialog
             fp = filedialog.asksaveasfilename(defaultextension=".json", initialfile="homegrid_backup_settings.json", filetypes=[("JSON", "*.json")])
             if not fp: return
-            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend"}
+            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend", "device_id"}
             data = {k: v for k, v in st.items() if k not in skip_k}
             with open(fp, "w", encoding="utf-8") as fo:
                 _j.dump(data, fo, indent=2, ensure_ascii=False)
@@ -547,7 +653,7 @@ class DialogsMixin:
             if not fp: return
             with open(fp, "r", encoding="utf-8") as fi:
                 data = _j.load(fi)
-            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend"}
+            skip_k = {"client_token", "session_token", "login_pin", "editor_pin", "_jar", "dirty", "storage_backend", "device_id"}
             for k, v in data.items():
                 if k in st and k not in skip_k:
                     st[k] = v
@@ -619,6 +725,17 @@ class DialogsMixin:
 
 
         def _commit_settings(close_after):
+            selected_tab = nb.index(nb.select())
+            cloud_remote = v_cloud_remote.get().strip()
+            cloud_path = v_cloud_path.get().strip() or "HomeGridBackup"
+            if v_cloud_enabled.get():
+                try:
+                    from core.cloud import validate_cloud_settings
+                    cloud_path = validate_cloud_settings(cloud_remote, cloud_path)
+                except ValueError as exc:
+                    cloud_msg.configure(text=str(exc), fg=p["red"])
+                    nb.select(tab_cloud)
+                    return
             st["keep_last_count"] = max(1, int(v_keep_n.get()))
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))
@@ -630,6 +747,9 @@ class DialogsMixin:
             st["delete_mode"] = "trash" if v_trash.get() else "direct"
             st["minimize_to_tray"] = bool(v_tray_min.get())
             st["silent_cleanup"] = bool(v_sclean.get())
+            st["cloud_enabled"] = bool(v_cloud_enabled.get())
+            st["cloud_remote"] = cloud_remote
+            st["cloud_path"] = cloud_path
             old_sc = st.get("ui_scale", "auto")
             new_sc = scale_map.get(cb_scale.get(), "auto")
             st["ui_scale"] = new_sc
@@ -640,7 +760,7 @@ class DialogsMixin:
             self.engine.log("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "ok")
             dlg.destroy()
             if not close_after:
-                self.open_settings()
+                self.open_settings(initial_tab=selected_tab)
 
         tk.Button(bf, text="Скинути PIN", command=lambda: (self.reset_pins(), lbl_sch_msg.configure(text="✓ Збережені PIN-коди очищено", fg=p["amber"])), bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=(6, 6), pady=6)
         tk.Button(bf, text="Експорт JSON", command=_export_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
@@ -652,6 +772,7 @@ class DialogsMixin:
             lng = st.get("lang", "en")
             nb.tab(0, text="  " + tr("Резервне копіювання та Розклад", lng) + "  ")
             nb.tab(1, text="  " + tr("Вигляд та Інтерфейс", lng) + "  ")
+            nb.tab(2, text="  " + tr("Хмарне сховище", lng) + "  ")
             apply_widget_i18n(dlg, lng)
         _i18n_settings()
 

@@ -83,6 +83,10 @@ jobs:
           cd dist_mac/pack
           7z a -t7z -mx=9 ../HomeGridBackup_macOS_Intel.7z HomeGridBackup.app
 
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
       - name: Delete old macOS release and tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,9 +98,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: macos-intel-latest
-          name: HomeGrid Backup — macOS Intel (x86_64)
+          name: HomeGrid Backup — macOS Intel (x86_64) — ${{ steps.build_time.outputs.value }}
           body: |
             Чистий архів **HomeGridBackup_macOS_Intel.7z** без подвійного пакування.
             Працює без прав `root` (`sudo`). Після розпакування натисніть правою кнопкою по **HomeGridBackup.app** → **Відкрити** (або виконайте в Терміналі: `xattr -cr ~/Downloads/HomeGridBackup.app && open ~/Downloads/HomeGridBackup.app`).
           files: dist_mac/HomeGridBackup_macOS_Intel.7z
+          fail_on_unmatched_files: true
           make_latest: true

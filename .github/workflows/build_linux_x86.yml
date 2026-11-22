@@ -162,11 +162,22 @@ jobs:
           cd ..
           ls -lh homegrid-backup-linux-i386-legacy.7z
 
+      - name: Set build completion timestamp
+        id: build_time
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+
+      - name: Delete previous Linux 32-bit release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete linux-32bit-latest --yes || true
+          git push origin --delete linux-32bit-latest || true
+
       - name: Publish legacy 32-bit .7z to GitHub Releases
         uses: softprops/action-gh-release@v3
         with:
           tag_name: linux-32bit-latest
-          name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+)
+          name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+) — ${{ steps.build_time.outputs.value }}
           body: |
             Одиночный 32-битный исполняемый файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, собранный на Ubuntu 18.04 / glibc 2.27) для MX Linux 32-bit, antiX, Debian 10+, Ubuntu 18.04+.
 

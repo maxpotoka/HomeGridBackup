@@ -68,11 +68,21 @@ jobs:
             --output-filename=HomeGridBackup.exe ^
             main.py
 
+      - name: Set build completion timestamp
+        id: build_time
+        shell: pwsh
+        run: |
+          $utcNow = [DateTime]::UtcNow
+          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+          $buildDate = $utcNow.ToString("yyyy.MM.dd")
+          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
+          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
+
       - name: Generate version tag
         id: tag
         shell: pwsh
         run: |
-          $date = Get-Date -Format "yyyy.MM.dd"
+          $date = "${{ steps.build_time.outputs.date }}"
           $runNumber = "${{ github.run_number }}"
           $tag = "win10-x64-v$date.$runNumber"
           echo "tag=$tag" >> $env:GITHUB_OUTPUT
@@ -112,12 +122,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: HomeGrid Backup — Windows 10/11 (OneFile x64)
+          name: HomeGrid Backup — Windows 10/11 (OneFile x64) — ${{ steps.build_time.outputs.value }}
           body: |
             ## HomeGrid Backup для Windows 10/11 (x64 OneFile)
             
             **Версія:** ${{ steps.tag.outputs.tag }}  
-            **Дата збірки:** $(Get-Date -Format "dd.MM.yyyy HH:mm")
+            **Дата збірки:** ${{ steps.build_time.outputs.value }}
             
             Чистий виконуваний файл **HomeGridBackup.exe** без обгортки `.zip`.
             Запускається напряму подвійним кліком без встановлення.
@@ -126,4 +136,5 @@ jobs:
             - Windows 10 / 11 (64-bit)
             - .NET Framework не потрібен
           files: dist_win10/HomeGridBackup.exe
+          fail_on_unmatched_files: true
           make_latest: true

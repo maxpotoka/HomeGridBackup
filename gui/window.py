@@ -4,7 +4,9 @@ from core.i18n import tr, apply_widget_i18n
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: mirror-btn-sig-2.22
-# [ФАЙЛ: gui/window.py (v2.10 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: adaptive-ui-poll-2.11
+# patch-id: ui-widget-signatures-2.12
+# [ФАЙЛ: gui/window.py (v2.12 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -82,8 +84,7 @@ class HomeGridApp(DialogsMixin):
                     e.widget.select_range(0, "end")
                     return "break"
             self.root.bind_class("Entry", "<KeyPress>", _x11_ctrl_key, add="+")
-        if sys.platform == "darwin" or sys.platform.startswith("linux"):
-            self._setup_native_menubar()
+        self._setup_native_menubar()
         self._build_ui()
         self.apply_theme_and_mode()
         self.root.deiconify()
@@ -107,6 +108,7 @@ class HomeGridApp(DialogsMixin):
                 app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
                 app_menu.add_separator()
                 app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
+                app_menu.add_command(label=tr("Налаштування хмарного сховища...", lng), command=self.open_cloud_settings)
                 app_menu.add_separator()
                 app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
                 menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
@@ -137,6 +139,7 @@ class HomeGridApp(DialogsMixin):
             tools_menu.add_command(label=tr("Світла тема" if is_dk else "Темна тема", lng), command=self.toggle_theme_quick)
             if sys.platform != "darwin":
                 tools_menu.add_command(label=tr("Налаштування", lng), command=self.open_settings)
+                tools_menu.add_command(label=tr("Налаштування хмарного сховища...", lng), command=self.open_cloud_settings)
             menubar.add_cascade(label="Інструменти" if lng == "uk" else "Tools", menu=tools_menu)
 
             if sys.platform != "darwin":
@@ -248,15 +251,32 @@ class HomeGridApp(DialogsMixin):
             try:
                 if self.engine.tray_icon is None:
                     _start_tray_thread(self.engine)
-                if self.engine.tray_icon is not None:
+                ready_event = getattr(self.engine, "tray_ready_event", None)
+                ready = bool(
+                    self.engine.tray_icon is not None
+                    and ready_event is not None
+                    and (ready_event.is_set() or ready_event.wait(2.5))
+                    and getattr(self.engine, "tray_ready", False)
+                )
+                if ready:
                     self.root.withdraw()
-                    self.engine.log("Вікно згорнуто у системний трей (програма продовжує роботу).", "info")
+                    self.engine.log("Значок системного трею запущено; вікно приховано.", "info")
                     return
-            except Exception:
-                pass
-        if sys.platform.startswith("linux") and keep_tray and self.engine.tray_icon is None:
+            except Exception as exc:
+                self.engine.tray_error = str(exc)
+                self.engine.log("Не вдалося перевірити запуск значка системного трею.", "err")
+        if sys.platform.startswith("linux") and keep_tray:
             self.root.iconify()
-            self.engine.log("Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).", "info")
+            reason = getattr(self.engine, "tray_error", "")
+            if not reason:
+                from gui.tray import _tray_problem
+                reason = _tray_problem()
+            self.engine.log(
+                "Запуск трею не підтверджено; вікно згорнуто на панель задач.",
+                "warn"
+            )
+            if reason:
+                self.engine.log(f"[TRAY DETAIL] {reason}", "warn")
             return
         self.confirm_exit()
 
@@ -424,6 +444,11 @@ class HomeGridApp(DialogsMixin):
         self.btn_start.pack(side="left", padx=(0, 10))
         self.btn_strat = tk.Button(self.footer, text="Налаштування", command=self.open_settings, padx=12, pady=5, cursor="hand2")
         self.btn_strat.pack(side="left", padx=8)
+        self.btn_cloud = tk.Button(
+            self.footer, text="☁ Хмарне сховище",
+            command=self.open_cloud_settings, padx=12, pady=5, cursor="hand2"
+        )
+        self.btn_cloud.pack(side="left", padx=8)
         self.btn_about = tk.Button(self.footer, text="Про програму", command=self.open_about, padx=12, pady=5, cursor="hand2")
         self.btn_about.pack(side="left", padx=8)
         self.btn_exit = tk.Button(self.footer, text="Вихід", command=self.confirm_exit, padx=14, pady=5, cursor="hand2")
@@ -444,6 +469,7 @@ class HomeGridApp(DialogsMixin):
             (self.btn_clear_log, "Очистити поточні повідомлення у вікні системного логу"),
             (self.btn_start, "Запустити створення та перевірку нової резервної копії зараз"),
             (self.btn_strat, "Налаштування глибини GFS, розкладу, трею, мови та теми"),
+            (self.btn_cloud, tr("Відкрити налаштування хмарного сховища", self.engine.state.get("lang", "en"))),
             (self.btn_about, "Інформація про версію та можливості програми"),
             (self.btn_exit, "Завершити роботу програми та вийти"),
         ):
@@ -578,7 +604,7 @@ class HomeGridApp(DialogsMixin):
         self.root.title(tr(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})", lang))
         apply_widget_i18n(self.root, lang)
         fix_mac_buttons(self.root, p)
-        if (sys.platform == "darwin" or sys.platform.startswith("linux")) and hasattr(self, "_setup_native_menubar"):
+        if hasattr(self, "_setup_native_menubar"):
             self._setup_native_menubar()
 
 
@@ -655,17 +681,18 @@ class HomeGridApp(DialogsMixin):
                     pass
 
     def _update_mirror_btn(self):
-        p = self._get_palette()
-        fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
         is_lite = bool(self.engine.state.get("lite_mode", False))
-        fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         is_run = bool(getattr(self.engine, "is_running", False))
         checked = bool(self.engine.state.get("mirror_enabled", False))
-        _mir_sig = (checked, is_run, lang, is_lite, fs, self.engine.state.get("theme", "dark"))
+        fs = self.metrics["font_sz"]
+        theme = self.engine.state.get("theme", "dark")
+        _mir_sig = (checked, is_run, lang, is_lite, fs, theme)
         if getattr(self, "_mir_btn_sig", None) == _mir_sig:
             return
         self._mir_btn_sig = _mir_sig
+        p = self._get_palette()
+        fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         self.var_mir_en.set(checked)
         f_state = "disabled" if (is_run or not checked) else "normal"
         self.chk_mir_tog.configure(
@@ -805,7 +832,7 @@ class HomeGridApp(DialogsMixin):
                     self.var_srv.set(srv_in_state)
 
             now_m = time.monotonic()
-            if now_m - getattr(self, '_last_disk_t', 0.0) >= 3.5 or not self.engine.is_running:
+            if now_m - getattr(self, '_last_disk_t', 0.0) >= 5.5 or not self.engine.is_running:
                 self._last_disk_t = now_m
                 self._cached_disk = self.engine.get_storage_stats()
             cur_lang = st.get("lang", "en")
@@ -865,10 +892,13 @@ class HomeGridApp(DialogsMixin):
 
             btn_state = "disabled" if self.engine.is_running else "normal"
             btns_changed = False
-            for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
-                if str(b.cget("state")) != btn_state:
-                    b.configure(state=btn_state)
-                    btns_changed = True
+            _action_btn_sig = (btn_state, cur_lang, cur_theme, cur_lite)
+            if getattr(self, '_last_action_btn_sig', None) != _action_btn_sig:
+                self._last_action_btn_sig = _action_btn_sig
+                for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
+                    if str(b.cget("state")) != btn_state:
+                        b.configure(state=btn_state)
+                        btns_changed = True
             self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
             if hasattr(self, "btn_pick_lan"):
@@ -885,7 +915,8 @@ class HomeGridApp(DialogsMixin):
             if btns_changed:
                 fix_mac_buttons(self.root, self._get_palette())
 
-            logs = self.engine.logs
+            with self.engine.lock:
+                logs = list(self.engine.logs)
             if not logs and self.last_log_len != 0:
                 self.txt_log.configure(state="normal")
                 self.txt_log.delete("1.0", "end")
@@ -945,7 +976,7 @@ class HomeGridApp(DialogsMixin):
             pass
         lite = bool(self.engine.state.get("lite_mode", False))
         if self.engine.is_running:
-            delay = 500 if lite else 300
+            delay = 650 if lite else 450
         else:
-            delay = 1000 if lite else 600
+            delay = 1200 if lite else 800
         self.root.after(delay, self._poll_ui)

@@ -81,11 +81,21 @@ jobs:
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
 
+      - name: Set build completion timestamp
+        id: build_time
+        shell: pwsh
+        run: |
+          $utcNow = [DateTime]::UtcNow
+          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
+          $buildDate = $utcNow.ToString("yyyy.MM.dd")
+          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
+          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
+
       - name: Generate version tag
         id: tag
         shell: pwsh
         run: |
-          $date = Get-Date -Format "yyyy.MM.dd"
+          $date = "${{ steps.build_time.outputs.date }}"
           $runNumber = "${{ github.run_number }}"
           $tag = "win7-x86-v$date.$runNumber"
           echo "tag=$tag" >> $env:GITHUB_OUTPUT
@@ -125,12 +135,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: HomeGrid Backup — Windows 7/10/11 (x86 Folder)
+          name: HomeGrid Backup — Windows 7/10/11 (x86 Folder) — ${{ steps.build_time.outputs.value }}
           body: |
             ## HomeGrid Backup для Windows 7 (x86)
             
             **Версія:** ${{ steps.tag.outputs.tag }}  
-            **Дата збірки:** $(Get-Date -Format "dd.MM.yyyy HH:mm")
+            **Дата збірки:** ${{ steps.build_time.outputs.value }}
             
             Чистий архів **HomeGridBackup_Win7_x86.7z** без подвійного пакування у `.zip`.
             Розпакуйте у зручну папку та запустіть **HomeGridBackup.exe**.
@@ -144,4 +154,5 @@ jobs:
             - Windows 7/8/10/11 (32-bit або 64-bit)
             - .NET Framework не потрібен
           files: dist_win7/HomeGridBackup_Win7_x86.7z
+          fail_on_unmatched_files: true
           make_latest: false

@@ -35,6 +35,7 @@ __pycache__/
 
 !/core/__init__.py
 !/core/backup.py
+!/core/cloud.py
 !/core/config.py
 !/core/engine.py
 !/core/files.py
