@@ -1,3 +1,4 @@
+
 name: Build HomeGrid Backup for Legacy Linux 32-bit (i386)
 
 on:
@@ -8,10 +9,9 @@ on:
     tags:
       - 'v*'
     paths:
-      - 'main.py'
-      - 'core/**'
-      - 'console/**'
-      - 'gui/**'
+      - '**'
+      - '!.github/workflows/*.yml'
+      - '!.github/workflows/*.yaml'
       - '.github/workflows/build_linux_x86.yml'
 
 permissions:
@@ -81,6 +81,7 @@ jobs:
             "pystray==0.19.5" "python-xlib==0.33" "pillow<10.5" send2trash
 
           PYSTRAY_BACKEND=dummy python -c 'import tkinter, pystray, keyring, secretstorage, jeepney, PIL, send2trash; print("All 32-bit modules OK")'
+
           export CFLAGS="-O1 -march=i686 -mtune=generic -mno-avx -pipe --param ggc-min-expand=10 --param ggc-min-heapsize=32768"
           export CXXFLAGS="-O1 -march=i686 -mtune=generic -mno-avx -pipe --param ggc-min-expand=10 --param ggc-min-heapsize=32768"
           export LDFLAGS="-Wl,-O1,--as-needed,--no-keep-memory"
@@ -162,13 +163,17 @@ jobs:
           ls -lh homegrid-backup-linux-i386-legacy.7z
 
       - name: Publish legacy 32-bit .7z to GitHub Releases
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: linux-32bit-latest
           name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+)
           body: |
-            Одиничний 32-бітний виконуваний файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, зібраний на Ubuntu 18.04 / glibc 2.27) для MX Linux 32-bit, antiX, Debian 10+, Ubuntu 18.04+.
+            Одиночный 32-битный исполняемый файл **homegrid-backup** (`--onefile`, ELF 32-bit LSB i686, собранный на Ubuntu 18.04 / glibc 2.27) для MX Linux 32-bit, antiX, Debian 10+, Ubuntu 18.04+.
+
             - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
-            - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
+            - Создать ярлык в меню программ и на рабочем столе: `./install_shortcut.sh`
+
           files: homegrid-backup-linux-i386-legacy.7z
+          overwrite_files: true
+          fail_on_unmatched_files: true
           make_latest: false
