@@ -696,7 +696,10 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         engine.state["all_time_mb"] = round(max(float(engine.state.get("all_time_mb", 0.0)), 0.0) + total_mb, 1)
         commit_state(engine.state)
         if hasattr(engine, "record_op_event"):
-            engine.record_op_event("Успішно", final_name, round(total_mb, 1), dur_sec=total_sec)
+            engine.record_op_event(
+                "Успішно", final_name, round(total_mb, 1), dur_sec=total_sec,
+                started_at=t_total_start, finished_at=t_end,
+            )
         _record_cloud_event(
             engine, operation_id, "success", archive=final_name,
             size_mb=total_mb, size_bytes=total_bytes, files_count=cnt,
@@ -730,7 +733,11 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         _desktop_notify(_tr_e("HomeGrid Backup: помилка", engine.state.get("lang", "en")), str(exc)[:200])
         engine.set_pill("Помилка бекапу", "err")
         if hasattr(engine, "record_op_event"):
-            engine.record_op_event("Помилка", str(exc), 0.0, dur_sec=round(time.time() - t_total_start, 1))
+            error_time = time.time()
+            engine.record_op_event(
+                "Помилка", str(exc), 0.0, dur_sec=round(error_time - t_total_start, 1),
+                started_at=t_total_start, finished_at=error_time,
+            )
         _record_cloud_event(
             engine, operation_id, "error", archive=out_file,
             size_mb=total_mb, duration_sec=time.time() - t_total_start,

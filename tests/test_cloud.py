@@ -436,6 +436,26 @@ class RcloneExecutableTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(backup_dir, ".cloud-archives.pending")))
             with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True):
                 self.assertEqual(cloud.cloud_sync_queue_state(engine)["archives"], 1)
+                self.assertEqual(
+                    cloud.cloud_archive_sync_status(engine, os.path.basename(archive_path)),
+                    "error",
+                )
+
+    def test_cloud_archive_status_tracks_queue_and_target_remote(self):
+        with tempfile.TemporaryDirectory() as backup_dir:
+            engine = SimpleNamespace(state={
+                "backup_dir": backup_dir, "cloud_enabled": True, "cloud_remote": "mega",
+                "cloud_path": "HomeGridBackup",
+            })
+            archive = "homegrid_backup_DAILY_test.zip"
+            with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True):
+                self.assertEqual(cloud.cloud_archive_sync_status(engine, archive), "unknown")
+                open(os.path.join(backup_dir, ".cloud-archives.pending"), "w").close()
+                self.assertEqual(cloud.cloud_archive_sync_status(engine, archive), "queued")
+                cloud._write_cloud_archive_status(engine, archive, "uploaded")
+                self.assertEqual(cloud.cloud_archive_sync_status(engine, archive), "uploaded")
+                engine.state["cloud_remote"] = "koofr"
+                self.assertEqual(cloud.cloud_archive_sync_status(engine, archive), "unknown")
 
     def test_preview_archives_share_one_folder_without_cross_device_pruning(self):
         device_id = "a" * 32
@@ -474,6 +494,7 @@ class RcloneExecutableTests(unittest.TestCase):
                  mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
                  mock.patch.object(cloud, "_rclone", side_effect=rclone) as mocked_rclone:
                 self.assertTrue(cloud.sync_cloud_backups(engine, prune=True))
+            self.assertEqual(cloud.cloud_archive_sync_status(engine, archive_name), "uploaded")
 
             shared_dir = "drive:HomeGridBackup/backups"
             mocked_rclone.assert_any_call(

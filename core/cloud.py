@@ -295,22 +295,28 @@ def sync_cloud_backups(engine, prune=False):
             local_name = os.path.basename(path)
             remote_name = remote_device_prefix + local_name
             keep_names.add(remote_name)
-            _rclone("copyto", path, f"{remote_dir}/{remote_name}")
-            sha_path = path + ".sha256"
-            if os.path.isfile(sha_path):
-                if shared_user_folder:
-                    with open(sha_path, "r", encoding="utf-8") as source:
-                        sha_parts = source.read().split()
-                    if not sha_parts or not re.fullmatch(r"[0-9a-fA-F]{64}", sha_parts[0]):
-                        raise ValueError(f"Invalid SHA-256 sidecar: {sha_path}")
-                    digest = sha_parts[0]
-                    with tempfile.TemporaryDirectory(prefix="homegrid-cloud-sha-") as temp_dir:
-                        cloud_sha_path = os.path.join(temp_dir, remote_name + ".sha256")
-                        with open(cloud_sha_path, "w", encoding="utf-8", newline="\n") as target:
-                            target.write(f"{digest.lower()}  {remote_name}\n")
-                        _rclone("copyto", cloud_sha_path, f"{remote_dir}/{remote_name}.sha256")
-                else:
-                    _rclone("copyto", sha_path, f"{remote_dir}/{remote_name}.sha256")
+            try:
+                _write_cloud_archive_status(engine, path, "queued")
+                _rclone("copyto", path, f"{remote_dir}/{remote_name}")
+                sha_path = path + ".sha256"
+                if os.path.isfile(sha_path):
+                    if shared_user_folder:
+                        with open(sha_path, "r", encoding="utf-8") as source:
+                            sha_parts = source.read().split()
+                        if not sha_parts or not re.fullmatch(r"[0-9a-fA-F]{64}", sha_parts[0]):
+                            raise ValueError(f"Invalid SHA-256 sidecar: {sha_path}")
+                        digest = sha_parts[0]
+                        with tempfile.TemporaryDirectory(prefix="homegrid-cloud-sha-") as temp_dir:
+                            cloud_sha_path = os.path.join(temp_dir, remote_name + ".sha256")
+                            with open(cloud_sha_path, "w", encoding="utf-8", newline="\n") as target:
+                                target.write(f"{digest.lower()}  {remote_name}\n")
+                            _rclone("copyto", cloud_sha_path, f"{remote_dir}/{remote_name}.sha256")
+                    else:
+                        _rclone("copyto", sha_path, f"{remote_dir}/{remote_name}.sha256")
+                _write_cloud_archive_status(engine, path, "uploaded")
+            except Exception:
+                _write_cloud_archive_status(engine, path, "error")
+                raise
 
         if prune:
             names = _rclone("lsf", "--files-only", remote_dir).splitlines()
@@ -352,6 +358,48 @@ def cloud_sync_queue_state(engine):
     result = {"archives": int(archives_pending), "reports": reports_pending}
     result["total"] = result["archives"] + result["reports"]
     return result
+
+
+def _cloud_archive_status_path(engine, archive):
+    status_dir = os.path.join(os.path.abspath(engine.state["backup_dir"]), ".cloud-status")
+    return os.path.join(status_dir, os.path.basename(archive) + ".json")
+
+
+def _write_cloud_archive_status(engine, archive, status):
+    if not WINDOWS7_CLOUD_SYNC_PREVIEW:
+        return
+    status_path = _cloud_archive_status_path(engine, archive)
+    os.makedirs(os.path.dirname(status_path), exist_ok=True)
+    remote = str(engine.state.get("cloud_remote") or "").strip()
+    cloud_path = validate_cloud_settings(remote, engine.state.get("cloud_path", ""))
+    payload = {"status": status, "remote": remote, "cloud_path": cloud_path}
+    temp_path = status_path + ".tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as status_file:
+            json.dump(payload, status_file)
+        os.replace(temp_path, status_path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def cloud_archive_sync_status(engine, archive):
+    if not WINDOWS7_CLOUD_SYNC_PREVIEW or not engine.state.get("cloud_enabled"):
+        return "unknown"
+    status_path = _cloud_archive_status_path(engine, archive)
+    try:
+        with open(status_path, "r", encoding="utf-8") as status_file:
+            payload = json.load(status_file)
+    except FileNotFoundError:
+        return "queued" if os.path.isfile(
+            os.path.join(os.path.abspath(engine.state["backup_dir"]), ".cloud-archives.pending")
+        ) else "unknown"
+    remote = str(engine.state.get("cloud_remote") or "").strip()
+    cloud_path = validate_cloud_settings(remote, engine.state.get("cloud_path", ""))
+    if payload.get("remote") != remote or payload.get("cloud_path") != cloud_path:
+        return "unknown"
+    status = payload.get("status")
+    return status if status in ("uploaded", "queued", "error") else "error"
 
 
 def _recover_report_upload_markers(report_dir):

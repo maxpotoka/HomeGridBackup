@@ -19,6 +19,43 @@ from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage
 from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES, fix_mac_buttons
 from gui.tray import _force_quit_app
 
+
+_OP_ARCHIVE_RE = re.compile(r"^homegrid_backup_(DAILY|WEEKLY|MONTHLY|YEARLY|KEEP)_(.+)$", re.IGNORECASE)
+
+
+def _operation_archive_name(detail):
+    value = str(detail or "").strip()
+    if " (" in value and value.endswith(")") and not value.lower().endswith(".zip"):
+        value = value.rsplit(" (", 1)[0].strip()
+    name = os.path.basename(value)
+    return name if name.lower().endswith(".zip") else ""
+
+
+def _operation_archive_display(name):
+    match = _OP_ARCHIVE_RE.match(name)
+    if not match:
+        return "", name
+    return match.group(1).upper(), match.group(2)
+
+
+def _operation_interval_text(item):
+    from datetime import datetime, timedelta
+
+    try:
+        start = datetime.fromisoformat(str(item.get("started_at", "")))
+        end = datetime.fromisoformat(str(item.get("finished_at", "")))
+        approximate = False
+    except (TypeError, ValueError):
+        try:
+            duration = float(item.get("dur_sec"))
+            end = datetime.strptime(str(item.get("ts", "")), "%d.%m.%Y %H:%M")
+        except (TypeError, ValueError):
+            return None, False
+        start = end - timedelta(seconds=duration)
+        approximate = True
+    return "{} → {}".format(start.strftime("%H:%M:%S"), end.strftime("%H:%M:%S")), approximate
+
+
 class _EmbeddedDialog(tk.Frame):
     def __init__(self, root, palette, title_txt, w, h, on_close_cb):
         self._root = root
@@ -1300,6 +1337,21 @@ class DialogsMixin:
             elif verify_state["res"]:
                 res = verify_state["res"]
                 verify_state["status_map"] = {it["name"]: it for it in res.get("items", [])}
+                history_changed = False
+                history = getattr(self.engine, "op_history", []) or []
+                for history_item in history:
+                    archive_name = _operation_archive_name(history_item.get("detail", ""))
+                    result_item = verify_state["status_map"].get(archive_name)
+                    archive_path = os.path.join(self.engine.state.get("backup_dir", ""), archive_name)
+                    if not result_item or not archive_name or not os.path.isfile(archive_path):
+                        continue
+                    history_item["sha_status"] = result_item.get("status", "")
+                    history_item["sha_detail"] = result_item.get("detail", "")
+                    history_item["sha_checked_mtime"] = os.path.getmtime(archive_path)
+                    history_changed = True
+                if history_changed:
+                    self.engine.state["op_history"] = history
+                    commit_state(self.engine.state)
                 ok_all = (res["err_cnt"] == 0 and not res.get("cancelled"))
                 perf_txt = f"Час: {res.get('elapsed', 0):.2f} с | Швидкість: {res.get('speed_mbs', 0)} МБ/с (буфер {v_buf.get()})"
                 prefix = "Зупинено! " if res.get("cancelled") else ""
@@ -1526,7 +1578,35 @@ class DialogsMixin:
     def open_ops_history(self):
         fs = self.metrics["font_sz"]
         lang = self.engine.state.get("lang", "en")
-        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 940, 540)
+        dlg, p, _ = self._make_dialog("Журнал останніх операцій архівування", 1000, 600)
+        if isinstance(dlg, _EmbeddedDialog):
+            def _resize_embedded_history(_event=None):
+                if not dlg.winfo_exists():
+                    return
+                width = min(
+                    int(1000 * self.metrics["k"]),
+                    max(360, self.root.winfo_width() - 24),
+                )
+                height = min(
+                    int(600 * self.metrics["k"]),
+                    max(160, self.root.winfo_height() - 24),
+                )
+                dlg.place_configure(width=width, height=height)
+
+            resize_binding = self.root.bind("<Configure>", _resize_embedded_history, add="+")
+            dlg.bind(
+                "<Destroy>",
+                lambda event: self.root.unbind("<Configure>", resize_binding)
+                if event.widget is dlg else None,
+            )
+            _resize_embedded_history()
+        else:
+            dlg.resizable(True, True)
+            dlg._fit_flag = True
+            dlg.minsize(
+                min(760, max(360, self.metrics["sw"] - 24)),
+                min(440, max(160, self.metrics["sh"] - 48)),
+            )
         hdr_txt = "Останні 25 операцій створення резервних копій (подвійний клік по рядку — деталі):" if lang == "uk" else "Last 25 backup operations (double-click a row for details):"
         tk.Label(dlg, text=hdr_txt, bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(anchor="w", padx=14, pady=(10, 6))
 
@@ -1546,27 +1626,39 @@ class DialogsMixin:
         style.configure("HGB.Treeview", background=p["log_bg"], foreground=p["text"], fieldbackground=p["log_bg"], rowheight=max(26, int((fs + 16) * self.metrics["k"])), font=("Segoe UI", max(8, fs - 1)))
         style.configure("HGB.Treeview.Heading", background=p["card"], foreground=p["cyan"], font=("Segoe UI", max(8, fs - 1), "bold"))
 
-        cols = ("date", "status", "file", "size", "dur", "sha")
+        cols = ("date", "status", "type", "file", "size", "dur", "sha", "cloud")
         tree = ttk.Treeview(wrap, columns=cols, show="headings", style="HGB.Treeview")
         heads = [
-            ("date", "Дата" if lang == "uk" else "Date", 174, "center"),
-            ("status", "Статус" if lang == "uk" else "Status", 98, "center"),
-            ("file", "Файл / Подія" if lang == "uk" else "File / Event", 350, "w"),
-            ("size", "Розмір" if lang == "uk" else "Size", 94, "e"),
-            ("dur", "Час" if lang == "uk" else "Duration", 98, "center"),
-            ("sha", "SHA", 54, "center")
+            ("date", "Дата" if lang == "uk" else "Date", 142, 106, "center"),
+            ("status", "Статус" if lang == "uk" else "Status", 86, 66, "center"),
+            ("type", "Тип" if lang == "uk" else "Type", 72, 58, "center"),
+            ("file", "Файл" if lang == "uk" else "File", 300, 130, "w"),
+            ("size", "Розмір" if lang == "uk" else "Size", 78, 60, "e"),
+            ("dur", "Час" if lang == "uk" else "Duration", 88, 70, "center"),
+            ("sha", "SHA", 56, 48, "center"),
+            ("cloud", "Хмара" if lang == "uk" else "Cloud", 74, 58, "center"),
         ]
-        for cid, title_h, w_col, anc in heads:
+        for cid, title_h, w_col, min_w_col, anc in heads:
             tree.heading(cid, text=title_h)
-            tree.column(cid, width=int(w_col * self.metrics["k"]), minwidth=44, anchor=anc, stretch=(cid == "file"))
+            tree.column(
+                cid,
+                width=int(w_col * self.metrics["k"]),
+                minwidth=int(min_w_col * self.metrics["k"]),
+                anchor=anc,
+                stretch=(cid == "file"),
+            )
 
         vsb = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=vsb.set)
+        hsb = ttk.Scrollbar(wrap, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         vsb.pack(side="right", fill="y")
-        tree.pack(side="left", fill="both", expand=True)
+        tree.pack(side="top", fill="both", expand=True)
+        hsb.pack(side="bottom", fill="x")
 
-        tree.tag_configure("ok", foreground=p["green"])
-        tree.tag_configure("err", foreground=p["red"])
+        tree.tag_configure("stripe_even", background=p["log_bg"])
+        tree.tag_configure("stripe_odd", background=p["card"])
+        tree.tag_configure("tone_error", foreground=p["red"])
+        tree.tag_configure("tone_warning", foreground=p["amber"])
 
         row_items = {}
         def _populate():
@@ -1575,52 +1667,217 @@ class DialogsMixin:
             row_items.clear()
             bdir = self.engine.state.get("backup_dir", "")
             ops = getattr(self.engine, "op_history", []) or []
+            from core.cloud import cloud_archive_sync_status
             for idx_o, item in enumerate(ops):
                 st_lbl = item.get("status", "")
-                is_ok = (st_lbl == "Успішно")
-                det = item.get("detail", "")
+                detail = str(item.get("detail", ""))
+                full_name = _operation_archive_name(detail)
+                file_type, short_name = _operation_archive_display(full_name)
+                file_label = short_name or detail
                 dur_v = item.get("dur_sec", None)
-                if " (" in det and det.endswith(")"):
-                    base_part, paren_part = det.rsplit(" (", 1)
-                    fname = base_part.strip()
-                    p_clean = paren_part[:-1].strip()
-                    if dur_v is None and (p_clean.endswith(" с") or p_clean.endswith(" s")):
-                        dur_txt = p_clean
-                    else:
-                        dur_txt = format_duration(dur_v, lang) if dur_v is not None else "—"
+                if dur_v is not None:
+                    try:
+                        dur_txt = format_duration(float(dur_v), lang)
+                    except (TypeError, ValueError, OverflowError):
+                        dur_txt = "—"
                 else:
-                    fname = det
-                    dur_txt = format_duration(dur_v, lang) if dur_v is not None else "—"
+                    duration_match = re.search(r"\(([^()]*)\)\s*$", detail)
+                    dur_txt = duration_match.group(1).strip() if duration_match else "—"
 
-                has_sha = "✔" if (bdir and fname.endswith(".zip") and os.path.exists(os.path.join(bdir, fname + ".sha256"))) else "—"
-                mb_txt = f"{item.get('size_mb', 0)} {'МБ' if lang == 'uk' else 'MB'}" if is_ok else "—"
+                archive_path = os.path.join(bdir, full_name) if bdir and full_name else ""
+                sha_path = archive_path + ".sha256" if archive_path else ""
+                has_sidecar = bool(sha_path and os.path.isfile(sha_path))
+                sha_status = "absent"
+                sha_tooltip = (
+                    "Контрольної суми немає." if lang == "uk" else "Checksum is absent."
+                )
+                if has_sidecar:
+                    sha_status = "present"
+                    sha_tooltip = (
+                        "Файл контрольної суми є; відповідність ще не перевірялась."
+                        if lang == "uk" else
+                        "Checksum file exists; it has not been verified against the archive."
+                    )
+                    try:
+                        archive_mtime = os.path.getmtime(archive_path)
+                    except OSError:
+                        archive_mtime = None
+                    if archive_mtime is not None and item.get("sha_checked_mtime") == archive_mtime:
+                        if item.get("sha_status") == "err":
+                            sha_status = "error"
+                            sha_tooltip = item.get("sha_detail") or (
+                                "Контрольна сума не збігається."
+                                if lang == "uk" else "Checksum does not match."
+                            )
+                        elif item.get("sha_status") == "ok":
+                            sha_status = "verified"
+                            sha_tooltip = (
+                                "Контрольна сума збігається."
+                                if lang == "uk" else "Checksum matches."
+                            )
+                sha_mark = {
+                    "absent": "—",
+                    "present": "✔",
+                    "verified": "✔",
+                    "error": "✖",
+                }[sha_status]
+
+                try:
+                    cloud_status = cloud_archive_sync_status(self.engine, full_name) if full_name else "unknown"
+                    cloud_tooltip = {
+                        "uploaded": "Завантажено до хмари." if lang == "uk" else "Uploaded to cloud.",
+                        "queued": "Очікує синхронізації." if lang == "uk" else "Waiting in sync queue.",
+                        "error": "Помилка синхронізації." if lang == "uk" else "Cloud sync failed.",
+                        "unknown": "Статус хмари невідомий." if lang == "uk" else "Cloud status is unknown.",
+                    }.get(cloud_status, "Статус хмари невідомий." if lang == "uk" else "Cloud status is unknown.")
+                except (OSError, ValueError, TypeError) as exc:
+                    cloud_status = "error"
+                    cloud_tooltip = (
+                        f"Помилка читання статусу хмари: {exc}"
+                        if lang == "uk" else f"Could not read cloud status: {exc}"
+                    )
+                cloud_mark = {
+                    "uploaded": "☁✔",
+                    "queued": "⏳",
+                    "error": "✖",
+                }.get(cloud_status, "—")
+
+                is_success = st_lbl == "Успішно"
+                mb_txt = f"{item.get('size_mb', 0)} {'МБ' if lang == 'uk' else 'MB'}" if is_success else "—"
+                status_lower = st_lbl.lower()
+                if (
+                    any(word in status_lower for word in ("помил", "error", "failed"))
+                    or sha_status == "error"
+                    or cloud_status == "error"
+                ):
+                    tone = "tone_error"
+                elif (
+                    any(word in status_lower for word in ("поперед", "warn"))
+                    or sha_status == "absent"
+                    or cloud_status == "queued"
+                ):
+                    tone = "tone_warning"
+                else:
+                    tone = ""
                 iid = f"op_{idx_o}"
-                row_items[iid] = (item, fname, mb_txt, dur_txt, has_sha)
-                tree.insert("", "end", iid=iid, values=(item.get("ts", ""), tr(st_lbl, lang), fname, mb_txt, dur_txt, has_sha), tags=("ok" if is_ok else "err",))
+                row_items[iid] = {
+                    "item": item,
+                    "full_name": full_name or detail,
+                    "file_type": file_type,
+                    "size": mb_txt,
+                    "duration": dur_txt,
+                    "sha": sha_mark,
+                    "sha_tooltip": sha_tooltip,
+                    "cloud": cloud_mark,
+                    "cloud_tooltip": cloud_tooltip,
+                    "interval": _operation_interval_text(item),
+                }
+                tags = ["stripe_even" if idx_o % 2 == 0 else "stripe_odd"]
+                if tone:
+                    tags.append(tone)
+                tree.insert(
+                    "", "end", iid=iid,
+                    values=(
+                        item.get("ts", ""), tr(st_lbl, lang), file_type, file_label,
+                        mb_txt, dur_txt, sha_mark, cloud_mark,
+                    ),
+                    tags=tuple(tags),
+                )
 
         def _on_double_click(_ev=None):
             sel = tree.selection()
             if not sel or sel[0] not in row_items:
                 return
-            item, fname, mb_txt, dur_txt, has_sha = row_items[sel[0]]
+            row = row_items[sel[0]]
+            item = row["item"]
             st_tr = tr(item.get("status", ""), lang)
+            interval, approximate = row["interval"]
+            if interval:
+                interval_line = (
+                    ("Інтервал (приблизно): " if approximate else "Інтервал: ") + interval
+                    if lang == "uk" else
+                    ("Interval (approx.): " if approximate else "Interval: ") + interval
+                )
+            else:
+                interval_line = ""
+            details_lines = [
+                f"Дата та час: {item.get('ts', '')}" if lang == "uk" else f"Date & Time: {item.get('ts', '')}",
+                f"Статус: {st_tr}" if lang == "uk" else f"Status: {st_tr}",
+                f"Тип: {row['file_type'] or '—'}" if lang == "uk" else f"Type: {row['file_type'] or '—'}",
+                f"Розмір: {row['size']}" if lang == "uk" else f"Size: {row['size']}",
+                f"Тривалість: {row['duration']}" if lang == "uk" else f"Duration: {row['duration']}",
+                f"SHA-256: {row['sha']} — {row['sha_tooltip']}" if lang == "uk" else f"SHA-256: {row['sha']} — {row['sha_tooltip']}",
+                f"Хмара: {row['cloud']} — {row['cloud_tooltip']}" if lang == "uk" else f"Cloud: {row['cloud']} — {row['cloud_tooltip']}",
+            ]
+            if interval_line:
+                details_lines.append(interval_line)
             if lang == "uk":
-                info_msg = f"Дата та час: {item.get('ts', '')}\nСтатус: {st_tr}\nРозмір: {mb_txt}  •  Тривалість: {dur_txt}  •  SHA-256: {has_sha}\n\nДеталі / Файл:\n{fname}"
+                info_msg = "\n".join(details_lines) + f"\n\nПовне ім'я файлу:\n{row['full_name']}"
                 t_dlg = "Деталі операції"
             else:
-                info_msg = f"Date & Time: {item.get('ts', '')}\nStatus: {st_tr}\nSize: {mb_txt}  •  Duration: {dur_txt}  •  SHA-256: {has_sha}\n\nDetails / File:\n{fname}"
+                info_msg = "\n".join(details_lines) + f"\n\nFull file name:\n{row['full_name']}"
                 t_dlg = "Operation Details"
             self._show_engine_modal({"type": "alert", "title": t_dlg, "text": info_msg})
 
         tree.bind("<Double-1>", _on_double_click)
+        tooltip_state = {"window": None, "text": ""}
+
+        def _hide_history_tooltip(_event=None):
+            window = tooltip_state["window"]
+            tooltip_state["window"] = None
+            tooltip_state["text"] = ""
+            if window is not None:
+                window.destroy()
+
+        def _show_history_tooltip(event):
+            row_id = tree.identify_row(event.y)
+            column_id = tree.identify_column(event.x)
+            row = row_items.get(row_id)
+            if not row:
+                _hide_history_tooltip()
+                return
+            tooltip_text = {
+                "#4": row["full_name"],
+                "#7": row["sha_tooltip"],
+                "#8": row["cloud_tooltip"],
+            }.get(column_id)
+            if not tooltip_text:
+                _hide_history_tooltip()
+                return
+            if tooltip_text == tooltip_state["text"] and tooltip_state["window"] is not None:
+                return
+            _hide_history_tooltip()
+            tip = tk.Toplevel(self.root)
+            tip.wm_overrideredirect(True)
+            tk.Label(
+                tip, text=tooltip_text, bg=p["card"], fg=p["text"],
+                bd=1, relief="solid", justify="left", wraplength=560,
+                font=("Segoe UI", max(8, fs - 1)), padx=6, pady=4,
+            ).pack()
+            tip.update_idletasks()
+            x = min(event.x_root + 12, max(4, self.metrics["sw"] - tip.winfo_reqwidth() - 6))
+            y = min(event.y_root + 16, max(4, self.metrics["sh"] - tip.winfo_reqheight() - 6))
+            tip.geometry(f"+{x}+{y}")
+            tooltip_state.update({"window": tip, "text": tooltip_text})
+
+        tree.bind("<Motion>", _show_history_tooltip)
+        tree.bind("<Leave>", _hide_history_tooltip)
+        tree.bind("<ButtonPress-1>", _hide_history_tooltip)
         _populate()
 
         def _clear_ops():
+            from tkinter import messagebox
+            title = "Очистити журнал?" if lang == "uk" else "Clear history?"
+            prompt = (
+                "Видалити всі записи журналу операцій?"
+                if lang == "uk" else "Delete all operation history entries?"
+            )
+            if not messagebox.askyesno(title, prompt, parent=self.root):
+                return
             self.engine.op_history = []
             self.engine.state["op_history"] = []
             commit_state(self.engine.state)
             _populate()
-
 
         tk.Button(bf, text="🗑 Очистити журнал" if lang == "uk" else "🗑 Clear History", command=_clear_ops, bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=5, cursor="hand2").pack(side="left")
         tk.Button(bf, text=tr("Закрити", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5, cursor="hand2").pack(side="right")

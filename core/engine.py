@@ -287,7 +287,7 @@ class BackupEngine:
         except Exception:
             pass
 
-    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0, dur_sec=None):
+    def record_op_event(self, status_lbl, detail_txt, size_mb=0.0, dur_sec=None, started_at=None, finished_at=None):
         from datetime import datetime
         from core.config import commit_state
         entry = {
@@ -297,6 +297,9 @@ class BackupEngine:
             "size_mb": round(float(size_mb), 1),
             "dur_sec": round(float(dur_sec), 1) if dur_sec is not None else None
         }
+        for key, value in (("started_at", started_at), ("finished_at", finished_at)):
+            if value is not None:
+                entry[key] = datetime.fromtimestamp(float(value)).astimezone().isoformat(timespec="seconds")
         if not hasattr(self, "op_history"):
             self.op_history = list(self.state.get("op_history") or [])
         self.op_history.insert(0, entry)
