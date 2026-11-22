@@ -325,7 +325,8 @@ class DialogsMixin:
                 info_f = tk.Frame(row, bg=p["card"])
                 info_f.pack(side="left", fill="x", expand=True)
                 tk.Label(info_f, text=url, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs + 1, "bold")).pack(anchor="w")
-                tk.Label(info_f, text=f"TCP: {t_ms} ms  •  API: {a_ms} ms", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
+                ms_unit = "мс" if lang == "uk" else "ms"
+                tk.Label(info_f, text=f"TCP: {t_ms} {ms_unit}  •  API: {a_ms} {ms_unit}", bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))).pack(anchor="w")
                 btn_bkp_t = "🔌 Підключити та бекап" if lang == "uk" else "🔌 Connect & Backup"
                 btn_sav_t = "⭐ В Історію" if lang == "uk" else "⭐ Save to History"
                 tk.Button(row, text=btn_bkp_t, command=lambda u=url: _done({"action": "backup", "url": u}), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=10, pady=4, cursor="hand2").pack(side="right", padx=(6, 0))
@@ -410,7 +411,10 @@ class DialogsMixin:
         tk.Button(dlg, text="Закрити", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=5).pack(side="bottom", anchor="e", padx=14, pady=12)
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
 
-    def open_settings(self):
+    def open_cloud_settings(self):
+        self.open_settings(initial_tab=2)
+
+    def open_settings(self, initial_tab=0):
         _sync_scheduler_from_windows(self.engine.state)
         st = self.engine.state
         fs = self.metrics["font_sz"]
@@ -455,10 +459,11 @@ class DialogsMixin:
         tab_cloud = tk.Frame(nb, bg=p["panel"])
         nb.add(tab_bkp, text="  Резервне копіювання та Розклад  ")
         nb.add(tab_ui, text="  Вигляд та Інтерфейс  ")
-        nb.add(tab_cloud, text="  Хмара та звіт  ")
+        nb.add(tab_cloud, text="  Хмарне сховище  ")
+        nb.select(initial_tab)
 
         f_cloud = tk.LabelFrame(
-            tab_cloud, text=" 5. Хмарне дзеркало та звіт операцій ",
+            tab_cloud, text="5. Налаштування хмарного сховища",
             bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"),
             padx=14, pady=10
         )
@@ -472,7 +477,7 @@ class DialogsMixin:
         cloud_remote_row = tk.Frame(f_cloud, bg=p["card"])
         cloud_remote_row.pack(fill="x", pady=4)
         tk.Label(
-            cloud_remote_row, text="rclone remote:", width=18, anchor="w",
+            cloud_remote_row, text="Вибір хмарного сховища:", width=24, anchor="w",
             bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
         ).pack(side="left")
         cb_cloud_remote = ttk.Combobox(
@@ -548,7 +553,7 @@ class DialogsMixin:
             font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
         ).pack(side="right")
         tk.Label(
-            f_cloud, text="Спочатку встановіть rclone та налаштуйте провайдера командою: rclone config",
+            f_cloud, text="Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config",
             bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))
         ).pack(anchor="w", pady=(4, 2))
         _refresh_cloud_remotes()
@@ -720,6 +725,7 @@ class DialogsMixin:
 
 
         def _commit_settings(close_after):
+            selected_tab = nb.index(nb.select())
             cloud_remote = v_cloud_remote.get().strip()
             cloud_path = v_cloud_path.get().strip() or "HomeGridBackup"
             if v_cloud_enabled.get():
@@ -754,7 +760,7 @@ class DialogsMixin:
             self.engine.log("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "ok")
             dlg.destroy()
             if not close_after:
-                self.open_settings()
+                self.open_settings(initial_tab=selected_tab)
 
         tk.Button(bf, text="Скинути PIN", command=lambda: (self.reset_pins(), lbl_sch_msg.configure(text="✓ Збережені PIN-коди очищено", fg=p["amber"])), bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=(6, 6), pady=6)
         tk.Button(bf, text="Експорт JSON", command=_export_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
@@ -766,7 +772,7 @@ class DialogsMixin:
             lng = st.get("lang", "en")
             nb.tab(0, text="  " + tr("Резервне копіювання та Розклад", lng) + "  ")
             nb.tab(1, text="  " + tr("Вигляд та Інтерфейс", lng) + "  ")
-            nb.tab(2, text="  " + tr("Хмара та звіт", lng) + "  ")
+            nb.tab(2, text="  " + tr("Хмарне сховище", lng) + "  ")
             apply_widget_i18n(dlg, lng)
         _i18n_settings()
 

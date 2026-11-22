@@ -4,7 +4,7 @@
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
 # patch-id: android-storage-fallback-2.23
-# [ФАЙЛ: core/config.py (v2.23 | 22.11.2026 08:51) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.24 | 22.11.2026 09:42) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -64,8 +64,8 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.23"
-BUILD_DATE = "22.11.2026 08:51"
+SCRIPT_VER = "2.24"
+BUILD_DATE = "22.11.2026 09:42"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
