@@ -67,6 +67,40 @@ jobs:
             --output-filename=HomeGridBackup.exe ^
             main.py
 
+      - name: Bundle Windows 7-compatible rclone
+        shell: pwsh
+        run: |
+          $version = "1.62.2"
+          $archiveName = "rclone-v$version-windows-386.zip"
+          $archivePath = Join-Path $env:RUNNER_TEMP $archiveName
+          $extractPath = Join-Path $env:RUNNER_TEMP "rclone-win7"
+          $downloadUrl = "https://downloads.rclone.org/v$version/$archiveName"
+          $expectedSha256 = "5b91ee887762007cd9fef64003a70c496f855602d1bbb1c32a364008611f98ff"
+
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
+          $actualSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "rclone archive checksum mismatch: $actualSha256"
+          }
+
+          Expand-Archive -LiteralPath $archivePath -DestinationPath $extractPath -Force
+          $rcloneSource = Get-ChildItem -LiteralPath $extractPath -Filter "rclone.exe" -Recurse |
+            Select-Object -First 1
+          if (-not $rcloneSource) {
+            throw "rclone.exe was not found in the official archive."
+          }
+
+          $appDir = "dist_win7\main.dist"
+          Copy-Item -LiteralPath $rcloneSource.FullName -Destination (Join-Path $appDir "rclone.exe")
+          Invoke-WebRequest `
+            -Uri "https://raw.githubusercontent.com/rclone/rclone/v$version/COPYING" `
+            -OutFile (Join-Path $appDir "rclone-COPYING.txt")
+
+          & (Join-Path $appDir "rclone.exe") version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled rclone failed to start."
+          }
+
       - name: Prepare batch scripts and ultra-compress archive
         shell: cmd
         run: |
@@ -80,6 +114,12 @@ jobs:
             echo @echo off
             echo start "" "%%~dp0HomeGridBackup.exe" --hidden
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
+          (
+            echo @echo off
+            echo cd /d "%%~dp0"
+            echo "%%~dp0rclone.exe" config
+            echo pause
+          ) > "dist_win7\HomeGridBackup\rclone_config.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
 
       - name: Set build completion timestamp
@@ -145,6 +185,7 @@ jobs:
             
             Чистий архів **HomeGridBackup_Win7_x86.7z** без подвійного пакування у `.zip`.
             Розпакуйте у зручну папку та запустіть **HomeGridBackup.exe**.
+            В комплекті є rclone 1.62.2 (32-bit) для сумісності з Windows 7. Запустіть **rclone_config.bat** для налаштування хмарного remote.
             
             ### Режимы запуска:
             - `HomeGridBackup.exe` - звичайний запуск

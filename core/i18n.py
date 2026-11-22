@@ -101,6 +101,7 @@ EN_EXACT = {
     "Вибір хмарного сховища:": "Select cloud storage:",
     "5. Налаштування хмарного сховища": "5. Cloud storage settings",
     "Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config": "Select a configured cloud storage from the list. Add new storage with: rclone config",
+    "Виберіть налаштоване хмарне сховище зі списку. Нові remotes додаються через rclone_config.bat у папці програми.": "Select a configured cloud storage from the list. Add remotes by running rclone_config.bat in the application folder.",
     "Не вказано адресу": "No address entered",
     "Не перевірено": "Not checked",
     "Перевірка...": "Checking...",

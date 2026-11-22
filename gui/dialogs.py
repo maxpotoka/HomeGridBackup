@@ -553,7 +553,10 @@ class DialogsMixin:
             font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
         ).pack(side="right")
         tk.Label(
-            f_cloud, text="Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config",
+            f_cloud, text=tr(
+                "Виберіть налаштоване хмарне сховище зі списку. Нові remotes додаються через rclone_config.bat у папці програми.",
+                st.get("lang", "en")
+            ),
             bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))
         ).pack(anchor="w", pady=(4, 2))
         _refresh_cloud_remotes()

@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from uuid import uuid4
 
@@ -13,12 +14,21 @@ _DEVICE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _ARCHIVE_RE = re.compile(r"(backup|KEEP)", re.IGNORECASE)
 
 
+def _rclone_executable():
+    bundled_name = "rclone.exe" if os.name == "nt" else "rclone"
+    app_dir = os.path.dirname(os.path.abspath(sys.executable))
+    bundled_path = os.path.join(app_dir, bundled_name)
+    if os.path.isfile(bundled_path):
+        return bundled_path
+    return shutil.which("rclone")
+
+
 def new_operation_id():
     return uuid4().hex
 
 
 def list_rclone_remotes():
-    executable = shutil.which("rclone")
+    executable = _rclone_executable()
     if not executable:
         raise RuntimeError("rclone is not installed or is not available in PATH.")
     result = subprocess.run(
@@ -66,7 +76,7 @@ def _remote_path(state, *parts):
 
 
 def _rclone(*args, timeout=3600):
-    executable = shutil.which("rclone")
+    executable = _rclone_executable()
     if not executable:
         raise RuntimeError("rclone is not installed or is not available in PATH.")
     result = subprocess.run(
