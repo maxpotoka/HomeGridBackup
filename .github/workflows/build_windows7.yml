@@ -81,24 +81,51 @@ jobs:
           ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
           7z a -t7z -mx=9 -mfb=273 -md=64m "dist_win7\HomeGridBackup_Win7_x86.7z" ".\dist_win7\HomeGridBackup\*"
 
-      - name: Delete old Windows release and tag
+      - name: Generate version tag
+        id: tag
+        shell: pwsh
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $runNumber = "${{ github.run_number }}"
+          $tag = "win7-x86-v$date.$runNumber"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Delete old Windows 7 releases
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "SilentlyContinue"
-          gh release delete windows7-x86-latest --yes 2>$null
-          gh release delete windows7-x86-backup --yes 2>$null
-          git push origin --delete windows7-x86-latest 2>$null
-          git push origin --delete windows7-x86-backup 2>$null
+          $releases = gh release list --json tagName | ConvertFrom-Json
+          foreach ($release in $releases) {
+            if ($release.tagName -match "^win7-x86-v\d{4}\.\d{2}\.\d{2}") {
+              Write-Host "Deleting old release: $($release.tagName)"
+              gh release delete $release.tagName --yes 2>$null
+              git push origin --delete $release.tagName 2>$null
+            }
+          }
 
-      - name: Publish clean .7z to GitHub Releases (no double zip)
+      - name: Publish clean .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows7-x86-latest
-          name: HomeGrid Backup — Windows 7 / 10 / 11 (x86 Folder)
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: HomeGrid Backup — Windows 7/10/11 (x86 Folder)
           body: |
+            ## HomeGrid Backup для Windows 7 (x86)
+            
+            **Версія:** ${{ steps.tag.outputs.tag }}  
+            **Дата збірки:** $(Get-Date -Format "dd.MM.yyyy HH:mm")
+            
             Чистий архів **HomeGridBackup_Win7_x86.7z** без подвійного пакування у `.zip`.
             Розпакуйте у зручну папку та запустіть **HomeGridBackup.exe**.
+            
+            ### Режимы запуска:
+            - `HomeGridBackup.exe` - звичайний запуск
+            - `backup_silent.bat` - тихий режим
+            - `backup_hidden.bat` - прихований режим
+            
+            ### Системні вимоги:
+            - Windows 7/8/10/11 (32-bit або 64-bit)
+            - .NET Framework не потрібен
           files: dist_win7/HomeGridBackup_Win7_x86.7z
           make_latest: true
