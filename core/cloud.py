@@ -192,6 +192,42 @@ def test_rclone_remote(remote):
             raise RuntimeError(f"rclone about failed: {about_error}; listing failed: {list_error}") from list_error
 
 
+def check_rclone_remote(remote):
+    """Проверяет подключение одним вызовом rclone about.
+
+    Возвращает {"total", "used", "free"} в байтах. Значение None означает,
+    что облако не сообщает объем (подключение при этом работает).
+    """
+    remote = (remote or "").strip()
+    if remote.endswith(":"):
+        remote = remote[:-1]
+    if not _REMOTE_RE.fullmatch(remote):
+        raise ValueError("Select a valid rclone remote.")
+    remote_path = f"{remote}:"
+    unknown = {"total": None, "used": None, "free": None}
+    try:
+        output = _rclone("about", remote_path, "--json", timeout=60)
+    except RuntimeError as about_error:
+        try:
+            _rclone("lsd", remote_path, "--max-depth", "1", timeout=60)
+        except RuntimeError as list_error:
+            raise RuntimeError(
+                f"rclone about failed: {about_error}; listing failed: {list_error}"
+            ) from list_error
+        return unknown
+    try:
+        data = json.loads(output)
+    except ValueError:
+        return unknown
+    if not isinstance(data, dict):
+        return unknown
+    usage = {}
+    for key in ("total", "used", "free"):
+        value = data.get(key)
+        usage[key] = int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    return usage
+
+
 def delete_rclone_remote(remote):
     remote = (remote or "").strip()
     if remote.endswith(":"):
