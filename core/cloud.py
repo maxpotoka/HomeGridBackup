@@ -30,6 +30,10 @@ RCLONE_PROVIDERS = (
     ("MEGA", "mega", "mega"),
     ("Koofr", "koofr", "koofr"),
 )
+WINDOWS7_RCLONE_PROVIDERS = (
+    ("MEGA", "mega", "mega"),
+    ("Koofr", "koofr", "koofr"),
+)
 
 
 class CloudRateLimitError(RuntimeError):
@@ -91,6 +95,12 @@ def new_operation_id():
     return uuid4().hex
 
 
+def available_rclone_providers():
+    if WINDOWS7_CLOUD_SYNC_PREVIEW:
+        return WINDOWS7_RCLONE_PROVIDERS
+    return RCLONE_PROVIDERS
+
+
 def list_rclone_remotes():
     executable = _rclone_executable()
     if not executable:
@@ -109,7 +119,7 @@ def start_rclone_remote_setup(remote, backend):
     remote = (remote or "").strip()
     if not _REMOTE_RE.fullmatch(remote):
         raise ValueError("Имя подключения может содержать только буквы, цифры, '.', '_' и '-'.")
-    if backend not in {provider[1] for provider in RCLONE_PROVIDERS}:
+    if backend not in {provider[1] for provider in available_rclone_providers()}:
         raise ValueError("Unsupported cloud provider.")
     if remote in list_rclone_remotes():
         raise ValueError(f"A rclone remote named '{remote}' already exists.")
@@ -127,6 +137,43 @@ def start_rclone_remote_setup(remote, backend):
         bufsize=1,
         creationflags=_NO_WINDOW,
     )
+
+
+def create_rclone_remote(remote, backend, username, password):
+    remote = (remote or "").strip()
+    if not _REMOTE_RE.fullmatch(remote):
+        raise ValueError("Имя подключения может содержать только буквы, цифры, '.', '_' и '-'.")
+    if backend not in {provider[1] for provider in available_rclone_providers()}:
+        raise ValueError("Unsupported cloud provider.")
+    if backend not in ("mega", "koofr"):
+        raise ValueError("Credential setup is only available for MEGA and Koofr.")
+    username = (username or "").strip()
+    if not username or not password:
+        raise ValueError("Введіть ім'я користувача та пароль.")
+    if remote in list_rclone_remotes():
+        raise ValueError(f"A rclone remote named '{remote}' already exists.")
+    executable = _rclone_executable()
+    if not executable:
+        raise RuntimeError("rclone is not installed or is not available in PATH.")
+
+    password_key = "pass" if backend == "mega" else "password"
+    options = ["user", username, password_key, password]
+    if backend == "koofr":
+        options.extend(("provider", "koofr"))
+    try:
+        result = _run(
+            [executable, "config", "create", remote, backend, *options, "--obscure", "--non-interactive"],
+            60,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        message = str(exc).replace(password, "[redacted]")
+        raise RuntimeError(message[-700:]) from exc
+    if result.returncode:
+        message = (result.stderr or result.stdout or "rclone remote creation failed").strip()
+        if password:
+            message = message.replace(password, "[redacted]")
+        raise RuntimeError(message[-700:])
+    return result.stdout
 
 
 def test_rclone_remote(remote):

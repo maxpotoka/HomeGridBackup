@@ -435,12 +435,13 @@ class DialogsMixin:
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
         v_cloud_remote = tk.StringVar(value=st.get("cloud_remote", ""))
         v_cloud_path = tk.StringVar(value=st.get("cloud_path", "HomeGridBackup"))
-        v_google_client_id = tk.StringVar(value="")
-        v_google_client_secret = tk.StringVar(value="")
-        from core.cloud import RCLONE_PROVIDERS
-        cloud_provider_names = [provider[0] for provider in RCLONE_PROVIDERS]
-        cloud_provider_by_name = {provider[0]: provider[1] for provider in RCLONE_PROVIDERS}
-        cloud_default_remote_by_name = {provider[0]: provider[2] for provider in RCLONE_PROVIDERS}
+        v_cloud_username = tk.StringVar(value="")
+        v_cloud_password = tk.StringVar(value="")
+        from core.cloud import available_rclone_providers
+        cloud_providers = available_rclone_providers()
+        cloud_provider_names = [provider[0] for provider in cloud_providers]
+        cloud_provider_by_name = {provider[0]: provider[1] for provider in cloud_providers}
+        cloud_default_remote_by_name = {provider[0]: provider[2] for provider in cloud_providers}
         v_cloud_provider = tk.StringVar(value=cloud_provider_names[0])
         v_cloud_new_remote = tk.StringVar(value=cloud_default_remote_by_name[cloud_provider_names[0]])
 
@@ -512,38 +513,39 @@ class DialogsMixin:
             fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs), width=16
         ).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
-        google_oauth_frame = tk.Frame(f_cloud, bg=p["card"])
+        cloud_credentials_frame = tk.Frame(f_cloud, bg=p["card"])
+        cloud_credentials_hint = None
         if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            google_oauth_frame.pack(fill="x", pady=4)
-            google_id_row = tk.Frame(google_oauth_frame, bg=p["card"])
-            google_id_row.pack(fill="x", pady=2)
+            cloud_credentials_frame.pack(fill="x", pady=4)
+            username_row = tk.Frame(cloud_credentials_frame, bg=p["card"])
+            username_row.pack(fill="x", pady=2)
             tk.Label(
-                google_id_row, text=tr("Google OAuth Client ID:", st.get("lang", "en")),
+                username_row, text=tr("Email / ім'я користувача:", st.get("lang", "en")),
                 width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
             ).pack(side="left")
             tk.Entry(
-                google_id_row, textvariable=v_google_client_id, bg=p["inp_bg"],
+                username_row, textvariable=v_cloud_username, bg=p["inp_bg"],
                 fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
             ).pack(side="left", fill="x", expand=True)
-            google_secret_row = tk.Frame(google_oauth_frame, bg=p["card"])
-            google_secret_row.pack(fill="x", pady=2)
+            password_row = tk.Frame(cloud_credentials_frame, bg=p["card"])
+            password_row.pack(fill="x", pady=2)
             tk.Label(
-                google_secret_row, text=tr("Google OAuth Client Secret:", st.get("lang", "en")),
+                password_row, text=tr("Пароль:", st.get("lang", "en")),
                 width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
             ).pack(side="left")
             tk.Entry(
-                google_secret_row, textvariable=v_google_client_secret, show="*",
-                bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
+                password_row, textvariable=v_cloud_password, show="*", bg=p["inp_bg"],
+                fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
             ).pack(side="left", fill="x", expand=True)
-            tk.Label(
-                google_oauth_frame,
-                text=tr(
-                    "Для Google Drive рекомендуються власні OAuth Client ID і Secret. Залиште обидва поля порожніми, щоб ввести їх у майстрі rclone.",
-                    st.get("lang", "en"),
-                ),
-                bg=p["card"], fg=p["muted"], justify="left",
-                wraplength=780, font=("Segoe UI", max(8, fs - 1)),
-            ).pack(anchor="w", pady=(2, 0))
+            cloud_credentials_hint = tk.Label(
+                cloud_credentials_frame, text="", bg=p["card"], fg=p["muted"],
+                justify="left", wraplength=780, font=("Segoe UI", max(8, fs - 1)),
+            )
+            cloud_credentials_hint.pack(anchor="w", pady=(2, 0))
+            cloud_credentials_hint.configure(text=tr(
+                "Для MEGA використовується email і пароль аккаунта.",
+                st.get("lang", "en"),
+            ))
 
         cloud_actions = tk.Frame(f_cloud, bg=p["card"])
         cloud_actions.pack(fill="x", pady=(4, 2))
@@ -626,32 +628,68 @@ class DialogsMixin:
             provider = v_cloud_provider.get()
             v_cloud_new_remote.set(cloud_default_remote_by_name.get(provider, "cloud"))
             if WINDOWS7_CLOUD_SYNC_PREVIEW:
-                if cloud_provider_by_name.get(provider) == "drive":
-                    google_oauth_frame.pack(fill="x", pady=4, before=cloud_actions)
-                else:
-                    google_oauth_frame.pack_forget()
+                cloud_credentials_hint.configure(text=tr(
+                    "Для MEGA використовується email і пароль аккаунта."
+                    if cloud_provider_by_name.get(provider) == "mega"
+                    else "Для Koofr потрібен пароль додатка, створений в налаштуваннях Koofr.",
+                    st.get("lang", "en"),
+                ))
 
         def _open_cloud_setup():
             import queue
             import threading
-            from core.cloud import start_rclone_remote_setup
 
             remote = v_cloud_new_remote.get().strip()
             backend = cloud_provider_by_name.get(v_cloud_provider.get())
-            client_id = v_google_client_id.get().strip()
-            client_secret = v_google_client_secret.get()
             if not backend:
                 cloud_msg.configure(text=tr("Оберіть хмарний сервіс.", st.get("lang", "en")), fg=p["red"])
-                return
-            if backend == "drive" and bool(client_id) != bool(client_secret):
-                cloud_msg.configure(
-                    text=tr("Введіть обидва значення OAuth Client ID та Client Secret.", st.get("lang", "en")),
-                    fg=p["red"],
-                )
                 return
             if remote in (cb_cloud_remote.cget("values") or ()):
                 cloud_msg.configure(text=tr("Підключення з таким ім'ям уже існує.", st.get("lang", "en")), fg=p["red"])
                 return
+            if WINDOWS7_CLOUD_SYNC_PREVIEW:
+                username = v_cloud_username.get().strip()
+                password = v_cloud_password.get()
+                if not username or not password:
+                    cloud_msg.configure(
+                        text=tr("Введіть ім'я користувача та пароль.", st.get("lang", "en")),
+                        fg=p["red"],
+                    )
+                    return
+                v_cloud_password.set("")
+                cloud_msg.configure(
+                    text=tr("Створення підключення...", st.get("lang", "en")), fg=p["muted"]
+                )
+                cloud_setup_button.configure(state="disabled")
+
+                def _create_remote():
+                    try:
+                        from core.cloud import create_rclone_remote
+                        create_rclone_remote(remote, backend, username, password)
+                        error = ""
+                    except Exception as exc:
+                        error = str(exc)
+
+                    def _update():
+                        if not dlg.winfo_exists():
+                            return
+                        cloud_setup_button.configure(state="normal")
+                        if error:
+                            cloud_msg.configure(text=error, fg=p["red"])
+                        else:
+                            v_cloud_remote.set(remote)
+                            cloud_msg.configure(
+                                text=tr("Підключення створено.", st.get("lang", "en")),
+                                fg=p["green"],
+                            )
+                            _refresh_cloud_remotes()
+
+                    self.root.after(0, _update)
+
+                threading.Thread(target=_create_remote, daemon=True).start()
+                return
+
+            from core.cloud import start_rclone_remote_setup
             try:
                 process = start_rclone_remote_setup(remote, backend)
             except Exception as exc:
@@ -667,12 +705,7 @@ class DialogsMixin:
                 "Відповідайте на запити rclone. Для OAuth може відкритися браузер.",
                 st.get("lang", "en"),
             )
-            if WINDOWS7_CLOUD_SYNC_PREVIEW and backend == "drive":
-                wizard_hint += " " + tr(
-                    "Для Google Drive рекомендується власний OAuth Client ID та Secret, щоб уникнути спільного ліміту rclone.",
-                    st.get("lang", "en"),
-                )
-            elif backend == "mega":
+            if backend == "mega":
                 wizard_hint += " " + tr(
                     "Для MEGA введіть email і пароль свого облікового запису у відповідь на запити rclone.",
                     st.get("lang", "en"),
@@ -698,8 +731,6 @@ class DialogsMixin:
 
             output_queue = queue.Queue()
             reader_done = threading.Event()
-            prompt_tail = ""
-            sent_client_credentials = set()
 
             def _read_rclone_output():
                 try:
@@ -750,7 +781,6 @@ class DialogsMixin:
             wizard.protocol("WM_DELETE_WINDOW", _close_rclone_wizard)
 
             def _poll_rclone_output():
-                nonlocal prompt_tail
                 if not wizard.winfo_exists():
                     return
                 chunks = []
@@ -761,31 +791,13 @@ class DialogsMixin:
                         break
                     chunks.append(item)
                 if chunks:
-                    prompt_tail = (prompt_tail + "".join(chunks).lower())[-256:]
                     output.configure(state="normal")
                     output.insert("end", "".join(chunks))
                     output.see("end")
                     output.configure(state="disabled")
-                    if WINDOWS7_CLOUD_SYNC_PREVIEW and backend == "drive" and client_id and client_secret:
-                        prompts = (
-                            ("client_id", "client_id>", client_id),
-                            ("client_secret", "client_secret>", client_secret),
-                        )
-                        for key, prompt, value in prompts:
-                            if key not in sent_client_credentials and prompt in prompt_tail:
-                                try:
-                                    process.stdin.write(value + "\n")
-                                    process.stdin.flush()
-                                except (OSError, ValueError) as exc:
-                                    cloud_msg.configure(text=str(exc), fg=p["red"])
-                                else:
-                                    sent_client_credentials.add(key)
-                                prompt_tail = prompt_tail.split(prompt, 1)[-1]
                 if reader_done.is_set() and process.poll() is not None:
                     if process.returncode == 0:
                         v_cloud_remote.set(remote)
-                        v_google_client_secret.set("")
-                        v_google_client_id.set("")
                         cloud_msg.configure(text=tr("Підключення створено.", st.get("lang", "en")), fg=p["green"])
                         _refresh_cloud_remotes()
                     else:
@@ -940,11 +952,12 @@ class DialogsMixin:
             dlg.after(30000, _schedule_cloud_queue_refresh)
 
         cb_cloud_provider.bind("<<ComboboxSelected>>", _select_cloud_provider)
-        tk.Button(
+        cloud_setup_button = tk.Button(
             cloud_actions, text=tr("Додати та підключити", st.get("lang", "en")),
             command=_open_cloud_setup, bg=p["card"], fg=p["cyan"],
             font=("Segoe UI", fs), padx=10, cursor="hand2"
-        ).pack(side="left", padx=(0, 6))
+        )
+        cloud_setup_button.pack(side="left", padx=(0, 6))
         tk.Button(
             cloud_actions, text=tr("Перевірити", st.get("lang", "en")),
             command=_test_cloud_remote, bg=p["card"], fg=p["green"],

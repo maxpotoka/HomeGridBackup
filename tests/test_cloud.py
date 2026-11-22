@@ -10,6 +10,77 @@ from core import cloud
 
 
 class RcloneExecutableTests(unittest.TestCase):
+    def test_windows7_preview_exposes_only_mega_and_koofr(self):
+        with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True):
+            self.assertEqual(
+                [provider[1] for provider in cloud.available_rclone_providers()],
+                ["mega", "koofr"],
+            )
+        with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", False):
+            self.assertEqual(
+                [provider[1] for provider in cloud.available_rclone_providers()],
+                ["drive", "onedrive", "dropbox", "box", "pcloud", "mega", "koofr"],
+            )
+
+    def test_preview_credential_setup_creates_mega_and_koofr_without_prompts(self):
+        result = mock.Mock(returncode=0, stdout="", stderr="")
+        cases = (
+            ("mega", ["user", "user@example.com", "pass", "secret"]),
+            ("koofr", ["user", "user@example.com", "password", "secret", "provider", "koofr"]),
+        )
+        for backend, options in cases:
+            with self.subTest(backend=backend), \
+                 mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
+                 mock.patch.object(cloud, "list_rclone_remotes", return_value=[]), \
+                 mock.patch.object(cloud, "_rclone_executable", return_value="rclone"), \
+                 mock.patch.object(cloud, "_run", return_value=result) as run:
+                cloud.create_rclone_remote("mycloud", backend, "user@example.com", "secret")
+            self.assertEqual(
+                run.call_args.args[0],
+                [
+                    "rclone", "config", "create", "mycloud", backend,
+                    *options, "--obscure", "--non-interactive",
+                ],
+            )
+            self.assertEqual(run.call_args.args[1], 60)
+
+    def test_preview_credential_setup_rejects_providers_other_than_mega_and_koofr(self):
+        with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True):
+            with self.assertRaisesRegex(ValueError, "Unsupported cloud provider"):
+                cloud.create_rclone_remote("drive", "drive", "user", "password")
+
+    def test_preview_credential_setup_redacts_password_from_errors(self):
+        result = mock.Mock(returncode=1, stdout="", stderr="failed secret")
+        with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
+             mock.patch.object(cloud, "list_rclone_remotes", return_value=[]), \
+             mock.patch.object(cloud, "_rclone_executable", return_value="rclone"), \
+             mock.patch.object(cloud, "_run", return_value=result):
+            with self.assertRaisesRegex(RuntimeError, r"failed \[redacted\]"):
+                cloud.create_rclone_remote("mega", "mega", "user", "secret")
+
+    def test_preview_credential_setup_redacts_password_from_process_errors(self):
+        error = cloud.subprocess.TimeoutExpired(["rclone", "secret"], 60)
+        with mock.patch.object(cloud, "WINDOWS7_CLOUD_SYNC_PREVIEW", True), \
+             mock.patch.object(cloud, "list_rclone_remotes", return_value=[]), \
+             mock.patch.object(cloud, "_rclone_executable", return_value="rclone"), \
+             mock.patch.object(cloud, "_run", side_effect=error):
+            with self.assertRaises(RuntimeError) as raised:
+                cloud.create_rclone_remote("mega", "mega", "user", "secret")
+        self.assertNotIn("secret", str(raised.exception))
+
+    def test_cloud_queue_translation_keeps_format_placeholders(self):
+        from core.i18n import tr
+
+        source = "Черга синхронізації: архіви {archives}, звіти {reports}"
+        self.assertEqual(
+            tr(source, "uk").format(archives=2, reports=3),
+            "Черга синхронізації: архіви 2, звіти 3",
+        )
+        self.assertEqual(
+            tr(source, "en").format(archives=2, reports=3),
+            "Cloud sync queue: archives 2, reports 3",
+        )
+
     def test_cloud_settings_reject_a_blank_folder_or_remote_root(self):
         for path in ("", " / ", "///"):
             with self.subTest(path=path), self.assertRaisesRegex(ValueError, "корінь"):

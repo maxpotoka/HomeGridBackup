@@ -120,6 +120,12 @@ EN_EXACT = {
     "5. Налаштування хмарного сховища": "5. Cloud storage settings",
     "Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config": "Select a configured cloud storage from the list. Add new storage with: rclone config",
     "Сервіс:": "Service:",
+    "Email / ім'я користувача:": "Email / username:",
+    "Пароль:": "Password:",
+    "Для MEGA використовується email і пароль аккаунта.": "MEGA uses your account email and password.",
+    "Для Koofr потрібен пароль додатка, створений в налаштуваннях Koofr.": "Koofr requires an app password generated in Koofr settings.",
+    "Введіть ім'я користувача та пароль.": "Enter a username and password.",
+    "Створення підключення...": "Creating connection...",
     "Ім'я підключення:": "Connection name:",
     "Приховати введення": "Hide input",
     "Відповідайте на запити rclone. Для OAuth може відкритися браузер.": "Answer the rclone prompts. OAuth may open a browser.",
@@ -558,6 +564,9 @@ EN_SUBSTR = sorted([
 ], key=lambda x: len(x), reverse=True)
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}
+UK_EXACT["Черга синхронізації: архіви {archives}, звіти {reports}"] = (
+    "Черга синхронізації: архіви {archives}, звіти {reports}"
+)
 
 def _clean_linux_emoji(txt):
     import sys
