@@ -93,7 +93,7 @@ def toggle_keep_tag(state, filename):
         return True, new_name
     return False, safe_name
 
-def apply_gfs_cleanup(engine, skip_prompt=False):
+def apply_gfs_cleanup(engine, skip_prompt=False, sync_cloud=True):
     all_items, keep_items, del_items = compute_gfs_plan(engine.state)
     bdir = engine.state["backup_dir"]
     del_mode = engine.state.get("delete_mode", "trash")
@@ -128,6 +128,7 @@ def apply_gfs_cleanup(engine, skip_prompt=False):
 
     deleted = 0
     del_mb = round(sum(x["size"] for x in del_items) / 1048576.0, 1)
+    cloud_prune = not del_items
     if del_items:
         action_txt = "Видалити назавжди з диска" if del_mode == "permanent" else "Перемістити у Кошик"
         do_del = True if skip_prompt else engine.ask_modal("confirm", "Очищення старих бекапів", f"{action_txt} {len(del_items)} застарілих копій ({del_mb} МБ)?")
@@ -145,8 +146,15 @@ def apply_gfs_cleanup(engine, skip_prompt=False):
                     min(100, int((batch_start + len(batch)) * 100 / len(del_items))),
                     f"Ротація GFS: {min(batch_start + len(batch), len(del_items))}/{len(del_items)}"
                 )
+            cloud_prune = deleted == len(del_items)
             done_lbl = "Видалено з диска назавжди" if del_mode == "permanent" else "Переміщено у Кошик"
             engine.log(f"{done_lbl}: {deleted} файл(ів) ({del_mb} МБ).", "ok")
         else:
             engine.log("Очищення застарілих архівів пропущено.", "info")
+    if sync_cloud and engine.state.get("cloud_enabled"):
+        try:
+            from core.cloud import sync_cloud_backups
+            sync_cloud_backups(engine, prune=cloud_prune)
+        except Exception as exc:
+            engine.log(f"Попередження: не вдалося синхронізувати хмарне дзеркало GFS: {exc}", "warn")
     return deleted, renamed, del_mb

@@ -15,6 +15,7 @@ import threading
 import time
 import atexit
 import tempfile
+import uuid
 
 def is_wsl():
     if not sys.platform.startswith("linux"):
@@ -357,7 +358,9 @@ def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "keep_last_count": 5, "daily_days": 7, "today_max": 2,
+        "mirror_dir": "", "mirror_enabled": False, "cloud_enabled": False, "cloud_remote": "",
+        "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
+        "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
         "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True, "tray_enabled": True,
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
@@ -387,6 +390,16 @@ def load_state():
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
+            if not IS_ANDROID and isinstance(data.get("cloud_enabled"), bool):
+                state["cloud_enabled"] = data["cloud_enabled"]
+            if isinstance(data.get("cloud_remote"), str):
+                state["cloud_remote"] = data["cloud_remote"].strip()
+            if isinstance(data.get("cloud_path"), str):
+                state["cloud_path"] = data["cloud_path"].strip() or "HomeGridBackup"
+            if isinstance(data.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{32}", data["device_id"]):
+                state["device_id"] = data["device_id"]
+            else:
+                state["dirty"] = True
             if data.get("lang") in ("en", "uk"):
                 state["lang"] = data["lang"]
             if data.get("theme") in VALID_THEMES:
@@ -480,6 +493,7 @@ def commit_state(state):
         record_server_history(state, state["server"])
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
+        "cloud_enabled", "cloud_remote", "cloud_path", "device_id",
         "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
