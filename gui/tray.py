@@ -68,9 +68,6 @@ def _detect_linux_tray_backend():
             return "xorg"
     except Exception:
         pass
-    de = f"{os.environ.get('XDG_CURRENT_DESKTOP', '')} {os.environ.get('DESKTOP_SESSION', '')}".upper()
-    if any(k in de for k in ("XFCE", "KDE", "LXQT", "MATE", "CINNAMON", "UNITY")):
-        return "appindicator" if _has_appindicator_gi() else "auto"
     return ""
 
 _LNX_TRAY_BE = _detect_linux_tray_backend()
@@ -201,6 +198,9 @@ def _start_tray_thread(engine):
             return
         _TRAY_STARTED = True
         _TRAY_STOP.clear()
+        engine.tray_ready = False
+        engine.tray_error = ""
+        engine.tray_ready_event = threading.Event()
     from core.backup import run_backup_task
     from core.i18n import tr
 
@@ -257,8 +257,34 @@ def _start_tray_thread(engine):
             pystray.MenuItem(tr("✖ Вихід", lng_s), _on_exit)
         )
 
-    icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", _build_tray_menu())
+    try:
+        icon = pystray.Icon(f"HomeGridBackup_{os.getpid()}", _get_tray_img_safe(0, False, "idle", 0), "HomeGrid Backup", _build_tray_menu())
+    except Exception as exc:
+        with _TRAY_LOCK:
+            _TRAY_STARTED = False
+        engine.tray_icon = None
+        engine.tray_error = str(exc)
+        engine.tray_ready_event.set()
+        engine.log("Не вдалося створити значок системного трею.", "err")
+        return
     engine.tray_icon = icon
+
+    def _mark_tray_failed(exc):
+        global _TRAY_STARTED
+        engine.tray_ready = False
+        engine.tray_error = str(exc) or "Невідома помилка запуску трею."
+        engine.tray_icon = None
+        engine.tray_ready_event.set()
+        _TRAY_STOP.set()
+        with _TRAY_LOCK:
+            _TRAY_STARTED = False
+        engine.log("Не вдалося запустити значок системного трею.", "err")
+        engine.log(f"[TRAY DETAIL] {engine.tray_error}", "err")
+        if engine.app_ref is not None:
+            try:
+                engine.app_ref.root.after(0, engine.app_ref.root.deiconify)
+            except Exception:
+                pass
 
     def _anim_loop():
         err_streak = 0
@@ -270,6 +296,8 @@ def _start_tray_thread(engine):
             try:
                 if engine.tray_icon is None:
                     break
+                if not engine.tray_ready:
+                    continue
                 if not getattr(engine.tray_icon, "visible", True):
                     continue
                 cur_pct = int(engine.progress) if engine.is_running else 0
@@ -298,20 +326,29 @@ def _start_tray_thread(engine):
                         engine.tray_icon.title = new_title
                         last_title = new_title
                 err_streak = 0
-            except AssertionError:
-                engine.tray_icon = None
+            except AssertionError as exc:
+                _mark_tray_failed(exc)
                 break
-            except Exception:
+            except Exception as exc:
                 err_streak += 1
                 if err_streak >= 3:
-                    engine.tray_icon = None
+                    _mark_tray_failed(exc)
                     break
+
+    def _on_icon_setup(ready_icon):
+        try:
+            ready_icon.visible = True
+            engine.tray_ready = True
+        except Exception as exc:
+            _mark_tray_failed(exc)
+        else:
+            engine.tray_ready_event.set()
 
     def _run_icon_safe():
         try:
-            icon.run()
-        except Exception:
-            engine.tray_icon = None
+            icon.run(setup=_on_icon_setup)
+        except Exception as exc:
+            _mark_tray_failed(exc)
 
     threading.Thread(target=_anim_loop, daemon=True).start()
     threading.Thread(target=_run_icon_safe, daemon=True).start()

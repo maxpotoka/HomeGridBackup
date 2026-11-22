@@ -250,15 +250,32 @@ class HomeGridApp(DialogsMixin):
             try:
                 if self.engine.tray_icon is None:
                     _start_tray_thread(self.engine)
-                if self.engine.tray_icon is not None:
+                ready_event = getattr(self.engine, "tray_ready_event", None)
+                ready = bool(
+                    self.engine.tray_icon is not None
+                    and ready_event is not None
+                    and (ready_event.is_set() or ready_event.wait(2.5))
+                    and getattr(self.engine, "tray_ready", False)
+                )
+                if ready:
                     self.root.withdraw()
-                    self.engine.log("Вікно згорнуто у системний трей (програма продовжує роботу).", "info")
+                    self.engine.log("Значок системного трею запущено; вікно приховано.", "info")
                     return
-            except Exception:
-                pass
-        if sys.platform.startswith("linux") and keep_tray and self.engine.tray_icon is None:
+            except Exception as exc:
+                self.engine.tray_error = str(exc)
+                self.engine.log("Не вдалося перевірити запуск значка системного трею.", "err")
+        if sys.platform.startswith("linux") and keep_tray:
             self.root.iconify()
-            self.engine.log("Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).", "info")
+            reason = getattr(self.engine, "tray_error", "")
+            if not reason:
+                from gui.tray import _tray_problem
+                reason = _tray_problem()
+            self.engine.log(
+                "Запуск трею не підтверджено; вікно згорнуто на панель задач.",
+                "warn"
+            )
+            if reason:
+                self.engine.log(f"[TRAY DETAIL] {reason}", "warn")
             return
         self.confirm_exit()
 
