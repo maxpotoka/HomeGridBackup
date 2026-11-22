@@ -83,28 +83,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Continue"
-          
-          # Отримуємо список релізів безпечно
           $releasesJson = gh release list --json tagName 2>$null
           if ([string]::IsNullOrWhiteSpace($releasesJson)) {
             Write-Host "No releases found, skipping cleanup."
             exit 0
           }
-          
           $releases = $releasesJson | ConvertFrom-Json
           if ($null -eq $releases -or $releases.Count -eq 0) {
             Write-Host "Release list is empty, skipping cleanup."
             exit 0
           }
-          
           foreach ($release in $releases) {
             if ($release.tagName -match "^win10-x64-v\d{4}\.\d{2}\.\d{2}") {
               Write-Host "Deleting old release: $($release.tagName)"
-              
-              # Видаляємо реліз (ігноруємо помилки якщо вже видалено)
               gh release delete $release.tagName --yes 2>$null
-              
-              # Видаляємо тег з remote (перевіряємо чи існує перед видаленням)
               $tagExists = git ls-remote --tags origin $release.tagName 2>$null
               if (-not [string]::IsNullOrWhiteSpace($tagExists)) {
                 git push origin --delete $release.tagName 2>$null
@@ -114,7 +106,6 @@ jobs:
               }
             }
           }
-          
           Write-Host "Cleanup completed successfully."
 
       - name: Publish clean .exe to GitHub Releases
