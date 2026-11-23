@@ -8,7 +8,17 @@
 # patch-id: macos-tray-quit-apps-2.41
 # patch-id: cumulative-linux-tray-pcloud-menu-2.42
 # patch-id: linux-i386-installer-ldd-uninstall-2.43
-# [ФАЙЛ: core/config.py (v2.29 | 23.11.2026 16:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: settings-two-pane-sidebar-2.47
+# patch-id: settings-grouped-sidebar-clean-2.48
+# patch-id: settings-logical-sections-2.49
+# patch-id: settings-polish-labels-cloud-grid-2.50
+# patch-id: settings-fifth-tray-tab-2.51
+# patch-id: pcloud-retention-count-size-2.52
+# patch-id: horizontal-pcloud-and-ui-tabs-2.53
+# patch-id: pcloud-compact-sync-icon-2.54
+# patch-id: pcloud-disable-and-freespace-2.57
+# patch-id: destination-copies-network-journal-2.58-1a
+# [ФАЙЛ: core/config.py (v2.40 | 23.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -77,8 +87,10 @@ except Exception:
 # patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: dashboard-redesign-2.34
 # patch-id: center-storage-notepad-2.40
-SCRIPT_VER = "2.43"
-BUILD_DATE = "23.11.2026 07:55"
+# patch-id: homegrid-design-system-2.45
+# patch-id: settings-all-tabs-homegrid-2.46
+SCRIPT_VER = "2.58"
+BUILD_DATE = "23.11.2026 20:30"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -371,7 +383,8 @@ def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True,
+        "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "journal_sync_target": "pcloud",
+        "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
@@ -403,6 +416,12 @@ def load_state():
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
+            if data.get("net_dir"):
+                state["net_dir"] = os.path.expanduser(str(data["net_dir"]).strip())
+            if isinstance(data.get("net_enabled"), bool):
+                state["net_enabled"] = data["net_enabled"] and bool(state["net_dir"])
+            if data.get("journal_sync_target") in ("pcloud", "network", "both"):
+                state["journal_sync_target"] = data["journal_sync_target"]
             if not IS_ANDROID and isinstance(data.get("cloud_enabled"), bool):
                 state["cloud_enabled"] = data["cloud_enabled"]
             if isinstance(data.get("cloud_remote"), str):
@@ -427,7 +446,7 @@ def load_state():
                 state["progress_style"] = data["progress_style"]
             if data.get("delete_mode") in ("trash", "direct", "permanent"):
                 state["delete_mode"] = data["delete_mode"]
-            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled", "cloud_save_archives", "cloud_save_logs"):
+            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled", "cloud_save_archives", "cloud_save_logs", "cloud_fit_free_space"):
                 if isinstance(data.get(bk), bool):
                     state[bk] = data[bk]
             st_raw = str(data.get("sched_time") or "").strip()
@@ -439,7 +458,9 @@ def load_state():
                 state["sched_mode"] = data["sched_mode"]
             if data.get("sched_prio") in (2, 4, 5, 6, 7, 8, 9):
                 state["sched_prio"] = data["sched_prio"]
-            for ik in ("keep_last_count", "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count"):
+            if isinstance(data.get("cloud_max_size_gb"), (int, float)) and data["cloud_max_size_gb"] >= 0:
+                state["cloud_max_size_gb"] = round(float(data["cloud_max_size_gb"]), 2)
+            for ik in ("keep_last_count", "cloud_max_archives", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count"):
                 if ik in data and isinstance(data[ik], int) and data[ik] >= 0:
                     state[ik] = data[ik]
             for sk in SECRET_KEYS:
@@ -506,7 +527,8 @@ def commit_state(state):
         record_server_history(state, state["server"])
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
-        "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_path", "device_id",
+        "net_dir", "net_enabled", "journal_sync_target",
+        "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 # ==============================================================================
+# patch-id: crash-faulthandler-2.03
 # patch-id: android-no-pip-install-2.02
-# [ФАЙЛ: main.py (v2.02 | 22.11.2026 08:51) — ТОЧКА ВХОДА, MUTEX И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v2.03 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
 import os
 import sys
 import ctypes
 import subprocess
+
+try:
+    import faulthandler
+    _crash_dir = os.path.join(os.path.expanduser("~"), ".backup_hgm")
+    os.makedirs(_crash_dir, exist_ok=True)
+    _crash_fp = open(os.path.join(_crash_dir, "crash.log"), "a", encoding="utf-8")
+    faulthandler.enable(_crash_fp)
+except Exception:
+    pass
+
 from core.scheduler import is_compiled_app
 from core.config import IS_ANDROID
 

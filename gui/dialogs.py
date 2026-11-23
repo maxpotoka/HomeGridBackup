@@ -10,7 +10,18 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # patch-id: fix-pcloud-vars-2.28
 # patch-id: fix-pcloud-nameerror-2.29
 # patch-id: pcloud-clean-hints-2.30
-# [ФАЙЛ: gui/dialogs.py (v2.13 | 23.11.2026 07:55)
+# patch-id: settings-two-pane-sidebar-2.47
+# patch-id: settings-grouped-sidebar-clean-2.48
+# patch-id: settings-logical-sections-2.49
+# patch-id: settings-polish-labels-cloud-grid-2.50
+# patch-id: settings-fifth-tray-tab-2.51
+# patch-id: pcloud-retention-count-size-2.52
+# patch-id: horizontal-pcloud-and-ui-tabs-2.53
+# patch-id: pcloud-compact-sync-icon-2.54
+# patch-id: fix-tooltip-import-2.55
+# patch-id: pcloud-disable-and-freespace-2.57
+# patch-id: destination-copies-network-journal-2.58-p4
+# [ФАЙЛ: gui/dialogs.py (v2.25 | 23.11.2026 20:30)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -23,6 +34,8 @@ from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage_windows_scheduler
 from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES, fix_mac_buttons
+# patch-id: settings-all-tabs-homegrid-2.46
+# patch-id: homegrid-design-system-2.45
 from gui.tray import _force_quit_app
 
 
@@ -331,6 +344,8 @@ class DialogsMixin:
             ]
             if d.get("mir_active"):
                 raw_stages.append(("Дзеркальне копіювання:" if lang == "uk" else "Mirror folder copy:", d.get("mir_sec", 0.0), p["green"]))
+            if d.get("net_active"):
+                raw_stages.append(("Копіювання у мережеву папку:" if lang == "uk" else "Network folder copy:", d.get("net_sec", 0.0), p["cyan"]))
             stages = [(f"{i}. {t}", v, c) for i, (t, v, c) in enumerate(raw_stages, 1)]
             for idx_r, (lbl_st, val_s, col_st) in enumerate(stages):
                 pct_v = min(100, int(round((float(val_s) / tot_s) * 100)))
@@ -459,7 +474,7 @@ class DialogsMixin:
         _sync_scheduler_from_windows(self.engine.state)
         st = self.engine.state
         fs = self.metrics["font_sz"]
-        dlg, p, host = self._make_dialog("Налаштування програми, тем, масштабу, GFS та Планувальника", 940, 620, scrollable=False, min_outer_w=880, min_outer_h=580)
+        dlg, p, host = self._make_dialog("Налаштування програми, тем, масштабу, GFS та Планувальника", 1040, 700, scrollable=False, min_outer_w=960, min_outer_h=650)
 
         v_keep_n = tk.IntVar(value=st.get("keep_last_count", 5))
         v_daily = tk.IntVar(value=st.get("daily_days", 7))
@@ -482,6 +497,10 @@ class DialogsMixin:
         v_cloud_save_archives = tk.BooleanVar(value=bool(st.get("cloud_save_archives", True)))
         v_cloud_save_logs = tk.BooleanVar(value=bool(st.get("cloud_save_logs", True)))
         v_cloud_path = tk.StringVar(value=st.get("cloud_path", "HomeGridBackup"))
+        v_cloud_max_cnt = tk.IntVar(value=int(st.get("cloud_max_archives", 0) or 0))
+        v_cloud_max_gb = tk.DoubleVar(value=float(st.get("cloud_max_size_gb", 0.0) or 0.0))
+        v_cloud_fit_free = tk.BooleanVar(value=bool(st.get("cloud_fit_free_space", True)))
+        v_journal_target = tk.StringVar(value=st.get("journal_sync_target", "pcloud"))
 
         sch_parts = (st.get("sched_time") or "03:00").split(":")
         v_sh = tk.StringVar(value=sch_parts[0] if len(sch_parts) > 0 else "03")
@@ -494,34 +513,113 @@ class DialogsMixin:
         bf = tk.Frame(dlg, bg=p["panel"], bd=1, relief="solid")
         bf.pack(side="bottom", fill="x", padx=12, pady=(4, 8))
 
-        nb_style = ttk.Style()
-        nb_style.configure("HGB.TNotebook", background=p["panel"], borderwidth=0)
-        nb_style.configure("HGB.TNotebook.Tab", font=("Segoe UI", fs, "bold"), padding=(12, 4))
-        nb = ttk.Notebook(host, style="HGB.TNotebook")
-        nb.pack(fill="both", expand=True, padx=10, pady=(4, 4))
-        tab_bkp = tk.Frame(nb, bg=p["panel"])
-        tab_ui = tk.Frame(nb, bg=p["panel"])
-        tab_cloud = tk.Frame(nb, bg=p["panel"])
-        nb.add(tab_bkp, text="  Резервне копіювання та Розклад  ")
-        nb.add(tab_ui, text="  Вигляд та Інтерфейс  ")
-        nb.add(tab_cloud, text="  Хмарне сховище  ")
-        nb.select(initial_tab)
 
-        f_cloud = tk.LabelFrame(
-            tab_cloud, text="5. Налаштування pCloud",
-            bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"),
-            padx=14, pady=10
-        )
-        f_cloud.pack(fill="x", padx=14, pady=12)
-        tk.Checkbutton(
-            f_cloud, text="Увімкнути синхронізацію з pCloud",
-            variable=v_cloud_enabled, bg=p["card"], fg=p["text"],
-            selectcolor=p["inp_bg"], font=("Segoe UI", fs, "bold")
-        ).pack(anchor="w", pady=(2, 6))
-        _c_opts = tk.Frame(f_cloud, bg=p["card"])
-        _c_opts.pack(fill="x", pady=(0, 8), padx=(18, 0))
-        tk.Checkbutton(_c_opts, text="Зберігати архів у pCloud", variable=v_cloud_save_archives, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(side="left", padx=(0, 20))
-        tk.Checkbutton(_c_opts, text="Зберігати журнал у pCloud", variable=v_cloud_save_logs, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(side="left")
+        from gui.widgets import SidebarNavItem, make_ui_icons
+        split_wrap = tk.Frame(host, bg=p["panel"])
+        split_wrap.pack(fill="both", expand=True)
+
+        sb_w = max(255, int(round(fs * 25)))
+        sidebar = tk.Frame(split_wrap, bg=p["panel"], width=sb_w, padx=10, pady=10)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+
+        v_sep = tk.Frame(split_wrap, bg=p["border"], width=1)
+        v_sep.pack(side="left", fill="y")
+
+        content_area = tk.Frame(split_wrap, bg=p["panel"], padx=8, pady=6)
+        content_area.pack(side="left", fill="both", expand=True)
+
+        tab_bkp = tk.Frame(content_area, bg=p["panel"])
+        tab_sched = tk.Frame(content_area, bg=p["panel"])
+        tab_cloud = tk.Frame(content_area, bg=p["panel"])
+        tab_ui = tk.Frame(content_area, bg=p["panel"])
+        tab_sys = tk.Frame(content_area, bg=p["panel"])
+        _pages = [tab_bkp, tab_sched, tab_cloud, tab_ui, tab_sys]
+        _nav_items = []
+        _grp_lbls = []
+
+        _s_icons = {} if self.engine.state.get("lite_mode", False) else make_ui_icons(max(15, fs + 4), p["text"], p["cyan"])
+        _nav_specs = [
+            ("ПРОГРАМА ТА КОПІЇ", "shield", "🛡", "Зберігання та GFS", False),
+            (None, "hist", "🕒", "Розклад та запуск", True),
+            ("СИСТЕМА ТА ХМАРА", "cloud", "☁", "Хмара pCloud", False),
+            (None, "gear", "⚙", "Інтерфейс", False),
+            (None, "shield", "🔒", "Трей та безпека", False),
+        ]
+        _init_map = {0: 0, 1: 3, 2: 2}
+        _start_idx = _init_map.get(int(initial_tab), int(initial_tab)) if int(initial_tab) in (0, 1, 2, 3, 4) else 0
+        _cur_tab = {"idx": _start_idx}
+
+        def _select_pill_tab(idx):
+            _cur_tab["idx"] = idx
+            for i_p, pg in enumerate(_pages):
+                if i_p == idx:
+                    pg.pack(fill="both", expand=True)
+                else:
+                    pg.pack_forget()
+            for i_n, nav_w in enumerate(_nav_items):
+                nav_w.set_active(i_n == idx)
+
+        row_h = max(38, int(round(40 * self.metrics["k"])))
+        for i_n, (grp_k, ico_k, fb_s, cap_k, add_gap) in enumerate(_nav_specs):
+            if grp_k:
+                gl = tk.Label(sidebar, text=tr(grp_k, st.get("lang", "en")), bg=p["panel"], fg=p["muted"], anchor="w", font=(self._ui_fam(), max(8, fs - 2), "bold"))
+                gl.pack(fill="x", padx=10, pady=(4 if i_n == 0 else 8, 5))
+                _grp_lbls.append((gl, grp_k))
+            nav_w = SidebarNavItem(
+                sidebar, _s_icons.get(ico_k), fb_s, tr(cap_k, st.get("lang", "en")),
+                on_click=lambda ix=i_n: _select_pill_tab(ix),
+                palette=p, font_fam=self._ui_fam(), font_sz=fs, height_px=row_h
+            )
+            nav_w.pack(fill="x", pady=(0, 8 if add_gap else 3))
+            _nav_items.append(nav_w)
+        _select_pill_tab(_cur_tab["idx"])
+
+
+        f_cloud = tk.Frame(tab_cloud, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_cloud.pack(fill="x", padx=14, pady=10)
+        tk.Label(f_cloud, text=tr("Налаштування pCloud", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
+        from gui.widgets import HomeGridToggle
+        def _sync_pcloud_now():
+            import threading
+            if not st.get("cloud_enabled"):
+                cloud_msg.configure(text="Спочатку увімкніть pCloud і натисніть «Застосувати»." if st.get("lang", "en") == "uk" else "Enable pCloud and click Apply first.", fg=p["amber"])
+                return
+            cloud_msg.configure(text="Синхронізація з pCloud..." if st.get("lang", "en") == "uk" else "Syncing with pCloud...", fg=p["cyan"])
+            def _w():
+                try:
+                    from core.cloud import sync_cloud_backups, sync_cloud_reports
+                    sync_cloud_backups(self.engine, prune=False)
+                    sync_cloud_reports(self.engine)
+                    msg_r, col_r = ("Синхронізацію завершено ✔" if st.get("lang", "en") == "uk" else "Sync completed ✔"), p["green"]
+                except Exception as ex:
+                    msg_r, col_r = str(ex), p["red"]
+                self.root.after(0, lambda: dlg.winfo_exists() and cloud_msg.configure(text=msg_r, fg=col_r))
+            threading.Thread(target=_w, daemon=True).start()
+
+        from gui.styles import ToolTip
+        _c_en_row = tk.Frame(f_cloud, bg=p["card"])
+        _c_en_row.pack(fill="x", pady=(2, 6))
+        tk.Label(_c_en_row, text=tr("Увімкнути синхронізацію з pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold")).pack(side="left")
+        btn_sync_ico = tk.Button(_c_en_row, text="↻", command=_sync_pcloud_now, bg=p["inp_bg"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs + 1, "bold"), width=3, pady=1, cursor="hand2")
+        btn_sync_ico.pack(side="right", padx=(8, 0))
+        ToolTip(btn_sync_ico, "Синхронізувати з pCloud зараз" if st.get("lang", "en") == "uk" else "Sync with pCloud now")
+        tog_cloud_main = HomeGridToggle(_c_en_row, variable=v_cloud_enabled, compact=True, palette=p, font_sz=fs)
+        tog_cloud_main.pack(side="right")
+        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=4)
+        _c_opt1 = tk.Frame(f_cloud, bg=p["card"])
+        _c_opt1.pack(fill="x", pady=4)
+        lbl_c_arc = tk.Label(_c_opt1, text=tr("Зберігати архів у pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
+        lbl_c_arc.pack(side="left")
+        tog_c_arc = HomeGridToggle(_c_opt1, variable=v_cloud_save_archives, compact=True, palette=p, font_sz=fs)
+        tog_c_arc.pack(side="right")
+        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=4)
+        _c_opt2 = tk.Frame(f_cloud, bg=p["card"])
+        _c_opt2.pack(fill="x", pady=(4, 8))
+        lbl_c_log = tk.Label(_c_opt2, text=tr("Зберігати журнал у pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
+        lbl_c_log.pack(side="left")
+        tog_c_log = HomeGridToggle(_c_opt2, variable=v_cloud_save_logs, compact=True, palette=p, font_sz=fs)
+        tog_c_log.pack(side="right")
 
         cloud_remote_row = tk.Frame(f_cloud, bg=p["card"])
         tk.Label(
@@ -598,16 +696,46 @@ class DialogsMixin:
             )
             cloud_queue_label.pack(anchor="w", pady=(0, 4))
 
+        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=6)
+        c_ret0 = tk.Frame(f_cloud, bg=p["card"])
+        c_ret0.pack(fill="x", pady=4)
+        lbl_ret0 = tk.Label(c_ret0, text=tr("Контроль вільного місця у хмарі (автоочищення):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
+        lbl_ret0.pack(side="left")
+        tog_c_free = HomeGridToggle(c_ret0, variable=v_cloud_fit_free, compact=True, palette=p, font_sz=fs)
+        tog_c_free.pack(side="right")
+        c_ret1 = tk.Frame(f_cloud, bg=p["card"])
+        c_ret1.pack(fill="x", pady=4)
+        lbl_ret1 = tk.Label(c_ret1, text=tr("Зберігати останніх архівів у хмарі (0 = без обмеження):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
+        lbl_ret1.pack(side="left")
+        sp_c_cnt = tk.Spinbox(c_ret1, from_=0, to=200, textvariable=v_cloud_max_cnt, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold"))
+        sp_c_cnt.pack(side="right")
+
+        c_ret2 = tk.Frame(f_cloud, bg=p["card"])
+        c_ret2.pack(fill="x", pady=(4, 8))
+        lbl_ret2 = tk.Label(c_ret2, text=tr("Максимальний розмір папки у хмарі, ГБ (0 = без обмеження):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
+        lbl_ret2.pack(side="left")
+        sp_c_gb = tk.Spinbox(c_ret2, from_=0.0, to=500.0, increment=0.5, format="%.1f", textvariable=v_cloud_max_gb, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold"))
+        sp_c_gb.pack(side="right")
         cloud_path_row = tk.Frame(f_cloud, bg=p["card"])
         cloud_path_row.pack(fill="x", pady=4)
-        tk.Label(
-            cloud_path_row, text="Папка у хмарі:", width=18, anchor="w",
-            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-        ).pack(side="left")
-        tk.Entry(
+        lbl_cpath = tk.Label(
+            cloud_path_row, text=tr("Папка у хмарі:", st.get("lang", "en")), width=18, anchor="w",
+            bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)
+        )
+        lbl_cpath.pack(side="left")
+        ent_c_path = tk.Entry(
             cloud_path_row, textvariable=v_cloud_path, bg=p["inp_bg"],
-            fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
-        ).pack(side="left", fill="x", expand=True)
+            fg=p["text"], insertbackground=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs)
+        )
+        ent_c_path.pack(side="left", fill="x", expand=True, ipady=4)
+        j_row = tk.Frame(f_cloud, bg=p["card"]); j_row.pack(fill="x", pady=4)
+        tk.Label(j_row, text=tr("Куди надсилати спільний журнал обміну:", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        lng_j = st.get("lang", "en")
+        j_map = {tr("pCloud (за замовчуванням)", lng_j): "pcloud", tr("Мережева папка (Мережа)", lng_j): "network", tr("Обидва (pCloud + Мережа)", lng_j): "both"}
+        rev_j = {v: k for k, v in j_map.items()}
+        cb_journal_target = ttk.Combobox(j_row, values=list(j_map.keys()), state="readonly", width=28, font=(self._ui_fam(), fs))
+        cb_journal_target.set(rev_j.get(v_journal_target.get(), tr("pCloud (за замовчуванням)", lng_j)))
+        cb_journal_target.pack(side="right")
         tk.Label(
             f_cloud, text="Архіви та журнал зберігаються у вказаній папці pCloud." if st.get("lang", "en") == "uk" else "Archives and log are stored in the specified pCloud folder.",
             bg=p["card"], fg=p["muted"], justify="left",
@@ -1068,42 +1196,26 @@ class DialogsMixin:
         v_cloud_provider.set("pCloud")
         v_cloud_new_remote.set("pcloud")
         v_cloud_remote.set("pcloud")
+        cloud_actions.columnconfigure(0, weight=1)
+        cloud_actions.columnconfigure(1, weight=1)
+        cloud_actions.columnconfigure(2, weight=1)
         cloud_setup_button = tk.Button(
             cloud_actions, text=tr("Авторизація pCloud", st.get("lang", "en")),
             command=lambda: (v_cloud_provider.set("pCloud"), v_cloud_new_remote.set("pcloud"), _open_cloud_setup()),
-            bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2"
+            bg=p["blue"], fg="#ffffff", bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=10, pady=5, cursor="hand2"
         )
-        cloud_setup_button.pack(side="left", padx=(0, 8))
-        tk.Button(
+        cloud_setup_button.grid(row=0, column=0, sticky="ew", padx=(0, 5), pady=3)
+        btn_cloud_free = tk.Button(
             cloud_actions, text=tr("Перевірити вільне місце", st.get("lang", "en")),
             command=lambda: (v_cloud_remote.set("pcloud"), _test_cloud_remote()),
-            bg=p["card"], fg=p["green"], font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2"
-        ).pack(side="left", padx=4)
-        def _sync_pcloud_now():
-            import threading
-            if not st.get("cloud_enabled"):
-                cloud_msg.configure(text="Спочатку увімкніть pCloud і натисніть «Застосувати»." if st.get("lang", "en") == "uk" else "Enable pCloud and click Apply first.", fg=p["amber"])
-                return
-            cloud_msg.configure(text="Синхронізація з pCloud..." if st.get("lang", "en") == "uk" else "Syncing with pCloud...", fg=p["cyan"])
-            def _w():
-                try:
-                    from core.cloud import sync_cloud_backups, sync_cloud_reports
-                    sync_cloud_backups(self.engine, prune=False)
-                    sync_cloud_reports(self.engine)
-                    msg_r, col_r = ("Синхронізацію завершено ✔" if st.get("lang", "en") == "uk" else "Sync completed ✔"), p["green"]
-                except Exception as ex:
-                    msg_r, col_r = str(ex), p["red"]
-                self.root.after(0, lambda: dlg.winfo_exists() and cloud_msg.configure(text=msg_r, fg=col_r))
-            threading.Thread(target=_w, daemon=True).start()
-        tk.Button(
-            cloud_actions, text="Синхронізувати зараз" if st.get("lang", "en") == "uk" else "Sync Now",
-            command=_sync_pcloud_now, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
-        ).pack(side="left", padx=4)
+            bg=p["inp_bg"], fg=p["green"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=10, pady=5, cursor="hand2"
+        )
+        btn_cloud_free.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
         tk.Button(
             cloud_actions, text="Відкрити pCloud" if st.get("lang", "en") == "uk" else "Open pCloud",
             command=lambda: __import__("webbrowser").open("https://pcloud.com"),
-            bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
-        ).pack(side="left", padx=4)
+            bg=p["inp_bg"], fg=p["muted"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=10, pady=5, cursor="hand2"
+        ).grid(row=0, column=2, sticky="ew", padx=(5, 0), pady=3)
         retry_cloud_button = None
         if WINDOWS7_CLOUD_SYNC_PREVIEW:
             retry_cloud_button = tk.Button(
@@ -1117,48 +1229,88 @@ class DialogsMixin:
             command=_refresh_cloud_remotes, bg=p["card"], fg=p["cyan"],
             font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
         ).pack(side="right")
-        pass
+        def _sync_pcloud_widgets_state():
+            on_c = bool(v_cloud_enabled.get())
+            st_w = "normal" if on_c else "disabled"
+            fg_lbl = p["text"] if on_c else p["muted"]
+            btn_sync_ico.configure(state=st_w, fg=p["cyan"] if on_c else p["muted"], cursor="hand2" if on_c else "")
+            tog_c_arc.apply_style(palette=p, state=st_w, font_sz=fs)
+            tog_c_log.apply_style(palette=p, state=st_w, font_sz=fs)
+            tog_c_free.apply_style(palette=p, state=st_w, font_sz=fs)
+            lbl_c_arc.configure(fg=fg_lbl)
+            lbl_c_log.configure(fg=fg_lbl)
+            lbl_ret0.configure(fg=fg_lbl)
+            cloud_setup_button.configure(state=st_w, bg=p["blue"] if on_c else p["inp_bg"], fg="#ffffff" if on_c else p["muted"], cursor="hand2" if on_c else "")
+            btn_cloud_free.configure(state=st_w, fg=p["green"] if on_c else p["muted"], cursor="hand2" if on_c else "")
+            lbl_ret1.configure(fg=fg_lbl)
+            lbl_ret2.configure(fg=fg_lbl)
+            lbl_cpath.configure(fg=fg_lbl)
+            sp_c_cnt.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
+            sp_c_gb.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
+            ent_c_path.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
+
+        tog_cloud_main.cmd = _sync_pcloud_widgets_state
+        _sync_pcloud_widgets_state()
         _refresh_cloud_remotes()
         if WINDOWS7_CLOUD_SYNC_PREVIEW:
             dlg.after(0, _schedule_cloud_queue_refresh)
 
-        top_grid = tk.Frame(tab_bkp, bg=p["panel"])
-        top_grid.pack(fill="x", padx=12, pady=(6, 2))
-        top_grid.columnconfigure(0, weight=1)
-        top_grid.columnconfigure(1, weight=1)
+        f_gfs = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_gfs.pack(fill="x", padx=12, pady=(8, 8))
+        tk.Label(f_gfs, text=tr("Кільцева стратегія (останні N архівів)", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
+        g_r1 = tk.Frame(f_gfs, bg=p["card"])
+        g_r1.pack(fill="x", pady=4)
+        tk.Label(g_r1, text=tr("Зберігати останніх архівів (шт.):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        tk.Spinbox(g_r1, from_=1, to=50, textvariable=v_keep_n, width=5, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold")).pack(side="right")
+        tk.Frame(f_gfs, height=1, bg=p["border"]).pack(fill="x", pady=6)
+        g_r2 = tk.Frame(f_gfs, bg=p["card"])
+        g_r2.pack(fill="x", pady=2)
+        tk.Label(g_r2, text=tr("У Кошик (замість видалення)", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        HomeGridToggle(g_r2, variable=v_trash, compact=True, palette=p, font_sz=fs).pack(side="right")
+        tk.Frame(f_gfs, height=1, bg=p["border"]).pack(fill="x", pady=6)
+        g_r3 = tk.Frame(f_gfs, bg=p["card"])
+        g_r3.pack(fill="x", pady=2)
+        tk.Label(g_r3, text=tr("Автоочищення у фоні (GFS)", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        HomeGridToggle(g_r3, variable=v_sclean, compact=True, palette=p, font_sz=fs).pack(side="right")
 
-        f_gfs = tk.LabelFrame(top_grid, text=" 1. Кільцева стратегія (останні N архівів) ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=8)
-        f_gfs.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=2)
-        tk.Label(f_gfs, text="Зберігати останніх архівів (шт.):", bg=p["card"], fg=p["text"], font=("Segoe UI", fs), anchor="w").grid(row=0, column=0, sticky="w", pady=6)
-        tk.Spinbox(f_gfs, from_=1, to=50, textvariable=v_keep_n, width=5, bg=p["inp_bg"], fg=p["text"], font=("Segoe UI", fs, "bold")).grid(row=0, column=1, sticky="w", padx=(8, 0), pady=6)
-        tk.Checkbutton(f_gfs, text="У Кошик (замість видалення)", variable=v_trash, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
-
-        f_del = tk.LabelFrame(top_grid, text=" 2. Трей та тихий режим ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=12, pady=6)
-        f_del.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=2)
-        tk.Checkbutton(f_del, text="Згортати у трей при закритті", variable=v_tray_min, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=6)
-        tk.Checkbutton(f_del, text="Автоочищення у фоні (GFS)", variable=v_sclean, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(anchor="w", pady=4)
-
-        fs_sch = fs + 1
-        f_sch = tk.LabelFrame(tab_bkp, text=" 3. Автозапуск за розкладом ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs_sch, "bold"), padx=10, pady=4)
-        f_sch.pack(fill="x", padx=12, pady=2)
+        f_sch = tk.Frame(tab_sched, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_sch.pack(fill="x", padx=12, pady=(8, 8))
+        tk.Label(f_sch, text=tr("Автозапуск за розкладом", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
 
         sr1 = tk.Frame(f_sch, bg=p["card"])
-        sr1.pack(fill="x", pady=3)
-        tk.Label(sr1, text="Час щодня:", bg=p["card"], fg=p["text"], font=("Segoe UI", fs_sch, "bold")).pack(side="left")
-        ttk.Combobox(sr1, textvariable=v_sh, values=[f"{i:02d}" for i in range(24)], width=4, state="readonly", font=("Segoe UI", fs_sch)).pack(side="left", padx=4)
-        tk.Label(sr1, text=":", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs_sch, "bold")).pack(side="left")
-        ttk.Combobox(sr1, textvariable=v_sm, values=[f"{i:02d}" for i in range(60)], width=4, state="readonly", font=("Segoe UI", fs_sch)).pack(side="left", padx=4)
-        tk.Radiobutton(sr1, text="У фоні (з іконкою в треї)", variable=v_smode, value="--hidden", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=(16, 8))
-        tk.Radiobutton(sr1, text="З вікном консолі", variable=v_smode, value="--silent", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs_sch)).pack(side="left", padx=8)
+        sr1.pack(fill="x", pady=4)
+        tk.Label(sr1, text=tr("Час щодня:", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold")).pack(side="left")
+        t_box = tk.Frame(sr1, bg=p["card"])
+        t_box.pack(side="right")
+        ttk.Combobox(t_box, textvariable=v_sh, values=[f"{i:02d}" for i in range(24)], width=4, state="readonly", font=(self._ui_fam(), fs)).pack(side="left")
+        tk.Label(t_box, text=":", bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs, "bold")).pack(side="left", padx=4)
+        ttk.Combobox(t_box, textvariable=v_sm, values=[f"{i:02d}" for i in range(60)], width=4, state="readonly", font=(self._ui_fam(), fs)).pack(side="left")
+
+        tk.Frame(f_sch, height=1, bg=p["border"]).pack(fill="x", pady=6)
+        sr_m = tk.Frame(f_sch, bg=p["card"])
+        sr_m.pack(fill="x", pady=2)
+        tk.Radiobutton(sr_m, text=tr("У фоні (з іконкою в треї)", st.get("lang", "en")), variable=v_smode, value="--hidden", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], activebackground=p["card"], activeforeground=p["text"], font=(self._ui_fam(), fs)).pack(side="left", padx=(0, 16))
+        tk.Radiobutton(sr_m, text=tr("З вікном консолі", st.get("lang", "en")), variable=v_smode, value="--silent", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], activebackground=p["card"], activeforeground=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
 
         from core.config import IS_WINDOWS as _IS_WIN_S, IS_WSL as _IS_WSL_S, IS_MAC as _IS_MAC_S
         if _IS_WIN_S:
+            tk.Frame(f_sch, height=1, bg=p["border"]).pack(fill="x", pady=6)
             sr2 = tk.Frame(f_sch, bg=p["card"])
-            sr2.pack(fill="x", pady=3)
-            tk.Label(sr2, text="Пріоритет (2-9):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs_sch)).pack(side="left")
-            tk.Spinbox(sr2, from_=2, to=9, textvariable=v_sprio, width=4, bg=p["inp_bg"], fg=p["text"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=6)
-            tk.Checkbutton(sr2, text="Запускати пропущене", variable=v_smissed, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=12)
-            tk.Checkbutton(sr2, text="Розбудити ПК зі сну", variable=v_swake, bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], font=(self._ui_fam(), fs_sch)).pack(side="left", padx=12)
+            sr2.pack(fill="x", pady=2)
+            tk.Label(sr2, text=tr("Пріоритет (2-9):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+            tk.Spinbox(sr2, from_=2, to=9, textvariable=v_sprio, width=4, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs)).pack(side="right")
+
+            tk.Frame(f_sch, height=1, bg=p["border"]).pack(fill="x", pady=6)
+            sr2b = tk.Frame(f_sch, bg=p["card"])
+            sr2b.pack(fill="x", pady=2)
+            tk.Label(sr2b, text=tr("Запускати пропущене", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+            HomeGridToggle(sr2b, variable=v_smissed, compact=True, palette=p, font_sz=fs).pack(side="right")
+
+            tk.Frame(f_sch, height=1, bg=p["border"]).pack(fill="x", pady=6)
+            sr2c = tk.Frame(f_sch, bg=p["card"])
+            sr2c.pack(fill="x", pady=2)
+            tk.Label(sr2c, text=tr("Розбудити ПК зі сну", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+            HomeGridToggle(sr2c, variable=v_swake, compact=True, palette=p, font_sz=fs).pack(side="right")
         else:
             lng_n = st.get("lang", "en")
             os_note = (
@@ -1229,80 +1381,96 @@ class DialogsMixin:
             self.open_settings()
 
         tk.Button(sr3, text="Додати в Планувальник", command=_create_task, bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2").pack(side="left", padx=(0, 10))
-        tk.Button(sr3, text="Видалити задачу", command=_del_task, bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=4, cursor="hand2").pack(side="left", padx=6)
+        tk.Button(sr3, text=tr("Видалити задачу", st.get("lang", "en")), command=_del_task, bg=p["card"], fg=p["red"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=10, pady=4, cursor="hand2").pack(side="left", padx=6)
         def _open_adv_sched():
             lng_m = st.get("lang", "en")
             m_adv = tk.Menu(dlg, tearoff=0, bg=p["panel"], fg=p["text"], font=("Segoe UI", fs))
             m_adv.add_command(label=tr("Копіювати команду фонового запуску", lng_m), command=lambda: _copy_cmd("--hidden"))
             m_adv.add_command(label=tr("Копіювати команду консольного запуску", lng_m), command=lambda: _copy_cmd("--silent"))
-            m_adv.add_separator()
-            m_adv.add_command(label=tr("Експорт налаштувань (JSON)...", lng_m), command=_export_cfg)
-            m_adv.add_command(label=tr("Імпорт налаштувань (JSON)...", lng_m), command=_import_cfg)
             m_adv.tk_popup(btn_adv.winfo_rootx(), btn_adv.winfo_rooty() + btn_adv.winfo_height())
-        btn_adv = tk.Button(sr3, text="Додатково ▾", command=_open_adv_sched, bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2")
+        btn_adv = tk.Button(sr3, text=tr("Додатково ▾", st.get("lang", "en")), command=_open_adv_sched, bg=p["card"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=10, pady=4, cursor="hand2")
         btn_adv.pack(side="right")
 
         bot_col = tk.Frame(tab_ui, bg=p["panel"])
-        bot_col.pack(fill="both", expand=True, padx=14, pady=(6, 4))
+        bot_col.pack(fill="both", expand=True, padx=12, pady=(8, 4))
 
-        f_thm = tk.LabelFrame(bot_col, text=" 4. Оформлення, мова та масштаб екрана ", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"), padx=14, pady=8)
+        f_thm = tk.Frame(bot_col, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
         f_thm.pack(fill="x", pady=(0, 8))
+        tk.Label(f_thm, text=tr("Оформлення, мова та масштаб екрана", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 10))
 
-        t_r0 = tk.Frame(f_thm, bg=p["card"])
-        t_r0.pack(fill="x", pady=4)
-        tk.Label(t_r0, text="Мова інтерфейсу:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        ug = tk.Frame(f_thm, bg=p["card"])
+        ug.pack(fill="x")
+
+        c00 = tk.Frame(ug, bg=p["card"])
+        c00.pack(fill="x", pady=4)
+        tk.Label(c00, text=tr("Мова інтерфейсу:", st.get("lang", "en")), anchor="w", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         lang_map = {"English (Default)": "en", "Українська": "uk"}
         rev_lang = {"en": "English (Default)", "uk": "Українська"}
-        cb_lang = ttk.Combobox(t_r0, values=list(lang_map.keys()), state="readonly", font=("Segoe UI", fs))
+        cb_lang = ttk.Combobox(c00, values=list(lang_map.keys()), state="readonly", width=26, font=(self._ui_fam(), fs))
         cb_lang.set(rev_lang.get(v_lang.get(), "English (Default)"))
-        cb_lang.pack(side="left", fill="x", expand=True)
+        cb_lang.pack(side="right")
 
-        t_r1 = tk.Frame(f_thm, bg=p["card"])
-        t_r1.pack(fill="x", pady=4)
-        tk.Label(t_r1, text="Тема оформлення:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        tk.Frame(ug, height=1, bg=p["border"]).pack(fill="x", pady=5)
+        c01 = tk.Frame(ug, bg=p["card"])
+        c01.pack(fill="x", pady=4)
+        tk.Label(c01, text=tr("Тема оформлення:", st.get("lang", "en")), anchor="w", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         lng_t = st.get("lang", "en")
         thm_map = {tr("Темна тема", lng_t): "dark", tr("Світла тема", lng_t): "light"}
         rev_thm = {"dark": tr("Темна тема", lng_t), "light": tr("Світла тема", lng_t)}
-        cb_theme = ttk.Combobox(t_r1, values=list(thm_map.keys()), state="readonly", font=("Segoe UI", fs))
+        cb_theme = ttk.Combobox(c01, values=list(thm_map.keys()), state="readonly", width=26, font=(self._ui_fam(), fs))
         cb_theme.set(rev_thm.get(v_theme.get(), tr("Темна тема", lng_t)))
-        cb_theme.pack(side="left", fill="x", expand=True)
+        cb_theme.pack(side="right")
 
-
-        t_r2 = tk.Frame(f_thm, bg=p["card"])
-        t_r2.pack(fill="x", pady=4)
-        tk.Label(t_r2, text="Роздільна здатність:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        tk.Frame(ug, height=1, bg=p["border"]).pack(fill="x", pady=5)
+        c10 = tk.Frame(ug, bg=p["card"])
+        c10.pack(fill="x", pady=4)
+        tk.Label(c10, text=tr("Роздільна здатність:", st.get("lang", "en")), anchor="w", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         lng_cur = st.get("lang", "en")
         scale_map = {tr(lbl, lng_cur): code for code, lbl in UI_SCALE_LABELS}
         rev_scale = {code: tr(lbl, lng_cur) for code, lbl in UI_SCALE_LABELS}
-        cb_scale = ttk.Combobox(t_r2, values=[tr(lbl, lng_cur) for _, lbl in UI_SCALE_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_scale = ttk.Combobox(c10, values=[tr(lbl, lng_cur) for _, lbl in UI_SCALE_LABELS], state="readonly", width=26, font=(self._ui_fam(), fs))
         cb_scale.set(rev_scale.get(v_scale.get(), tr(UI_SCALE_LABELS[0][1], lng_cur)))
-        cb_scale.pack(side="left", fill="x", expand=True)
+        cb_scale.pack(side="right")
 
-        t_r3 = tk.Frame(f_thm, bg=p["card"])
-        t_r3.pack(fill="x", pady=4)
-        tk.Label(t_r3, text="Розмір шрифту:", width=20, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)).pack(side="left")
+        tk.Frame(ug, height=1, bg=p["border"]).pack(fill="x", pady=5)
+        c11 = tk.Frame(ug, bg=p["card"])
+        c11.pack(fill="x", pady=4)
+        tk.Label(c11, text=tr("Розмір шрифту:", st.get("lang", "en")), anchor="w", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         font_map = {tr(lbl, lng_cur): code for code, lbl in UI_FONT_LABELS}
         rev_font = {code: tr(lbl, lng_cur) for code, lbl in UI_FONT_LABELS}
-        cb_font = ttk.Combobox(t_r3, values=[tr(lbl, lng_cur) for _, lbl in UI_FONT_LABELS], state="readonly", font=("Segoe UI", fs))
+        cb_font = ttk.Combobox(c11, values=[tr(lbl, lng_cur) for _, lbl in UI_FONT_LABELS], state="readonly", width=26, font=(self._ui_fam(), fs))
         cb_font.set(rev_font.get(v_font.get(), tr(UI_FONT_LABELS[0][1], lng_cur)))
-        cb_font.pack(side="left", fill="x", expand=True)
+        cb_font.pack(side="right")
 
+        f_sec = tk.Frame(tab_sys, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_sec.pack(fill="x", padx=12, pady=(8, 8))
+        tk.Label(f_sec, text=tr("Системний трей, профіль та PIN", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
+        tr_row = tk.Frame(f_sec, bg=p["card"])
+        tr_row.pack(fill="x", pady=(0, 6))
+        tk.Label(tr_row, text=tr("Згортати у трей при закритті", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        HomeGridToggle(tr_row, variable=v_tray_min, compact=True, palette=p, font_sz=fs).pack(side="right")
+        tk.Frame(f_sec, height=1, bg=p["border"]).pack(fill="x", pady=6)
+        sec_r = tk.Frame(f_sec, bg=p["card"])
+        sec_r.pack(fill="x")
+        tk.Button(sec_r, text=tr("Зберегти налаштування", st.get("lang", "en")), command=_export_cfg, bg=p["inp_bg"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=12, pady=5, cursor="hand2").pack(side="left", padx=(0, 8))
+        tk.Button(sec_r, text=tr("Відновити налаштування", st.get("lang", "en")), command=_import_cfg, bg=p["inp_bg"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=12, pady=5, cursor="hand2").pack(side="left", padx=(0, 8))
+        tk.Button(sec_r, text=tr("Скинути PIN", st.get("lang", "en")), command=lambda: (self.reset_pins(), lbl_sch_msg.configure(text="✓ Збережені PIN-коди очищено", fg=p["amber"])), bg=p["inp_bg"], fg=p["red"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=12, pady=5, cursor="hand2").pack(side="right")
 
         def _commit_settings(close_after):
-            selected_tab = nb.index(nb.select())
+            selected_tab = _cur_tab["idx"]
             cloud_remote = "pcloud"
             cloud_path = v_cloud_path.get().strip()
             if v_cloud_enabled.get():
                 if not v_cloud_save_archives.get() and not v_cloud_save_logs.get():
                     cloud_msg.configure(text=tr("Оберіть хоча б один пункт: зберігати архів або журнал.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
-                    nb.select(tab_cloud)
+                    _select_pill_tab(2)
                     return
                 try:
                     from core.cloud import validate_cloud_settings
                     cloud_path = validate_cloud_settings(cloud_remote, cloud_path)
                 except ValueError as exc:
                     cloud_msg.configure(text=tr(str(exc), lang_map.get(cb_lang.get(), "en")), fg=p["red"])
-                    nb.select(tab_cloud)
+                    _select_pill_tab(2)
                     return
             else:
                 cloud_path = cloud_path or "HomeGridBackup"
@@ -1322,6 +1490,14 @@ class DialogsMixin:
             st["cloud_save_archives"] = bool(v_cloud_save_archives.get())
             st["cloud_save_logs"] = bool(v_cloud_save_logs.get())
             st["cloud_path"] = cloud_path
+            st["cloud_max_archives"] = max(0, int(v_cloud_max_cnt.get() or 0))
+            st["cloud_max_size_gb"] = max(0.0, round(float(v_cloud_max_gb.get() or 0.0), 2))
+            st["cloud_fit_free_space"] = bool(v_cloud_fit_free.get())
+            j_val = j_map.get(cb_journal_target.get(), "pcloud")
+            if j_val in ("network", "both") and not (st.get("net_dir") or "").strip():
+                cloud_msg.configure(text=tr("Для обміну через мережеву папку вкажіть шлях у рядку «Мережа» головного вікна.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
+                _select_pill_tab(2); return
+            st["journal_sync_target"] = j_val
             old_sc = st.get("ui_scale", "auto")
             new_sc = scale_map.get(cb_scale.get(), "auto")
             st["ui_scale"] = new_sc
@@ -1334,17 +1510,16 @@ class DialogsMixin:
             if not close_after:
                 self.open_settings(initial_tab=selected_tab)
 
-        tk.Button(bf, text="Скинути PIN", command=lambda: (self.reset_pins(), lbl_sch_msg.configure(text="✓ Збережені PIN-коди очищено", fg=p["amber"])), bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=(6, 6), pady=6)
-        tk.Button(bf, text="Експорт JSON", command=_export_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
-        tk.Button(bf, text="Імпорт JSON", command=_import_cfg, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4, pady=6)
-        tk.Button(bf, text="Скасувати", command=dlg.destroy, bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=14, pady=6, cursor="hand2").pack(side="right", padx=(6, 6), pady=6)
-        tk.Button(bf, text="Зберегти та закрити", command=lambda: _commit_settings(True), bg=p["green"], fg=p["green_txt"], font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
-        tk.Button(bf, text="Застосувати", command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=14, pady=6, cursor="hand2").pack(side="right", padx=6, pady=6)
+        bf.configure(bd=0, highlightthickness=1, highlightbackground=p["border"])
+        tk.Button(bf, text=tr("Скасувати", st.get("lang", "en")), command=dlg.destroy, bg=p["panel"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=12, pady=6, cursor="hand2").pack(side="right", padx=(4, 6), pady=4)
+        tk.Button(bf, text=tr("Зберегти та закрити", st.get("lang", "en")), command=lambda: _commit_settings(True), bg=p["green"], fg=p["green_txt"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=16, pady=6, cursor="hand2").pack(side="right", padx=6, pady=4)
+        tk.Button(bf, text=tr("Застосувати", st.get("lang", "en")), command=lambda: _commit_settings(False), bg=p["blue"], fg="#ffffff", bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=16, pady=6, cursor="hand2").pack(side="right", padx=6, pady=4)
         def _i18n_settings():
             lng = st.get("lang", "en")
-            nb.tab(0, text="  " + tr("Резервне копіювання та Розклад", lng) + "  ")
-            nb.tab(1, text="  " + tr("Вигляд та Інтерфейс", lng) + "  ")
-            nb.tab(2, text="  " + tr("Хмарне сховище", lng) + "  ")
+            for _gl, _gk in _grp_lbls:
+                _gl.configure(text=tr(_gk, lng))
+            for _ib, _tc in enumerate(("Зберігання та GFS", "Розклад та запуск", "Хмара pCloud", "Інтерфейс", "Трей та безпека")):
+                _nav_items[_ib].set_active(_ib == _cur_tab["idx"], text_override=tr(_tc, lng))
             apply_widget_i18n(dlg, lng)
         _i18n_settings()
 

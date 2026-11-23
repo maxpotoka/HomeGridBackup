@@ -1,5 +1,6 @@
 # ==============================================================================
 # patch-id: stage-window-2.21
+# patch-id: homegrid-design-system-2.45
 # [ФАЙЛ: gui/styles.py (v2.02 | 22.11.2026 09:10) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
 import os
@@ -43,18 +44,18 @@ PBAR_STYLE_LABELS = [("v8", "Адаптивний градієнт (v8)")]
 
 THEMES = {
     "dark": {
-        "bg": "#0a0f18", "panel": "#111827", "card": "#161f33", "border": "#26324d",
-        "text": "#f1f5f9", "muted": "#94a3b8", "blue": "#2b7fff", "green": "#10b981",
-        "amber": "#f59e0b", "red": "#ef4444", "cyan": "#38bdf8",
-        "inp_bg": "#060911", "log_bg": "#060911", "btn_txt": "#ffffff", "green_txt": "#042f2e",
-        "pbar_bg": "#1e293b", "pbar_brd": "#475569", "font": "Segoe UI", "relief": "solid"
+        "bg": "#0b1220", "panel": "#131c2e", "card": "#182338", "border": "#1e293b",
+        "text": "#f1f5f9", "muted": "#94a3b8", "blue": "#1d6ef2", "green": "#10b981",
+        "amber": "#f59e0b", "red": "#ef4444", "cyan": "#60a5fa",
+        "inp_bg": "#23314d", "log_bg": "#0b1220", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "pbar_bg": "#1e293b", "pbar_brd": "#334155", "font": "Segoe UI", "relief": "flat"
     },
     "light": {
-        "bg": "#eef2f6", "panel": "#ffffff", "card": "#f8fafc", "border": "#cbd5e1",
-        "text": "#0f172a", "muted": "#475569", "blue": "#2563eb", "green": "#059669",
-        "amber": "#d97706", "red": "#dc2626", "cyan": "#0284c7",
-        "inp_bg": "#ffffff", "log_bg": "#f8fafc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
-        "pbar_bg": "#e2e8f0", "pbar_brd": "#94a3b8", "font": "Segoe UI", "relief": "solid"
+        "bg": "#f3f6fb", "panel": "#ffffff", "card": "#f8fafc", "border": "#dfe7f2",
+        "text": "#0f172a", "muted": "#64748b", "blue": "#1d6ef2", "green": "#059669",
+        "amber": "#d97706", "red": "#dc2626", "cyan": "#1d6ef2",
+        "inp_bg": "#e8eef7", "log_bg": "#f8fafc", "btn_txt": "#ffffff", "green_txt": "#ffffff",
+        "pbar_bg": "#e2e8f0", "pbar_brd": "#cbd5e1", "font": "Segoe UI", "relief": "flat"
     }
 }
 

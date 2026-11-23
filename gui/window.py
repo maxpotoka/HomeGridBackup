@@ -21,7 +21,8 @@ from core.files import open_folder_native, choose_folder_native, get_app_icon_pa
 from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
 from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip, fix_mac_buttons
-from gui.widgets import StyledProgressBar
+# patch-id: homegrid-design-system-2.45
+from gui.widgets import StyledProgressBar, HomeGridToggle
 from gui.tray import HAS_TRAY, _start_tray_thread, drain_tray_ui_queue
 from gui.dialogs import DialogsMixin
 
@@ -373,8 +374,9 @@ class HomeGridApp(DialogsMixin):
         self.btn_net_mir = tk.Button(cg, text="🌐", command=lambda: self.open_settings(initial_tab=2), width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
         self.btn_net_mir.grid(row=2, column=3, padx=2, pady=3)
         self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", False)) and bool(self.var_mirror.get().strip()))
-        self.chk_mir_tog = tk.Checkbutton(cg, text="Увімкнено", variable=self.var_mir_en, command=self.toggle_mirror, cursor="hand2")
-        self.chk_mir_tog.grid(row=2, column=4, sticky="w", padx=(4, 0), pady=3)
+        self.chk_mir_tog = HomeGridToggle(cg, variable=self.var_mir_en, command=self.toggle_mirror, compact=True, palette=self._get_palette(), font_sz=fs)
+        self.chk_mir_tog.grid(row=2, column=4, sticky="w", padx=(8, 0), pady=3)
+        ToolTip(self.chk_mir_tog, "Увімкнути / вимкнути дзеркальне копіювання")
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
@@ -705,13 +707,7 @@ class HomeGridApp(DialogsMixin):
         fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
         self.var_mir_en.set(checked)
         f_state = "disabled" if (is_run or not checked) else "normal"
-        self.chk_mir_tog.configure(
-            state="disabled" if is_run else "normal",
-            text=tr("Увімкнено" if checked else "Вимкнено", lang),
-            bg=p["panel"], fg=p["green"] if checked else p["muted"],
-            selectcolor=p["inp_bg"], activebackground=p["panel"], activeforeground=p["text"],
-            font=(fam, fs, "bold" if checked else "normal")
-        )
+        self.chk_mir_tog.apply_style(palette=p, state="disabled" if is_run else "normal", font_fam=fam, font_sz=fs)
         self.ent_mir.configure(
             state=f_state,
             bg=p["inp_bg"], fg=p["text"],

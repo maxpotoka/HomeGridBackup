@@ -15,6 +15,9 @@ from uuid import uuid4
 # patch-id: pcloud-only-simple-ui-2.27
 # patch-id: pcloud-clean-hints-2.30
 # patch-id: cloud-speed-stats-2.31
+# patch-id: pcloud-disable-and-freespace-2.57
+# patch-id: pcloud-retention-count-size-2.52
+# patch-id: destination-copies-network-journal-2.58-1b
 # patch-id: pcloud-speed-progress-gradient-2.33
 from core.config import SCRIPT_VER
 _PCT_RE = re.compile(r"(\d+)%")
@@ -326,6 +329,45 @@ def _rclone(*args, timeout=3600):
     return result.stdout
 
 
+def _ensure_cloud_free_space(engine, remote_dir, needed_bytes):
+    if not engine.state.get("cloud_fit_free_space", True):
+        return
+    remote = str(engine.state.get("cloud_remote") or "pcloud").strip()
+    try:
+        usage = check_rclone_remote(remote)
+    except Exception:
+        return
+    free_b = usage.get("free")
+    if free_b is None:
+        return
+    safety_b = 64 * 1024 * 1024
+    target_free = max(0, int(needed_bytes)) + safety_b
+    if free_b >= target_free:
+        return
+    raw_ls = _rclone("lsjson", "--files-only", remote_dir)
+    entries = json.loads(raw_ls) if raw_ls.strip() else []
+    arcs = [
+        e for e in entries
+        if isinstance(e, dict)
+        and str(e.get("Name", "")).lower().endswith(".zip")
+        and _ARCHIVE_RE.search(str(e.get("Name", "")))
+    ]
+    arcs.sort(key=lambda e: (1 if "_KEEP_" in str(e.get("Name", "")).upper() else 0, str(e.get("ModTime", ""))))
+    all_names = {str(e.get("Name", "")) for e in entries}
+    freed_b, del_cnt = 0, 0
+    for e in arcs:
+        if free_b + freed_b >= target_free:
+            break
+        nm = str(e.get("Name", ""))
+        sz_b = max(0, int(e.get("Size", 0) or 0))
+        _rclone("deletefile", f"{remote_dir}/{nm}")
+        if f"{nm}.sha256" in all_names:
+            _rclone("deletefile", f"{remote_dir}/{nm}.sha256")
+        freed_b += sz_b
+        del_cnt += 1
+    if del_cnt:
+        engine.log(f"pCloud автоочищення: звільнено {round(freed_b / 1048576.0, 1)} МБ (видалено {del_cnt} старих архівів) під вільне місце.", "info")
+
 def sync_cloud_backups(engine, prune=False, progress_cb=None):
     if not engine.state.get("cloud_enabled") or not engine.state.get("cloud_save_archives", True):
         return
@@ -359,6 +401,7 @@ def sync_cloud_backups(engine, prune=False, progress_cb=None):
             keep_names.add(remote_name)
             try:
                 _write_cloud_archive_status(engine, path, "queued")
+                _ensure_cloud_free_space(engine, remote_dir, os.path.getsize(path))
                 _rclone_upload_with_progress(path, f"{remote_dir}/{remote_name}", progress_cb=progress_cb)
                 sha_path = path + ".sha256"
                 if os.path.isfile(sha_path):
@@ -380,20 +423,54 @@ def sync_cloud_backups(engine, prune=False, progress_cb=None):
                 _write_cloud_archive_status(engine, path, "error")
                 raise
 
-        if prune:
-            names = _rclone("lsf", "--files-only", remote_dir).splitlines()
-            stale_archives = {
-                name for name in names
-                if name.lower().endswith(".zip")
-                and _ARCHIVE_RE.search(name)
-                and name.startswith(remote_device_prefix)
-                and name not in keep_names
-            }
-            for name in stale_archives:
-                _rclone("deletefile", f"{remote_dir}/{name}")
-                sha_name = f"{name}.sha256"
-                if sha_name in names:
-                    _rclone("deletefile", f"{remote_dir}/{sha_name}")
+        max_cnt = max(0, int(engine.state.get("cloud_max_archives", 0) or 0))
+        max_gb = max(0.0, float(engine.state.get("cloud_max_size_gb", 0.0) or 0.0))
+        if prune or max_cnt > 0 or max_gb > 0.0:
+            raw_ls = _rclone("lsjson", "--files-only", remote_dir)
+            entries = json.loads(raw_ls) if raw_ls.strip() else []
+            arc_entries = [
+                e for e in entries
+                if isinstance(e, dict)
+                and str(e.get("Name", "")).lower().endswith(".zip")
+                and _ARCHIVE_RE.search(str(e.get("Name", "")))
+                and str(e.get("Name", "")).startswith(remote_device_prefix)
+            ]
+            arc_entries.sort(key=lambda e: str(e.get("ModTime", "")), reverse=True)
+            all_zip_names = {str(e.get("Name", "")) for e in entries if str(e.get("Name", "")).lower().endswith(".zip")}
+            to_remove = set()
+            if prune:
+                for e in arc_entries:
+                    nm = str(e.get("Name", ""))
+                    if nm not in keep_names:
+                        to_remove.add(nm)
+            kept_after_prune = [e for e in arc_entries if str(e.get("Name", "")) not in to_remove]
+            if max_cnt > 0 and len(kept_after_prune) > max_cnt:
+                for e in kept_after_prune[max_cnt:]:
+                    nm = str(e.get("Name", ""))
+                    if "_KEEP_" not in nm.upper():
+                        to_remove.add(nm)
+            kept_after_cnt = [e for e in kept_after_prune if str(e.get("Name", "")) not in to_remove]
+            if max_gb > 0.0 and len(kept_after_cnt) > 1:
+                limit_bytes = int(max_gb * (1024 ** 3))
+                acc_bytes = 0
+                for idx_e, e in enumerate(kept_after_cnt):
+                    nm = str(e.get("Name", ""))
+                    sz_b = max(0, int(e.get("Size", 0) or 0))
+                    if idx_e == 0 or "_KEEP_" in nm.upper():
+                        acc_bytes += sz_b
+                        continue
+                    if acc_bytes + sz_b > limit_bytes:
+                        to_remove.add(nm)
+                    else:
+                        acc_bytes += sz_b
+            all_names_set = {str(e.get("Name", "")) for e in entries}
+            for nm in sorted(to_remove):
+                _rclone("deletefile", f"{remote_dir}/{nm}")
+                sha_nm = f"{nm}.sha256"
+                if sha_nm in all_names_set:
+                    _rclone("deletefile", f"{remote_dir}/{sha_nm}")
+            if to_remove:
+                engine.log(f"pCloud ротація: видалено {len(to_remove)} застарілих архівів у хмарі.", "info")
         if pending_path:
             os.remove(pending_path)
         return True
@@ -568,6 +645,47 @@ def _write_plain_text_report(records, output_path):
     return len(ordered)
 
 
+def _write_speed_csv_report(records, output_path):
+    import csv
+    ordered = [r for r in _ordered_report_records(records) if r.get("event") == "success"]
+    cols = (
+        "timestamp", "device_id", "platform", "platform_version", "architecture",
+        "app_version", "archive", "size_mb", "files_count", "duration_sec",
+        "download_duration_sec", "download_speed_mbps", "server_duration_sec",
+        "crc_duration_sec", "sha256_duration_sec", "mirror_duration_sec", "summary",
+    )
+    with open(output_path, "w", encoding="utf-8-sig", newline="") as out_f:
+        writer = csv.writer(out_f, delimiter=";")
+        writer.writerow(cols)
+        for rec in ordered:
+            writer.writerow([rec.get(c, "") for c in cols])
+    return len(ordered)
+
+
+def sync_network_shared_journal(engine):
+    state = engine.state
+    net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
+    if not net_dir or not os.path.isdir(net_dir):
+        raise RuntimeError("Мережева папка недоступна для обміну журналом.")
+    device_id = _device_id(state)
+    report_dir = os.path.join(os.path.abspath(state["backup_dir"]), "reports", device_id)
+    net_sources = os.path.join(net_dir, ".HomeGridBackup-sources")
+    os.makedirs(net_sources, exist_ok=True)
+    own_records = _collect_report_records((net_sources, report_dir), device_id=device_id)
+    if own_records:
+        tmp_src = os.path.join(net_sources, f"{device_id}.jsonl.tmp")
+        _write_jsonl_report(own_records, tmp_src)
+        os.replace(tmp_src, os.path.join(net_sources, f"{device_id}.jsonl"))
+    all_records = _collect_report_records((net_sources,))
+    tmp_log = os.path.join(net_dir, "HomeGridBackup.log.tmp")
+    _write_plain_text_report(all_records, tmp_log)
+    os.replace(tmp_log, os.path.join(net_dir, "HomeGridBackup.log"))
+    tmp_csv = os.path.join(net_dir, "speed_journal.csv.tmp")
+    _write_speed_csv_report(all_records, tmp_csv)
+    os.replace(tmp_csv, os.path.join(net_dir, "speed_journal.csv"))
+    return True
+
+
 def _sync_shared_root_report(engine, device_id, report_dir):
     source_remote_dir = _remote_path(engine.state, ".HomeGridBackup-sources")
     legacy_remote_dir = _remote_path(engine.state, "operations")
@@ -604,6 +722,9 @@ def _sync_shared_root_report(engine, device_id, report_dir):
         shared_log = os.path.join(temp_dir, "HomeGridBackup.log")
         _write_plain_text_report(all_records, shared_log)
         _rclone("copyto", shared_log, _remote_path(engine.state, "HomeGridBackup.log"))
+        shared_csv = os.path.join(temp_dir, "speed_journal.csv")
+        _write_speed_csv_report(all_records, shared_csv)
+        _rclone("copyto", shared_csv, _remote_path(engine.state, "speed_journal.csv"))
 
 
 
@@ -806,8 +927,10 @@ def start_cloud_sync_worker(engine, force=False, on_complete=None):
 
 def fetch_cloud_speed_stats(engine, refresh=True):
     state = engine.state
-    if not state.get("cloud_enabled"):
-        raise RuntimeError("Синхронізацію з pCloud вимкнено у Налаштуваннях.")
+    net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
+    has_net_src = bool(net_dir and os.path.isdir(os.path.join(net_dir, ".HomeGridBackup-sources")))
+    if not state.get("cloud_enabled") and not has_net_src:
+        raise RuntimeError("Увімкніть синхронізацію з pCloud або вкажіть доступну мережеву папку у Налаштуваннях.")
     remote = str(state.get("cloud_remote") or "pcloud").strip()
     cloud_path = validate_cloud_settings(remote, state.get("cloud_path", "HomeGridBackup"))
     ckey = hashlib.sha256((remote + "\0" + cloud_path).encode("utf-8")).hexdigest()[:16]
@@ -815,13 +938,16 @@ def fetch_cloud_speed_stats(engine, refresh=True):
     src_dir, ops_dir = os.path.join(base_cache, "sources"), os.path.join(base_cache, "operations")
     os.makedirs(src_dir, exist_ok=True)
     os.makedirs(ops_dir, exist_ok=True)
-    if refresh:
+    if refresh and state.get("cloud_enabled"):
         for rem_p, loc_p in ((_remote_path(state, ".HomeGridBackup-sources"), src_dir), (_remote_path(state, "operations"), ops_dir)):
             try:
                 _rclone("copy", rem_p, loc_p, "--include", "*.jsonl", timeout=90)
             except Exception:
                 pass
-    recs = _collect_report_records((src_dir, ops_dir))
+    scan_dirs = [src_dir, ops_dir]
+    if net_dir and os.path.isdir(os.path.join(net_dir, ".HomeGridBackup-sources")):
+        scan_dirs.append(os.path.join(net_dir, ".HomeGridBackup-sources"))
+    recs = _collect_report_records(tuple(scan_dirs))
     grouped = {}
     for r in _ordered_report_records(recs):
         did = str(r.get("device_id") or "unknown")

@@ -394,7 +394,44 @@ EN_EXACT = {
     # patch-id: pcloud-only-simple-ui-2.27
     "Завдання Linux не знайдено або вже видалено.": "Linux task not found or already deleted.",
     # patch-id: center-storage-notepad-2.40
+    # patch-id: settings-all-tabs-homegrid-2.46
+    # patch-id: settings-two-pane-sidebar-2.47
     "5. Налаштування pCloud": "5. pCloud Settings",
+    # patch-id: settings-grouped-sidebar-clean-2.48
+    "ПРОГРАМА ТА КОПІЇ": "APP & BACKUPS",
+    "СИСТЕМА ТА ХМАРА": "SYSTEM & CLOUD",
+    "Зберігання та GFS": "Retention & GFS",
+    "Розклад та запуск": "Schedule & Startup",
+    "Хмара pCloud": "pCloud Storage",
+    "Інтерфейс": "Interface",
+    "Налаштування pCloud": "pCloud Settings",
+    "Кільцева стратегія (останні N архівів)": "Ring Strategy (Last N Archives)",
+    "Трей та тихий режим": "Tray & Silent Mode",
+    "Автозапуск за розкладом": "Scheduled Autostart",
+    "Оформлення, мова та масштаб екрана": "Theme, Language & Screen Scale",
+    # patch-id: settings-logical-sections-2.49
+    "Безпека та перенесення налаштувань": "Security & Config Transfer",
+    # patch-id: settings-polish-labels-cloud-grid-2.50
+    "Системний трей та безпека": "System Tray & Security",
+    "Системний трей, профіль та PIN": "System Tray, Profile & PIN",
+    "Зберегти налаштування": "Save Settings",
+    # patch-id: settings-fifth-tray-tab-2.51
+    "Відновити налаштування": "Restore Settings",
+    # patch-id: pcloud-retention-count-size-2.52
+    "Трей та безпека": "Tray & Security",
+    "Зберігати останніх архівів у хмарі (0 = без обмеження):": "Keep last cloud archives (0 = unlimited):",
+    # patch-id: pcloud-disable-and-freespace-2.57
+    "Максимальний розмір папки у хмарі, ГБ (0 = без обмеження):": "Max cloud folder size, GB (0 = unlimited):",
+    "Контроль вільного місця у хмарі (автоочищення):": "Auto-fit backups to free cloud space:",
+    "Резервне копіювання": "Backup & Retention",
+    "Розклад автозапуску": "Scheduled Autostart",
+    "Інтерфейс і вигляд": "Interface & Appearance",
+    "1. Кільцева стратегія (останні N архівів)": "1. Ring Strategy (Last N Archives)",
+    "2. Трей та тихий режим": "2. Tray & Silent Mode",
+    "3. Автозапуск за розкладом": "3. Scheduled Autostart",
+    "4. Оформлення, мова та масштаб екрана": "4. Theme, Language & Screen Scale",
+    "Журнал операцій": "Operations Log",
+    "Статистика pCloud": "pCloud Stats",
     "Підключення та папки": "Connection & Folders",
     "Сховище та аналітика": "Storage & Analytics",
     "Сервер:": "Server:",
