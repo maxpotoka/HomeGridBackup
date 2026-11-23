@@ -1,4 +1,5 @@
 # ==============================================================================
+# patch-id: linux-wayland-sni-bridge-2.32
 # patch-id: linux-xorg-tray-menu-2.26
 # [ФАЙЛ: gui/tray.py (v2.07 | 23.11.2026 07:05)
 # patch-id: macos-quit-and-buttons-2.17
@@ -138,7 +139,7 @@ def _detect_linux_tray_backend():
                 os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
     sys_env = _clean_sys_env()
     if _has_sni_watcher(sys_env):
-        return "appindicator" if _has_appindicator_gi() else "auto"
+        return "appindicator" if _has_appindicator_gi() else "sni-bridge"
     if _has_x11_tray_manager():
         return "gtk" if _has_gtk_gi() else "xorg"
     return ""
@@ -293,6 +294,12 @@ def _start_tray_thread(engine):
                 def _probe_linux_tray():
                     global _LNX_TRAY_BE
                     _LNX_TRAY_BE = _detect_linux_tray_backend()
+                    if _LNX_TRAY_BE == "sni-bridge":
+                        if _start_wayland_sni_bridge(engine):
+                            with _TRAY_LOCK:
+                                _TRAY_STARTED = True
+                            return
+                        _LNX_TRAY_BE = "xorg" if _has_x11_tray_manager() else ""
                     if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
                         os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
                     if not _LNX_TRAY_BE:
@@ -571,6 +578,150 @@ def _attach_xorg_tk_menu(icon, engine):
             pass
 
     threading.Thread(target=_x11_click_watcher, daemon=True).start()
+
+
+
+_SNI_HELPER = """
+import sys, json, threading, signal, gi
+gi.require_version("Gtk", "3.0")
+try:
+    gi.require_version("AyatanaAppIndicator3", "0.1")
+    from gi.repository import AyatanaAppIndicator3 as AI
+except Exception:
+    gi.require_version("AppIndicator3", "0.1")
+    from gi.repository import AppIndicator3 as AI
+from gi.repository import Gtk, GLib
+
+ind = AI.Indicator.new("homegrid-backup", sys.argv, AI.IndicatorCategory.APPLICATION_STATUS)
+ind.set_status(AI.IndicatorStatus.ACTIVE)
+menu = Gtk.Menu()
+items = {}
+for k, lbl in json.loads(sys.argv):
+    if lbl is None:
+        menu.append(Gtk.SeparatorMenuItem())
+        continue
+    mi = Gtk.MenuItem(label=lbl)
+    if k == "status":
+        mi.set_sensitive(False)
+    else:
+        mi.connect("activate", lambda _w, c=k: print(json.dumps({"cmd": c}), flush=True))
+    menu.append(mi)
+    items[k] = mi
+menu.show_all()
+ind.set_menu(menu)
+print(json.dumps({"ready": True}), flush=True)
+
+def _in_loop():
+    for ln in sys.stdin:
+        try:
+            d = json.loads(ln)
+            if "status" in d: GLib.idle_add(items["status"].set_label, d["status"])
+            if "running" in d: GLib.idle_add(items["backup"].set_sensitive, not d["running"])
+            if d.get("quit"): break
+        except Exception:
+            pass
+    GLib.idle_add(Gtk.main_quit)
+
+threading.Thread(target=_in_loop, daemon=True).start()
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+Gtk.main()
+"""
+
+def _start_wayland_sni_bridge(engine):
+    import subprocess, json
+    from core.files import get_app_icon_path, open_folder_native
+    from core.config import DEFAULT_BACKUP_DIR
+    from core.backup import run_backup_task
+    from core.i18n import tr
+
+    sys_py = "/usr/bin/python3" if os.path.exists("/usr/bin/python3") else None
+    if not sys_py:
+        return False
+    lng = engine.state.get("lang", "en")
+    spec = [
+        ("open", tr("Відкрити HomeGrid Backup", lng)), ("s1", None),
+        ("status", _tray_status_text(engine, lng, 0)),
+        ("backup", tr("▶ Запустити резервне копіювання", lng)),
+        ("folder", tr("Відкрити папку", lng)), ("s2", None),
+        ("stats", tr("Статистика", lng)), ("cstats", "☁ Статистика pCloud"),
+        ("history", tr("Журнал операцій", lng)), ("analyze", tr("Аналіз GFS / SHA-256", lng)),
+        ("settings", tr("Налаштування", lng)), ("s3", None), ("exit", tr("✖ Вихід", lng)),
+    ]
+    ico = get_app_icon_path() or "drive-harddisk"
+    try:
+        proc = subprocess.Popen(
+            [sys_py, "-c", _SNI_HELPER, ico, json.dumps(spec, ensure_ascii=False)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, encoding="utf-8", bufsize=1, env=_clean_sys_env()
+        )
+        if '"ready": true' not in proc.stdout.readline().lower():
+            proc.terminate()
+            return False
+    except Exception:
+        return False
+
+    class _ProcTrayWrap:
+        visible = True
+        def stop(self):
+            try:
+                proc.stdin.write('{"quit":true}\n'); proc.stdin.flush(); proc.terminate()
+            except Exception:
+                pass
+
+    engine.tray_icon = _ProcTrayWrap()
+    engine.tray_ready = True
+    engine.tray_error = ""
+    if getattr(engine, "tray_ready_event", None):
+        engine.tray_ready_event.set()
+    engine.log("Активовано системний трей Wayland (AppIndicator bridge).", "info")
+
+    def _dispatch(cmd):
+        app = engine.app_ref
+        if cmd == "exit":
+            _force_quit_app(engine)
+        elif cmd == "folder":
+            open_folder_native(engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR)
+        elif cmd == "backup" and not engine.is_running:
+            threading.Thread(target=run_backup_task, args=(engine, engine.state.get("server", ""), False, False, False), daemon=True).start()
+        elif app is not None:
+            acts = {
+                "open": app.show_window,
+                "stats": lambda: (app.show_window(), app.open_stats_modal()),
+                "cstats": lambda: (app.show_window(), app.open_cloud_stats_modal()),
+                "history": lambda: (app.show_window(), app.open_ops_history()),
+                "analyze": lambda: (app.show_window(), app.open_analyze()),
+                "settings": lambda: (app.show_window(), app.open_settings()),
+            }
+            if cmd in acts:
+                app.root.after(0, acts[cmd])
+
+    def _read_loop():
+        for ln in proc.stdout:
+            try:
+                c = json.loads(ln).get("cmd")
+                if c: _dispatch(c)
+            except Exception:
+                pass
+
+    def _sync_loop():
+        t0, last_st, last_run = None, "", None
+        while not _TRAY_STOP.is_set() and proc.poll() is None:
+            _TRAY_STOP.wait(1.0)
+            if not engine.is_running: t0 = None
+            elif t0 is None: t0 = time.monotonic()
+            sec = int(time.monotonic() - t0) if t0 else 0
+            st_s = _tray_status_text(engine, engine.state.get("lang", "en"), sec)
+            if st_s != last_st or engine.is_running != last_run:
+                try:
+                    proc.stdin.write(json.dumps({"status": st_s, "running": bool(engine.is_running)}, ensure_ascii=False) + "\n")
+                    proc.stdin.flush()
+                    last_st, last_run = st_s, bool(engine.is_running)
+                except Exception:
+                    break
+
+    threading.Thread(target=_read_loop, daemon=True).start()
+    threading.Thread(target=_sync_loop, daemon=True).start()
+    return True
 
 
 def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowWindow_v1"):

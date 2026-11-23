@@ -15,6 +15,7 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
+# patch-id: cloud-speed-stats-2.31
 from core.config import SCRIPT_VER, commit_state
 from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
@@ -1562,6 +1563,142 @@ class DialogsMixin:
         apply_widget_i18n(dlg, self.engine.state.get("lang", "en"))
         self._fit_dialog(dlg)
 
+    def open_cloud_stats_modal(self):
+        import threading
+        fs, k, lang, fam = self.metrics["font_sz"], self.metrics["k"], self.engine.state.get("lang", "en"), self._ui_fam()
+        dlg, p, _ = self._make_dialog("☁ Хмарна статистика швидкості (pCloud)" if lang == "uk" else "☁ Cloud Speed Statistics (pCloud)", 960, 620)
+        bf = tk.Frame(dlg, bg=p["panel"])
+        bf.pack(side="bottom", fill="x", padx=14, pady=(4, 10))
+        tk.Button(bf, text=tr("Закрити", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs, "bold"), padx=18, pady=5, cursor="hand2").pack(side="right")
+
+        top_bar = tk.Frame(dlg, bg=p["panel"])
+        top_bar.pack(fill="x", padx=14, pady=(8, 4))
+        v_dev = tk.StringVar(value="Усі комп'ютери" if lang == "uk" else "All computers")
+        cb_dev = ttk.Combobox(top_bar, textvariable=v_dev, state="readonly", width=28, font=(fam, fs))
+        cb_dev.pack(side="left", padx=(0, 8))
+        lbl_st = tk.Label(top_bar, text="", bg=p["panel"], fg=p["muted"], font=(fam, max(8, fs - 1)))
+        lbl_st.pack(side="right")
+
+        cards_f = tk.Frame(dlg, bg=p["panel"])
+        cards_f.pack(fill="x", padx=14, pady=4)
+        for ci in range(4): cards_f.columnconfigure(ci, weight=1)
+        c_vals = []
+        for idx, cap in enumerate(("ПРИСТРОЇВ", "СЕР. ЧАС (ОСТ. 2)", "ШВИДШИЙ / ПОВІЛЬНИЙ", "СЕР. ШВИДКІСТЬ (ОСТ. 2)")):
+            cf = tk.Frame(cards_f, bg=p["card"], bd=1, relief="solid", padx=8, pady=5)
+            cf.grid(row=0, column=idx, sticky="nsew", padx=(0 if idx == 0 else 6, 0))
+            tk.Label(cf, text=tr(cap, lang), bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
+            vl = tk.Label(cf, text="—", bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"))
+            vl.pack(anchor="w")
+            c_vals.append(vl)
+
+        chart_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=10, pady=6)
+        chart_f.pack(fill="x", padx=14, pady=4)
+        tk.Label(chart_f, text="ПОРІВНЯННЯ ШВИДКОСТІ СИСТЕМ ЗА ОСТАННІМИ 2 АРХІВАМИ (МБ/с та час):" if lang == "uk" else "SYSTEM SPEED COMPARISON (LAST 2 ARCHIVES, MB/s & duration):", bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
+        cv = tk.Canvas(chart_f, height=int(128 * k), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
+        cv.pack(fill="x", pady=(4, 0))
+
+        wrap = tk.Frame(dlg, bg=p["panel"])
+        wrap.pack(fill="both", expand=True, padx=14, pady=(2, 2))
+        st_tv = ttk.Style()
+        try: st_tv.theme_use("clam")
+        except Exception: pass
+        st_tv.configure("HGBC.Treeview", background=p["log_bg"], foreground=p["text"], fieldbackground=p["log_bg"], rowheight=max(24, int((fs + 14) * k)), font=(fam, max(8, fs - 1)))
+        st_tv.configure("HGBC.Treeview.Heading", background=p["card"], foreground=p["cyan"], font=(fam, max(8, fs - 1), "bold"))
+        tree = ttk.Treeview(wrap, columns=("ts", "dev", "arc", "mb", "dur", "spd"), show="headings", style="HGBC.Treeview")
+        for cid, h_t, wc, anc in (("ts", "Дата та час", 145, "center"), ("dev", "Комп'ютер / ОС", 185, "w"), ("arc", "Архів", 260, "w"), ("mb", "Розмір", 80, "e"), ("dur", "Час (хв / с)", 115, "center"), ("spd", "МБ/с", 75, "e")):
+            tree.heading(cid, text=tr(h_t, lang))
+            tree.column(cid, width=int(wc * k), minwidth=50, anchor=anc, stretch=(cid == "arc"))
+        vsb = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        tree.pack(side="left", fill="both", expand=True)
+
+        state_box = {"ops": [], "devs": [], "rows": {}}
+        def _draw_bars(_e=None):
+            cv.delete("all")
+            devs = state_box["devs"]
+            w, h = max(300, cv.winfo_width()), max(110, cv.winfo_height())
+            if not devs:
+                cv.create_text(w // 2, h // 2, text=tr("Немає даних із pCloud", lang), fill=p["muted"], font=(fam, fs))
+                return
+            max_s = max([d["avg_spd"] for d in devs] + [0.1])
+            pad_x, top_y, bot_y = int(36 * k), int(28 * k), h - int(24 * k)
+            slot = (w - pad_x * 2) / len(devs)
+            bw = min(64, max(24, slot * 0.45))
+            cv.create_line(pad_x - 8, bot_y, w - pad_x + 8, bot_y, fill=p["border"])
+            for i, d in enumerate(devs):
+                cx = pad_x + slot * (i + 0.5)
+                bh = max(4, int(((bot_y - top_y) * d["avg_spd"]) / max_s))
+                col = p["green"] if i == 0 else (p["cyan"] if d["is_own"] else p["blue"])
+                cv.create_rectangle(cx - bw / 2, bot_y - bh, cx + bw / 2, bot_y, fill=col, outline="")
+                dur_s = format_duration(d["avg_dur"], lang)
+                unit = "МБ/с" if lang == "uk" else "MB/s"
+                cv.create_text(cx, bot_y - bh - int(12 * k), text=f"{d['avg_spd']} {unit} • {dur_s}", fill=p["text"], font=(fam, max(8, fs - 1), "bold"))
+                lbl_d = d["label"] if len(d["label"]) <= 24 else d["label"][:21] + "..."
+                cv.create_text(cx, bot_y + int(12 * k), text=lbl_d, fill=p["green"] if i == 0 else p["muted"], font=(fam, max(8, fs - 1), "bold" if i == 0 else "normal"))
+
+        def _render():
+            for rid in tree.get_children(): tree.delete(rid)
+            state_box["rows"].clear()
+            all_lbl = "Усі комп'ютери" if lang == "uk" else "All computers"
+            sel = v_dev.get()
+            ops = [o for o in state_box["ops"] if sel == all_lbl or o["dev_label"] == sel]
+            devs = state_box["devs"]
+            c_vals[0].configure(text=f"{len(devs)}")
+            sample = []
+            for d in devs:
+                sample.extend([o for o in ops if o["device_id"] == d["device_id"]][:2])
+            if sample:
+                c_vals[1].configure(text=format_duration(sum(x["dur_f"] for x in sample) / len(sample), lang))
+                c_vals[2].configure(text=f"{format_duration(min(x['dur_f'] for x in sample), lang)} / {format_duration(max(x['dur_f'] for x in sample), lang)}")
+                c_vals[3].configure(text=f"{round(sum(x['spd_f'] for x in sample) / len(sample), 2)} {'МБ/с' if lang == 'uk' else 'MB/s'}")
+            else:
+                for v in c_vals[1:]: v.configure(text="—")
+            for idx, o in enumerate(ops[:100]):
+                ts_s = str(o.get("timestamp") or "")[:19].replace("T", " ")
+                iid = f"c_{idx}"
+                state_box["rows"][iid] = o
+                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang), f"{o['spd_f']}"))
+            _draw_bars()
+
+        def _on_dbl(_e=None):
+            s = tree.selection()
+            if not s or s[0] not in state_box["rows"]: return
+            o = state_box["rows"][s[0]]
+            lines = [f"{o['dev_label']}  •  {o.get('archive', '')}", f"Загальний час: {format_duration(o['dur_f'], lang)}  •  Швидкість: {o['spd_f']} МБ/с"]
+            for k_s, n_s in (("server_duration_sec", "Сервер"), ("download_duration_sec", "Завантаження"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("mirror_duration_sec", "Дзеркало")):
+                if float(o.get(k_s) or 0) > 0:
+                    lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang)}")
+            self._show_engine_modal({"type": "alert", "title": "Деталі швидкості (pCloud)", "text": "\n".join(lines)})
+
+        def _load(refresh=True):
+            lbl_st.configure(text="Оновлення з pCloud..." if refresh else "Читання кешу...", fg=p["cyan"])
+            def _w():
+                try:
+                    from core.cloud import fetch_cloud_speed_stats
+                    res, err = fetch_cloud_speed_stats(self.engine, refresh=refresh), ""
+                except Exception as ex:
+                    res, err = None, str(ex)
+                def _u():
+                    if not dlg.winfo_exists(): return
+                    if err:
+                        lbl_st.configure(text=err, fg=p["red"])
+                        return
+                    state_box["ops"], state_box["devs"] = res["ops"], res["devices"]
+                    all_lbl = "Усі комп'ютери" if lang == "uk" else "All computers"
+                    cb_dev.configure(values=[all_lbl] + [d["label"] for d in res["devices"]])
+                    if v_dev.get() not in cb_dev["values"]: v_dev.set(all_lbl)
+                    lbl_st.configure(text=f"Оновлено ✔ ({len(res['ops'])} оп.)" if refresh else "Кеш", fg=p["green"])
+                    _render()
+                self.root.after(0, _u)
+            threading.Thread(target=_w, daemon=True).start()
+
+        cb_dev.bind("<<ComboboxSelected>>", lambda _e: _render())
+        tree.bind("<Double-1>", _on_dbl)
+        cv.bind("<Configure>", _draw_bars)
+        tk.Button(top_bar, text="🔄 Оновити з pCloud" if lang == "uk" else "🔄 Refresh pCloud", command=lambda: _load(True), bg=p["card"], fg=p["cyan"], font=(fam, fs), padx=10, pady=2, cursor="hand2").pack(side="left")
+        _load(False)
+        dlg.after(150, lambda: dlg.winfo_exists() and _load(True))
     def open_stats_modal(self):
         fs = self.metrics["font_sz"]
         lng_c = self.engine.state.get("lang", "en")

@@ -14,6 +14,7 @@ from uuid import uuid4
 
 # patch-id: pcloud-only-simple-ui-2.27
 # patch-id: pcloud-clean-hints-2.30
+# patch-id: cloud-speed-stats-2.31
 from core.config import SCRIPT_VER
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 
@@ -768,3 +769,62 @@ def start_cloud_sync_worker(engine, force=False, on_complete=None):
         worker_lock.release()
         raise
     return True
+
+def fetch_cloud_speed_stats(engine, refresh=True):
+    state = engine.state
+    if not state.get("cloud_enabled"):
+        raise RuntimeError("Синхронізацію з pCloud вимкнено у Налаштуваннях.")
+    remote = str(state.get("cloud_remote") or "pcloud").strip()
+    cloud_path = validate_cloud_settings(remote, state.get("cloud_path", "HomeGridBackup"))
+    ckey = hashlib.sha256((remote + "\0" + cloud_path).encode("utf-8")).hexdigest()[:16]
+    base_cache = os.path.join(os.path.abspath(state["backup_dir"]), ".cloud-report-cache", f"all_{ckey}")
+    src_dir, ops_dir = os.path.join(base_cache, "sources"), os.path.join(base_cache, "operations")
+    os.makedirs(src_dir, exist_ok=True)
+    os.makedirs(ops_dir, exist_ok=True)
+    if refresh:
+        for rem_p, loc_p in ((_remote_path(state, ".HomeGridBackup-sources"), src_dir), (_remote_path(state, "operations"), ops_dir)):
+            try:
+                _rclone("copy", rem_p, loc_p, "--include", "*.jsonl", timeout=90)
+            except Exception:
+                pass
+    recs = _collect_report_records((src_dir, ops_dir))
+    grouped = {}
+    for r in _ordered_report_records(recs):
+        did = str(r.get("device_id") or "unknown")
+        oid = str(r.get("operation_id") or r.get("timestamp") or "")
+        g = grouped.setdefault((did, oid), {"device_id": did, "operation_id": oid})
+        for k, v in r.items():
+            if v not in (None, "", 0, 0.0) or k not in g:
+                g[k] = v
+    own_id = str(state.get("device_id") or "")
+    ops = []
+    for op in grouped.values():
+        dur = float(op.get("duration_sec") or 0.0)
+        mb = float(op.get("size_mb") or 0.0)
+        if dur <= 0.0 or (mb <= 0.0 and not str(op.get("archive", "")).lower().endswith(".zip")):
+            continue
+        spd = float(op.get("speed_mbps") or op.get("download_speed_mbps") or 0.0)
+        if spd <= 0.0 and mb > 0.0:
+            spd = round(mb / dur, 2)
+        os_n = " ".join(str(op.get(k) or "").strip() for k in ("platform", "platform_version") if op.get(k)).strip() or "OS"
+        did = op["device_id"]
+        tag = f"#{did[:4]}" if len(did) >= 4 else ""
+        op["dev_label"] = (f"★ {os_n} ({tag})" if did == own_id else f"{os_n} ({tag})").strip()
+        op["dur_f"], op["mb_f"], op["spd_f"] = round(dur, 1), round(mb, 1), round(spd, 2)
+        ops.append(op)
+    ops.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
+    by_dev = {}
+    for op in ops:
+        by_dev.setdefault(op["device_id"], []).append(op)
+    dev_stats = []
+    for did, d_ops in by_dev.items():
+        last2 = d_ops[:2]
+        avg_dur = round(sum(x["dur_f"] for x in last2) / len(last2), 1)
+        avg_spd = round(sum(x["spd_f"] for x in last2) / len(last2), 2)
+        dev_stats.append({
+            "device_id": did, "label": d_ops[0]["dev_label"], "is_own": did == own_id,
+            "total_cnt": len(d_ops), "sample_cnt": len(last2),
+            "avg_dur": avg_dur, "min_dur": min(x["dur_f"] for x in last2), "avg_spd": avg_spd,
+        })
+    dev_stats.sort(key=lambda d: (-d["avg_spd"], d["avg_dur"]))
+    return {"ops": ops, "devices": dev_stats}

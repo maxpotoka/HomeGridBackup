@@ -69,7 +69,9 @@ except Exception:
 # patch-id: fix-pcloud-vars-2.28
 # patch-id: fix-pcloud-nameerror-2.29
 # patch-id: pcloud-clean-hints-2.30
-SCRIPT_VER = "2.30"
+# patch-id: cloud-speed-stats-2.31
+# patch-id: linux-wayland-sni-bridge-2.32
+SCRIPT_VER = "2.32"
 BUILD_DATE = "23.11.2026 07:55"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
