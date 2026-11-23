@@ -4,7 +4,8 @@
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
 # patch-id: android-storage-fallback-2.23
-# [ФАЙЛ: core/config.py (v2.24 | 22.11.2026 09:42) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: linux-xorg-tray-menu-2.26
+# [ФАЙЛ: core/config.py (v2.26 | 23.11.2026 07:05) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -64,8 +65,12 @@ except Exception:
     KEYRING_SERVICE = "HomeGridMonitorBackup"
     HAS_KEYRING = False
 
-SCRIPT_VER = "2.25"
-BUILD_DATE = "22.11.2026 11:20"
+# patch-id: pcloud-only-simple-ui-2.27
+# patch-id: fix-pcloud-vars-2.28
+# patch-id: fix-pcloud-nameerror-2.29
+# patch-id: pcloud-clean-hints-2.30
+SCRIPT_VER = "2.30"
+BUILD_DATE = "23.11.2026 07:55"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -358,7 +363,7 @@ def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "cloud_enabled": False, "cloud_remote": "",
+        "mirror_dir": "", "mirror_enabled": False, "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
@@ -393,7 +398,7 @@ def load_state():
             if not IS_ANDROID and isinstance(data.get("cloud_enabled"), bool):
                 state["cloud_enabled"] = data["cloud_enabled"]
             if isinstance(data.get("cloud_remote"), str):
-                state["cloud_remote"] = data["cloud_remote"].strip()
+                state["cloud_remote"] = data["cloud_remote"].strip() or "pcloud"
             if isinstance(data.get("cloud_path"), str):
                 state["cloud_path"] = data["cloud_path"].strip() or "HomeGridBackup"
             if isinstance(data.get("device_id"), str) and re.fullmatch(r"[0-9a-f]{32}", data["device_id"]):
@@ -414,7 +419,7 @@ def load_state():
                 state["progress_style"] = data["progress_style"]
             if data.get("delete_mode") in ("trash", "direct", "permanent"):
                 state["delete_mode"] = data["delete_mode"]
-            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled"):
+            for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled", "cloud_save_archives", "cloud_save_logs"):
                 if isinstance(data.get(bk), bool):
                     state[bk] = data[bk]
             st_raw = str(data.get("sched_time") or "").strip()
@@ -493,7 +498,7 @@ def commit_state(state):
         record_server_history(state, state["server"])
     pub_keys = (
         "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
-        "cloud_enabled", "cloud_remote", "cloud_path", "device_id",
+        "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",

@@ -6,7 +6,11 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
-# [ФАЙЛ: gui/dialogs.py (v2.09 | 22.11.2026 09:10)
+# patch-id: pcloud-only-simple-ui-2.27
+# patch-id: fix-pcloud-vars-2.28
+# patch-id: fix-pcloud-nameerror-2.29
+# patch-id: pcloud-clean-hints-2.30
+# [ФАЙЛ: gui/dialogs.py (v2.13 | 23.11.2026 07:55)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -470,17 +474,12 @@ class DialogsMixin:
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
-        v_cloud_remote = tk.StringVar(value=st.get("cloud_remote", ""))
+        v_cloud_provider = tk.StringVar(value="pCloud")
+        v_cloud_new_remote = tk.StringVar(value="pcloud")
+        v_cloud_remote = tk.StringVar(value="pcloud")
+        v_cloud_save_archives = tk.BooleanVar(value=bool(st.get("cloud_save_archives", True)))
+        v_cloud_save_logs = tk.BooleanVar(value=bool(st.get("cloud_save_logs", True)))
         v_cloud_path = tk.StringVar(value=st.get("cloud_path", "HomeGridBackup"))
-        v_cloud_username = tk.StringVar(value="")
-        v_cloud_password = tk.StringVar(value="")
-        from core.cloud import available_rclone_providers
-        cloud_providers = available_rclone_providers()
-        cloud_provider_names = [provider[0] for provider in cloud_providers]
-        cloud_provider_by_name = {provider[0]: provider[1] for provider in cloud_providers}
-        cloud_default_remote_by_name = {provider[0]: provider[2] for provider in cloud_providers}
-        v_cloud_provider = tk.StringVar(value=cloud_provider_names[0])
-        v_cloud_new_remote = tk.StringVar(value=cloud_default_remote_by_name[cloud_provider_names[0]])
 
         sch_parts = (st.get("sched_time") or "03:00").split(":")
         v_sh = tk.StringVar(value=sch_parts[0] if len(sch_parts) > 0 else "03")
@@ -507,19 +506,22 @@ class DialogsMixin:
         nb.select(initial_tab)
 
         f_cloud = tk.LabelFrame(
-            tab_cloud, text="5. Налаштування хмарного сховища",
+            tab_cloud, text="5. Налаштування pCloud",
             bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold"),
             padx=14, pady=10
         )
         f_cloud.pack(fill="x", padx=14, pady=12)
         tk.Checkbutton(
-            f_cloud, text="Увімкнути хмарне дзеркало та звіт",
+            f_cloud, text="Увімкнути синхронізацію з pCloud",
             variable=v_cloud_enabled, bg=p["card"], fg=p["text"],
-            selectcolor=p["inp_bg"], font=("Segoe UI", fs)
-        ).pack(anchor="w", pady=(2, 8))
+            selectcolor=p["inp_bg"], font=("Segoe UI", fs, "bold")
+        ).pack(anchor="w", pady=(2, 6))
+        _c_opts = tk.Frame(f_cloud, bg=p["card"])
+        _c_opts.pack(fill="x", pady=(0, 8), padx=(18, 0))
+        tk.Checkbutton(_c_opts, text="Зберігати архів у pCloud", variable=v_cloud_save_archives, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(side="left", padx=(0, 20))
+        tk.Checkbutton(_c_opts, text="Зберігати журнал у pCloud", variable=v_cloud_save_logs, bg=p["card"], fg=p["cyan"], selectcolor=p["inp_bg"], font=("Segoe UI", fs)).pack(side="left")
 
         cloud_remote_row = tk.Frame(f_cloud, bg=p["card"])
-        cloud_remote_row.pack(fill="x", pady=4)
         tk.Label(
             cloud_remote_row, text="Вибір хмарного сховища:", width=24, anchor="w",
             bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
@@ -531,13 +533,12 @@ class DialogsMixin:
         cb_cloud_remote.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         provider_row = tk.Frame(f_cloud, bg=p["card"])
-        provider_row.pack(fill="x", pady=4)
         tk.Label(
             provider_row, text=tr("Сервіс:", st.get("lang", "en")), width=24, anchor="w",
             bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
         ).pack(side="left")
         cb_cloud_provider = ttk.Combobox(
-            provider_row, textvariable=v_cloud_provider, values=cloud_provider_names,
+            provider_row, textvariable=v_cloud_provider, values=["pCloud"],
             state="readonly", font=("Segoe UI", fs), width=20
         )
         cb_cloud_provider.pack(side="left", padx=(0, 8))
@@ -552,8 +553,7 @@ class DialogsMixin:
 
         cloud_credentials_frame = tk.Frame(f_cloud, bg=p["card"])
         cloud_credentials_hint = None
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            cloud_credentials_frame.pack(fill="x", pady=4)
+        if False:
             username_row = tk.Frame(cloud_credentials_frame, bg=p["card"])
             username_row.pack(fill="x", pady=2)
             tk.Label(
@@ -606,23 +606,11 @@ class DialogsMixin:
             cloud_path_row, textvariable=v_cloud_path, bg=p["inp_bg"],
             fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
         ).pack(side="left", fill="x", expand=True)
-        cloud_storage_hint = (
-            "Архіви всіх пристроїв зберігаються у вибраній папці хмари в backups/; "
-            "назви містять ID пристрою. Спільний текстовий журнал у корені: HomeGridBackup.log. "
-            "На всіх пристроях виберіть той самий обліковий запис і папку."
-            if WINDOWS7_CLOUD_SYNC_PREVIEW else
-            "Архіви зберігаються у вибраній папці хмари в backups/<ID пристрою>/. "
-            "Журнал пристрою: operations/<ID пристрою>/<дата>.jsonl."
-        )
         tk.Label(
-            f_cloud, text=tr(cloud_storage_hint, st.get("lang", "en")),
-            bg=p["card"], fg=p["muted"], justify="left", wraplength=780,
+            f_cloud, text="Архіви та журнал зберігаються у вказаній папці pCloud." if st.get("lang", "en") == "uk" else "Archives and log are stored in the specified pCloud folder.",
+            bg=p["card"], fg=p["muted"], justify="left",
             font=("Segoe UI", max(8, fs - 1))
-        ).pack(anchor="w", pady=(8, 4))
-        tk.Label(
-            f_cloud, text=f"ID пристрою: {st.get('device_id', '')}",
-            bg=p["card"], fg=p["muted"], font=("Consolas", max(8, fs - 1))
-        ).pack(anchor="w", pady=(2, 6))
+        ).pack(anchor="w", pady=(6, 4))
 
         def _refresh_cloud_remotes():
             import threading
@@ -1075,22 +1063,45 @@ class DialogsMixin:
             dlg.after(30000, _schedule_cloud_queue_refresh)
 
         cb_cloud_provider.bind("<<ComboboxSelected>>", _select_cloud_provider)
+        v_cloud_provider.set("pCloud")
+        v_cloud_new_remote.set("pcloud")
+        v_cloud_remote.set("pcloud")
         cloud_setup_button = tk.Button(
-            cloud_actions, text=tr("Додати та підключити", st.get("lang", "en")),
-            command=_open_cloud_setup, bg=p["card"], fg=p["cyan"],
-            font=("Segoe UI", fs), padx=10, cursor="hand2"
+            cloud_actions, text=tr("Авторизація pCloud", st.get("lang", "en")),
+            command=lambda: (v_cloud_provider.set("pCloud"), v_cloud_new_remote.set("pcloud"), _open_cloud_setup()),
+            bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2"
         )
-        cloud_setup_button.pack(side="left", padx=(0, 6))
+        cloud_setup_button.pack(side="left", padx=(0, 8))
         tk.Button(
-            cloud_actions, text=tr("Перевірити", st.get("lang", "en")),
-            command=_test_cloud_remote, bg=p["card"], fg=p["green"],
-            font=("Segoe UI", fs), padx=10, cursor="hand2"
-        ).pack(side="left", padx=6)
+            cloud_actions, text=tr("Перевірити вільне місце", st.get("lang", "en")),
+            command=lambda: (v_cloud_remote.set("pcloud"), _test_cloud_remote()),
+            bg=p["card"], fg=p["green"], font=("Segoe UI", fs, "bold"), padx=12, pady=4, cursor="hand2"
+        ).pack(side="left", padx=4)
+        def _sync_pcloud_now():
+            import threading
+            if not st.get("cloud_enabled"):
+                cloud_msg.configure(text="Спочатку увімкніть pCloud і натисніть «Застосувати»." if st.get("lang", "en") == "uk" else "Enable pCloud and click Apply first.", fg=p["amber"])
+                return
+            cloud_msg.configure(text="Синхронізація з pCloud..." if st.get("lang", "en") == "uk" else "Syncing with pCloud...", fg=p["cyan"])
+            def _w():
+                try:
+                    from core.cloud import sync_cloud_backups, sync_cloud_reports
+                    sync_cloud_backups(self.engine, prune=False)
+                    sync_cloud_reports(self.engine)
+                    msg_r, col_r = ("Синхронізацію завершено ✔" if st.get("lang", "en") == "uk" else "Sync completed ✔"), p["green"]
+                except Exception as ex:
+                    msg_r, col_r = str(ex), p["red"]
+                self.root.after(0, lambda: dlg.winfo_exists() and cloud_msg.configure(text=msg_r, fg=col_r))
+            threading.Thread(target=_w, daemon=True).start()
         tk.Button(
-            cloud_actions, text=tr("Видалити підключення", st.get("lang", "en")),
-            command=_remove_cloud_remote, bg=p["card"], fg=p["red"],
-            font=("Segoe UI", fs), padx=10, cursor="hand2"
-        ).pack(side="left", padx=6)
+            cloud_actions, text="Синхронізувати зараз" if st.get("lang", "en") == "uk" else "Sync Now",
+            command=_sync_pcloud_now, bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
+        ).pack(side="left", padx=4)
+        tk.Button(
+            cloud_actions, text="Відкрити pCloud" if st.get("lang", "en") == "uk" else "Open pCloud",
+            command=lambda: __import__("webbrowser").open("https://pcloud.com"),
+            bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
+        ).pack(side="left", padx=4)
         retry_cloud_button = None
         if WINDOWS7_CLOUD_SYNC_PREVIEW:
             retry_cloud_button = tk.Button(
@@ -1104,13 +1115,7 @@ class DialogsMixin:
             command=_refresh_cloud_remotes, bg=p["card"], fg=p["cyan"],
             font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
         ).pack(side="right")
-        tk.Label(
-            f_cloud, text=tr(
-                "Оберіть сервіс і додайте підключення тут. Майстер rclone відкриється в цьому вікні; OAuth-підтвердження може перейти в браузер.",
-                st.get("lang", "en")
-            ),
-            bg=p["card"], fg=p["muted"], font=("Segoe UI", max(8, fs - 1))
-        ).pack(anchor="w", pady=(4, 2))
+        pass
         _refresh_cloud_remotes()
         if WINDOWS7_CLOUD_SYNC_PREVIEW:
             dlg.after(0, _schedule_cloud_queue_refresh)
@@ -1283,9 +1288,13 @@ class DialogsMixin:
 
         def _commit_settings(close_after):
             selected_tab = nb.index(nb.select())
-            cloud_remote = v_cloud_remote.get().strip()
+            cloud_remote = "pcloud"
             cloud_path = v_cloud_path.get().strip()
             if v_cloud_enabled.get():
+                if not v_cloud_save_archives.get() and not v_cloud_save_logs.get():
+                    cloud_msg.configure(text=tr("Оберіть хоча б один пункт: зберігати архів або журнал.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
+                    nb.select(tab_cloud)
+                    return
                 try:
                     from core.cloud import validate_cloud_settings
                     cloud_path = validate_cloud_settings(cloud_remote, cloud_path)
@@ -1307,7 +1316,9 @@ class DialogsMixin:
             st["minimize_to_tray"] = bool(v_tray_min.get())
             st["silent_cleanup"] = bool(v_sclean.get())
             st["cloud_enabled"] = bool(v_cloud_enabled.get())
-            st["cloud_remote"] = cloud_remote
+            st["cloud_remote"] = "pcloud"
+            st["cloud_save_archives"] = bool(v_cloud_save_archives.get())
+            st["cloud_save_logs"] = bool(v_cloud_save_logs.get())
             st["cloud_path"] = cloud_path
             old_sc = st.get("ui_scale", "auto")
             new_sc = scale_map.get(cb_scale.get(), "auto")

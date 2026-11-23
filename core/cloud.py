@@ -12,6 +12,8 @@ import time
 from datetime import datetime
 from uuid import uuid4
 
+# patch-id: pcloud-only-simple-ui-2.27
+# patch-id: pcloud-clean-hints-2.30
 from core.config import SCRIPT_VER
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 
@@ -21,14 +23,8 @@ _ARCHIVE_RE = re.compile(r"(backup|KEEP)", re.IGNORECASE)
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 _CLOUD_SYNC_LOCK = threading.Lock()
 _RCLONE_VERSION = None
-RCLONE_PROVIDERS = (
-    ("MEGA", "mega", "mega"),
-    ("Koofr", "koofr", "koofr"),
-)
-WINDOWS7_RCLONE_PROVIDERS = (
-    ("MEGA", "mega", "mega"),
-    ("Koofr", "koofr", "koofr"),
-)
+RCLONE_PROVIDERS = (("pCloud", "pcloud", "pcloud"),)
+WINDOWS7_RCLONE_PROVIDERS = (("pCloud", "pcloud", "pcloud"),)
 
 
 class CloudRateLimitError(RuntimeError):
@@ -99,7 +95,7 @@ def available_rclone_providers():
 def list_rclone_remotes():
     executable = _rclone_executable()
     if not executable:
-        raise RuntimeError("rclone is not installed or is not available in PATH.")
+        raise RuntimeError("Не знайдено rclone. Покладіть rclone.exe (або rclone) поруч із програмою.")
     result = _run([executable, "listremotes"], 15)
     if result.returncode:
         raise RuntimeError((result.stderr or "rclone listremotes failed").strip()[-500:])
@@ -120,7 +116,7 @@ def start_rclone_remote_setup(remote, backend):
         raise ValueError(f"A rclone remote named '{remote}' already exists.")
     executable = _rclone_executable()
     if not executable:
-        raise RuntimeError("rclone is not installed or is not available in PATH.")
+        raise RuntimeError("Не знайдено rclone. Покладіть rclone.exe (або rclone) поруч із програмою.")
     return subprocess.Popen(
         [executable, "config", "create", remote, backend],
         stdin=subprocess.PIPE,
@@ -149,7 +145,7 @@ def create_rclone_remote(remote, backend, username, password):
         raise ValueError(f"A rclone remote named '{remote}' already exists.")
     executable = _rclone_executable()
     if not executable:
-        raise RuntimeError("rclone is not installed or is not available in PATH.")
+        raise RuntimeError("Не знайдено rclone. Покладіть rclone.exe (або rclone) поруч із програмою.")
 
     password_key = "pass" if backend == "mega" else "password"
     options = ["user", username, password_key, password]
@@ -263,7 +259,7 @@ def _remote_path(state, *parts):
 def _rclone(*args, timeout=3600):
     executable = _rclone_executable()
     if not executable:
-        raise RuntimeError("rclone is not installed or is not available in PATH.")
+        raise RuntimeError("Не знайдено rclone. Покладіть rclone.exe (або rclone) поруч із програмою.")
     retry_args = (
         ["--retries", "3", "--low-level-retries", "10", "--tpslimit", "2"]
         if WINDOWS7_CLOUD_SYNC_PREVIEW
@@ -296,7 +292,7 @@ def _rclone(*args, timeout=3600):
 
 
 def sync_cloud_backups(engine, prune=False):
-    if not engine.state.get("cloud_enabled"):
+    if not engine.state.get("cloud_enabled") or not engine.state.get("cloud_save_archives", True):
         return
     pending_path = None
     if WINDOWS7_CLOUD_SYNC_PREVIEW:
@@ -375,10 +371,10 @@ def cloud_sync_queue_state(engine):
     if not WINDOWS7_CLOUD_SYNC_PREVIEW or not engine.state.get("cloud_enabled"):
         return {"archives": 0, "reports": 0, "total": 0}
     backup_dir = os.path.abspath(engine.state["backup_dir"])
-    archives_pending = os.path.isfile(os.path.join(backup_dir, ".cloud-archives.pending"))
+    archives_pending = bool(engine.state.get("cloud_save_archives", True)) and os.path.isfile(os.path.join(backup_dir, ".cloud-archives.pending"))
     report_dir = os.path.join(backup_dir, "reports", _device_id(engine.state))
     reports_pending = 0
-    if os.path.isdir(report_dir):
+    if engine.state.get("cloud_save_logs", True) and os.path.isdir(report_dir):
         names = set(os.listdir(report_dir))
         reports_pending = sum(name.endswith(".jsonl.pending") for name in names)
         reports_pending += sum(
@@ -627,7 +623,7 @@ def record_operation_event(engine, operation_id, event, stage="", archive="", si
 
 
 def sync_cloud_reports(engine):
-    if not engine.state.get("cloud_enabled"):
+    if not engine.state.get("cloud_enabled") or not engine.state.get("cloud_save_logs", True):
         return
     if WINDOWS7_CLOUD_SYNC_PREVIEW and not _CLOUD_SYNC_LOCK.acquire(blocking=False):
         return False

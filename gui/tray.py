@@ -1,5 +1,6 @@
 # ==============================================================================
-# [ФАЙЛ: gui/tray.py (v2.06 | 22.11.2026 11:20)
+# patch-id: linux-xorg-tray-menu-2.26
+# [ФАЙЛ: gui/tray.py (v2.07 | 23.11.2026 07:05)
 # patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
 import os
@@ -131,9 +132,10 @@ def _detect_linux_tray_backend():
     from core.config import IS_WSL
     if IS_WSL or (not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")):
         return ""
-    for gp in ("/usr/lib/x86_64-linux-gnu/girepository-1.0", "/usr/lib/aarch64-linux-gnu/girepository-1.0", "/usr/lib/girepository-1.0"):
-        if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
-            os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
+    if not getattr(sys, "frozen", False):
+        for gp in ("/usr/lib/x86_64-linux-gnu/girepository-1.0", "/usr/lib/i386-linux-gnu/girepository-1.0", "/usr/lib/aarch64-linux-gnu/girepository-1.0", "/usr/lib/girepository-1.0"):
+            if os.path.isdir(gp) and gp not in os.environ.get("GI_TYPELIB_PATH", ""):
+                os.environ["GI_TYPELIB_PATH"] = f"{gp}:{os.environ.get('GI_TYPELIB_PATH', '')}".rstrip(":")
     sys_env = _clean_sys_env()
     if _has_sni_watcher(sys_env):
         return "appindicator" if _has_appindicator_gi() else "auto"
@@ -143,6 +145,7 @@ def _detect_linux_tray_backend():
 
 _LNX_TRAY_BE = ""
 _LNX_TRAY_PROBED = False
+_LNX_PROBE_LOCK = threading.Lock()
 
 try:
     import pystray
@@ -281,27 +284,29 @@ def _start_tray_thread(engine):
         engine.log("Системний трей macOS не запускається — для керування використовується значок у Dock.", "info")
         return
 
-    if os.sys.platform.startswith("linux") and not _LNX_TRAY_PROBED:
-        engine.tray_ready_event = threading.Event()
+    if os.sys.platform.startswith("linux"):
+        with _LNX_PROBE_LOCK:
+            if not _LNX_TRAY_PROBED:
+                _LNX_TRAY_PROBED = True
+                engine.tray_ready_event = threading.Event()
 
-        def _probe_linux_tray():
-            global _LNX_TRAY_BE, _LNX_TRAY_PROBED
-            _LNX_TRAY_BE = _detect_linux_tray_backend()
-            _LNX_TRAY_PROBED = True
-            if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
-                os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
-            if not _LNX_TRAY_BE:
-                with _TRAY_LOCK:
-                    _TRAY_STARTED = False
-                engine.tray_ready = False
-                engine.tray_icon = None
-                engine.tray_ready_event.set()
-                engine.log(_tray_problem(), "warn")
+                def _probe_linux_tray():
+                    global _LNX_TRAY_BE
+                    _LNX_TRAY_BE = _detect_linux_tray_backend()
+                    if _LNX_TRAY_BE in ("appindicator", "gtk", "xorg") and not os.environ.get("PYSTRAY_BACKEND"):
+                        os.environ["PYSTRAY_BACKEND"] = _LNX_TRAY_BE
+                    if not _LNX_TRAY_BE:
+                        with _TRAY_LOCK:
+                            _TRAY_STARTED = False
+                        engine.tray_ready = False
+                        engine.tray_icon = None
+                        engine.tray_ready_event.set()
+                        engine.log(_tray_problem(), "warn")
+                        return
+                    _start_tray_thread(engine)
+
+                threading.Thread(target=_probe_linux_tray, daemon=True).start()
                 return
-            _start_tray_thread(engine)
-
-        threading.Thread(target=_probe_linux_tray, daemon=True).start()
-        return
 
     from core.config import IS_WSL, NO_TRAY
     with _TRAY_LOCK:
@@ -385,6 +390,7 @@ def _start_tray_thread(engine):
             pystray.MenuItem(tr("Відкрити папку", lng_s), _on_open_folder),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tr("Статистика", lng_s), _on_open_dialog("open_stats_modal"), enabled=lambda item: engine.app_ref is not None),
+            pystray.MenuItem(tr("Журнал операцій", lng_s), _on_open_dialog("open_ops_history"), enabled=lambda item: engine.app_ref is not None),
             pystray.MenuItem(tr("Аналіз GFS / SHA-256", lng_s), _on_open_dialog("open_analyze"), enabled=lambda item: engine.app_ref is not None),
             pystray.MenuItem(tr("Налаштування", lng_s), _on_open_dialog("open_settings"), enabled=lambda item: engine.app_ref is not None),
             pystray.Menu.SEPARATOR,
@@ -427,7 +433,7 @@ def _start_tray_thread(engine):
 
     def _anim_loop():
         err_streak = 0
-        last_sig, last_title = None, ""
+        last_sig, last_menu_sig, last_title = None, None, ""
         while not _TRAY_STOP.is_set():
             _TRAY_STOP.wait(1.0)
             if _TRAY_STOP.is_set():
@@ -440,40 +446,24 @@ def _start_tray_thread(engine):
                 if not getattr(engine.tray_icon, "visible", True):
                     continue
                 cur_pct = int(engine.progress) if engine.is_running else 0
-                sig = (cur_pct, engine.is_running, engine.pill_type)
-                elapsed_sec = _elapsed_seconds()
                 lng_s = engine.state.get("lang", "en")
+                sig = (cur_pct, engine.is_running, engine.pill_type)
+                menu_sig = (cur_pct if engine.is_running else 0, engine.is_running, lng_s, engine.app_ref is not None)
+                elapsed_sec = _elapsed_seconds()
                 new_title = (
                     f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
                     if engine.is_running else "HomeGrid Backup"
                 )
-                if os.sys.platform == "darwin":
-                    sig_changed = sig != last_sig
-                    if sig_changed:
-                        last_sig = sig
-                        if engine.app_ref is not None:
-                            _im_mac = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
-                            engine.app_ref.root.after(0, lambda im=_im_mac: setattr(engine.tray_icon, "icon", im) if engine.tray_icon else None)
-                    if engine.is_running or sig_changed:
-                        if engine.app_ref is not None:
-                            engine.app_ref.root.after(0, _refresh_tray_menu)
-                        else:
-                            _refresh_tray_menu()
-                    if new_title != last_title:
-                        last_title = new_title
-                        if engine.app_ref is not None:
-                            engine.app_ref.root.after(0, lambda t=new_title: setattr(engine.tray_icon, "title", t) if engine.tray_icon else None)
-                else:
-                    sig_changed = sig != last_sig
-                    if sig_changed:
-                        engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
-                        last_sig = sig
-                    if os.sys.platform != "darwin" or sig_changed:
-                        engine.tray_icon.menu = _build_tray_menu()
-                        engine.tray_icon.update_menu()
-                    if new_title != last_title:
-                        engine.tray_icon.title = new_title
-                        last_title = new_title
+                if sig != last_sig:
+                    engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
+                    last_sig = sig
+                if engine.is_running or menu_sig != last_menu_sig:
+                    engine.tray_icon.menu = _build_tray_menu()
+                    engine.tray_icon.update_menu()
+                    last_menu_sig = menu_sig
+                if new_title != last_title:
+                    engine.tray_icon.title = new_title
+                    last_title = new_title
                 err_streak = 0
             except AssertionError as exc:
                 _mark_tray_failed(exc)
@@ -488,6 +478,9 @@ def _start_tray_thread(engine):
         try:
             ready_icon.visible = True
             engine.tray_ready = True
+            if "xorg" in type(ready_icon).__module__:
+                _attach_xorg_tk_menu(ready_icon, engine)
+                engine.log("Активовано X11-меню трею (Tkinter) для сумісності зі середовищем без AppIndicator.", "info")
         except Exception as exc:
             _mark_tray_failed(exc)
         else:
@@ -502,6 +495,84 @@ def _start_tray_thread(engine):
     threading.Thread(target=_anim_loop, daemon=True).start()
     threading.Thread(target=_run_icon_safe, daemon=True).start()
 
+def _show_tk_tray_popup(engine, x_root, y_root):
+    import tkinter as tk
+    from core.backup import run_backup_task
+    from core.files import open_folder_native
+    from core.config import DEFAULT_BACKUP_DIR
+    from core.i18n import tr
+
+    app = engine.app_ref
+    if app is None:
+        return
+    lng = engine.state.get("lang", "en")
+    pal = app._get_palette() if hasattr(app, "_get_palette") else {"panel": "#1e293b", "text": "#f8fafc", "blue": "#2563eb", "muted": "#94a3b8"}
+    fs = app.metrics.get("font_sz", 10) if hasattr(app, "metrics") else 10
+    fam = getattr(app, "_base_fam", "Sans")
+    menu = tk.Menu(app.root, tearoff=0, bg=pal["panel"], fg=pal["text"], activebackground=pal["blue"], activeforeground="#ffffff", disabledforeground=pal["muted"], font=(fam, fs))
+    menu.add_command(label=tr("Відкрити HomeGrid Backup", lng), command=app.show_window, font=(fam, fs, "bold"))
+    menu.add_separator()
+    menu.add_command(label=_tray_status_text(engine, lng, 0), state="disabled")
+    menu.add_command(label=tr("▶ Запустити резервне копіювання", lng), state="disabled" if engine.is_running else "normal", command=lambda: threading.Thread(target=run_backup_task, args=(engine, engine.state.get("server", ""), False, False, False), daemon=True).start())
+    menu.add_command(label=tr("Відкрити папку", lng), command=lambda: open_folder_native(engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR))
+    menu.add_separator()
+    for title_key, method_name in (("Статистика", "open_stats_modal"), ("Журнал операцій", "open_ops_history"), ("Аналіз GFS / SHA-256", "open_analyze"), ("Налаштування", "open_settings")):
+        fn = getattr(app, method_name, None)
+        if callable(fn):
+            menu.add_command(label=tr(title_key, lng), command=lambda f=fn: (app.show_window(), f()))
+    menu.add_separator()
+    menu.add_command(label=tr("✖ Вихід", lng), command=lambda: _force_quit_app(engine))
+    try:
+        menu.tk_popup(x_root, y_root)
+    finally:
+        try:
+            menu.grab_release()
+        except Exception:
+            pass
+
+
+def _attach_xorg_tk_menu(icon, engine):
+    win_id = getattr(icon, "_window", None)
+    if not win_id or not os.environ.get("DISPLAY"):
+        return
+
+    def _x11_click_watcher():
+        try:
+            from ctypes.util import find_library
+            x11_path = find_library("X11")
+            if not x11_path:
+                return
+            x11 = ctypes.CDLL(x11_path)
+            class XButtonEvent(ctypes.Structure):
+                _fields_ = [("type", ctypes.c_int), ("serial", ctypes.c_ulong), ("send_event", ctypes.c_int), ("display", ctypes.c_void_p), ("window", ctypes.c_ulong), ("root", ctypes.c_ulong), ("subwindow", ctypes.c_ulong), ("time", ctypes.c_ulong), ("x", ctypes.c_int), ("y", ctypes.c_int), ("x_root", ctypes.c_int), ("y_root", ctypes.c_int), ("state", ctypes.c_uint), ("button", ctypes.c_uint), ("same_screen", ctypes.c_int)]
+            class XEvent(ctypes.Union):
+                _fields_ = [("type", ctypes.c_int), ("xbutton", XButtonEvent), ("pad", ctypes.c_long * 24)]
+            x11.XOpenDisplay.argtypes, x11.XOpenDisplay.restype = [ctypes.c_char_p], ctypes.c_void_p
+            x11.XSelectInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_long]
+            x11.XPending.argtypes, x11.XPending.restype = [ctypes.c_void_p], ctypes.c_int
+            x11.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.POINTER(XEvent)]
+            x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+            disp = x11.XOpenDisplay(os.environ["DISPLAY"].encode("utf-8"))
+            if not disp:
+                return
+            x11.XSelectInput(disp, win_id, 1 << 2)
+            ev = XEvent()
+            try:
+                while not _TRAY_STOP.is_set() and engine.tray_icon is not None:
+                    while x11.XPending(disp) > 0:
+                        x11.XNextEvent(disp, ctypes.byref(ev))
+                        if ev.type == 4 and engine.app_ref is not None:
+                            rx, ry = ev.xbutton.x_root, ev.xbutton.y_root
+                            engine.app_ref.root.after(0, lambda x=rx, y=ry: _show_tk_tray_popup(engine, x, y))
+                    _TRAY_STOP.wait(0.08)
+            finally:
+                x11.XCloseDisplay(disp)
+        except Exception:
+            pass
+
+    threading.Thread(target=_x11_click_watcher, daemon=True).start()
+
+
 def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowWindow_v1"):
     if os.name != "nt":
         def _posix_wait_loop():
@@ -512,6 +583,8 @@ def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowW
                 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 srv.bind(("127.0.0.1", 0))
                 srv.listen(2)
+                import atexit
+                atexit.register(lambda p=_port_p: os.path.exists(p) and os.remove(p))
                 with open(_port_p, "w") as pf:
                     pf.write(str(srv.getsockname()[1]))
                 while True:

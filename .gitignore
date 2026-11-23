@@ -67,3 +67,6 @@ __pycache__/
 !/tests/test_tray_platforms.py
 
 !/packaging/windows_user_setup.iss
+core/__pycache__/i18n.cpython-315.pyc
+/core/__pycache__
+/gui/__pycache__

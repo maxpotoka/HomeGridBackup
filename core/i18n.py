@@ -1,7 +1,8 @@
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
 # patch-id: android-storage-fallback-2.13
-# [ФАЙЛ: core/i18n.py (v2.13 | 22.11.2026 08:51) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# patch-id: linux-xorg-tray-menu-2.26
+# [ФАЙЛ: core/i18n.py (v2.14 | 23.11.2026 07:05) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 from functools import lru_cache
 
@@ -390,7 +391,19 @@ EN_EXACT = {
     "Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).": "Graphical server (DISPLAY/WSLg) unavailable — console mode (--cli) enabled automatically.",
     "Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.": "Backup folder on Windows drive (/mnt/): POSIX permissions not applied, I/O speed is lower.",
     "Помилка мережі": "Network error",
+    # patch-id: pcloud-only-simple-ui-2.27
     "Завдання Linux не знайдено або вже видалено.": "Linux task not found or already deleted.",
+    "5. Налаштування pCloud": "5. pCloud Settings",
+    "Увімкнути синхронізацію з pCloud": "Enable pCloud sync",
+    "Зберігати архів у pCloud": "Save archive to pCloud",
+    "Зберігати журнал у pCloud": "Save log to pCloud",
+    "Авторизація pCloud": "Authorize pCloud",
+    "Перевірити вільне місце": "Check free space",
+    "pCloud підключено.": "pCloud connected.",
+    "pCloud ще не авторизовано. Натисніть «Авторизація pCloud».": "pCloud is not authorized yet. Click «Authorize pCloud».",
+    "Оберіть хоча б один пункт: зберігати архів або журнал.": "Select at least one option: save archive or save log.",
+    "Підключення pCloud уже існує. Виконати повторну авторизацію?": "pCloud connection already exists. Re-authorize?",
+    "Активовано X11-меню трею (Tkinter) для сумісності зі середовищем без AppIndicator.": "X11 tray menu (Tkinter) enabled for environments without AppIndicator.",
 }
 
 EN_SUBSTR = sorted([
