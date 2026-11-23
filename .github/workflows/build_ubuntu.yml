@@ -146,7 +146,7 @@ jobs:
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
-      - name: Delete old releases and tags
+      - name: Delete old Ubuntu release and tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -157,6 +157,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ubuntu-x64-latest
+          target_commitish: ${{ github.sha }}
           name: HomeGrid Backup — Ubuntu (Linux x86_64)
           body: |
             Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
@@ -164,4 +165,4 @@ jobs:
             - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
             Вимоги: Ubuntu 24.04 або новіша, для іконки в треї потрібен AppIndicator.
           files: homegrid-backup-ubuntu-x86_64.7z
-          make_latest: true
+          make_latest: false
