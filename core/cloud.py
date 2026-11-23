@@ -22,11 +22,6 @@ _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 _CLOUD_SYNC_LOCK = threading.Lock()
 _RCLONE_VERSION = None
 RCLONE_PROVIDERS = (
-    ("Google Drive", "drive", "gdrive"),
-    ("OneDrive", "onedrive", "onedrive"),
-    ("Dropbox", "dropbox", "dropbox"),
-    ("Box", "box", "box"),
-    ("pCloud", "pcloud", "pcloud"),
     ("MEGA", "mega", "mega"),
     ("Koofr", "koofr", "koofr"),
 )
