@@ -7,7 +7,8 @@
 # patch-id: linux-xorg-tray-menu-2.26
 # patch-id: macos-tray-quit-apps-2.41
 # patch-id: cumulative-linux-tray-pcloud-menu-2.42
-# [ФАЙЛ: core/config.py (v2.28 | 23.11.2026 16:20) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: linux-i386-installer-ldd-uninstall-2.43
+# [ФАЙЛ: core/config.py (v2.29 | 23.11.2026 16:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -76,7 +77,7 @@ except Exception:
 # patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: dashboard-redesign-2.34
 # patch-id: center-storage-notepad-2.40
-SCRIPT_VER = "2.42"
+SCRIPT_VER = "2.43"
 BUILD_DATE = "23.11.2026 07:55"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 

@@ -1,4 +1,5 @@
 
+# patch-id: linux-i386-installer-ldd-uninstall-2.43
 name: Build HomeGrid Backup for Legacy Linux 32-bit (i386)
 
 on:
@@ -135,14 +136,18 @@ jobs:
           set -euo pipefail
           SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
           DEST="$HOME/.local/opt/HomeGridBackup"
-          mkdir -p "$DEST"
+          BIN_DIR="$HOME/.local/bin"
+          LINK_PATH="$BIN_DIR/homegrid-backup"
+          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
+
+          mkdir -p "$DEST" "$BIN_DIR" "$HOME/.local/share/applications"
           cp "$SCRIPT_DIR/HomeGridBackup" "$DEST/HomeGridBackup"
           cp "$SCRIPT_DIR/rclone" "$DEST/rclone"
           cp "$SCRIPT_DIR/rclone-LICENSE.txt" "$DEST/rclone-LICENSE.txt"
           cp "$SCRIPT_DIR/homegrid-backup.png" "$DEST/homegrid-backup.png"
           chmod +x "$DEST/HomeGridBackup" "$DEST/rclone"
-          mkdir -p "$HOME/.local/share/applications"
-          DESKTOP_FILE="$HOME/.local/share/applications/homegrid-backup.desktop"
+          ln -sf "$DEST/HomeGridBackup" "$LINK_PATH"
+
           cat > "$DESKTOP_FILE" << EOD
           [Desktop Entry]
           Type=Application
@@ -155,7 +160,85 @@ jobs:
           Categories=Utility;Archiving;
           EOD
           chmod 644 "$DESKTOP_FILE"
-          printf 'HomeGrid Backup installed to %s\n' "$DEST"
+
+          cat > "$DEST/uninstall.sh" << 'EOU'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          EXPECTED_DEST="$HOME/.local/opt/HomeGridBackup"
+          if [ -z "${HOME:-}" ] || [ "$EXPECTED_DEST" != "$HOME/.local/opt/HomeGridBackup" ]; then
+            echo "ERROR: Небезпечний шлях видалення, операцію скасовано."
+            exit 1
+          fi
+          rm -f "$HOME/.local/bin/homegrid-backup"
+          rm -f "$HOME/.local/share/applications/homegrid-backup.desktop"
+          if [ -d "$EXPECTED_DEST" ]; then
+            rm -rf "$EXPECTED_DEST"
+          fi
+          echo "HomeGrid Backup видалено."
+          echo "Налаштування (~/.backup_hgm) та архіви збережено (за потреби видаліть їх вручну)."
+          EOU
+          chmod +x "$DEST/uninstall.sh"
+
+          printf 'HomeGrid Backup встановлено в: %s
+' "$DEST"
+          printf 'Команда запуску: homegrid-backup (видалення: %s/uninstall.sh)
+' "$DEST"
+          case ":$PATH:" in
+            *":$BIN_DIR:"*) ;;
+            *) printf 'Підказка: відкрийте новий термінал або виконайте: source ~/.profile
+' ;;
+          esac
+
+          if command -v ldd >/dev/null 2>&1; then
+            MISSING_LIBS="$(ldd "$DEST/HomeGridBackup" 2>/dev/null | grep "not found" | awk '{print $1}' | sort -u || true)"
+            if [ -n "$MISSING_LIBS" ]; then
+              HOST_ARCH="$(uname -m || true)"
+              PKG_SFX=""
+              PRE_CMD=""
+              if [ "$HOST_ARCH" = "x86_64" ]; then
+                PKG_SFX=":i386"
+                PRE_CMD="sudo dpkg --add-architecture i386 && "
+              fi
+              PKGS=""
+              for lib in $MISSING_LIBS; do
+                case "$lib" in
+                  libz.so*) p="zlib1g" ;;
+                  libX11.so*) p="libx11-6" ;;
+                  libXext.so*) p="libxext6" ;;
+                  libXrender.so*) p="libxrender1" ;;
+                  libXft.so*) p="libxft2" ;;
+                  libfontconfig.so*) p="libfontconfig1" ;;
+                  libssl.so*|libcrypto.so*) p="libssl1.1" ;;
+                  libffi.so*) p="libffi6" ;;
+                  *) p="" ;;
+                esac
+                if [ -n "$p" ]; then
+                  case " $PKGS " in
+                    *" ${p}${PKG_SFX} "*) ;;
+                    *) PKGS="$PKGS ${p}${PKG_SFX}" ;;
+                  esac
+                fi
+              done
+              printf '
+[УВАГА] Відсутні системні бібліотеки:
+%s
+' "$MISSING_LIBS"
+              if [ -n "$PKGS" ]; then
+                printf 'Для встановлення виконайте:
+  %ssudo apt update && sudo apt install -y%s
+' "$PRE_CMD" "$PKGS"
+              fi
+            fi
+          fi
+
+          DE_UP="$(printf '%s %s' "${XDG_CURRENT_DESKTOP:-}" "${DESKTOP_SESSION:-}" | tr '[:lower:]' '[:upper:]')"
+          if [[ "$DE_UP" == *XFCE* ]] && ! command -v xfce4-statusnotifier-plugin >/dev/null 2>&1 && ! dpkg -s xfce4-statusnotifier-plugin >/dev/null 2>&1; then
+            printf 'Підказка для трею XFCE: sudo apt install -y xfce4-statusnotifier-plugin (і додайте «Status Notifier» на панель)
+'
+          elif [[ "$DE_UP" == *GNOME* ]] && ! dpkg -s gnome-shell-extension-appindicator >/dev/null 2>&1; then
+            printf 'Підказка для трею GNOME: sudo apt install -y gnome-shell-extension-appindicator gir1.2-ayatanaappindicator3-0.1
+'
+          fi
           INSTALL_EOF
           chmod +x dist32/install.sh
           cp icon.png dist32/homegrid-backup.png
