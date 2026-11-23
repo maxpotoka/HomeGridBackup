@@ -100,8 +100,13 @@ jobs:
           set -euo pipefail
           SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
           APP_SOURCE="$SCRIPT_DIR/HomeGridBackup.app"
-          DEST="$HOME/Applications/HomeGridBackup.app"
-          mkdir -p "$HOME/Applications"
+          if [ -w "/Applications" ]; then
+            DEST="/Applications/HomeGridBackup.app"
+          else
+            mkdir -p "$HOME/Applications"
+            DEST="$HOME/Applications/HomeGridBackup.app"
+          fi
+          rm -rf "$DEST"
           ditto "$APP_SOURCE" "$DEST"
           printf 'HomeGrid Backup installed to %s\n' "$DEST"
           INSTALL_EOF
@@ -137,7 +142,7 @@ jobs:
           name: HomeGrid Backup — macOS Intel (x86_64) — ${{ steps.build_time.outputs.value }}
           body: |
             Архів **HomeGridBackup_macOS_Intel.7z** збережений. Також доданий пер-користувацький образ **HomeGridBackup_macOS_Intel.dmg**.
-            В образі запустіть `Install HomeGridBackup.command`; програма встановиться в `~/Applications/HomeGridBackup.app` без прав адміністратора. Rclone 1.76.0 входить у комплект.
+            В образі запустіть `Install HomeGridBackup.command`; програма встановиться в `/Applications/HomeGridBackup.app` (або `~/Applications/HomeGridBackup.app`, якщо немає прав запису в `/Applications`). Rclone 1.76.0 входить у комплект.
           files: |
             dist_mac/HomeGridBackup_macOS_Intel.7z
             dist_mac/HomeGridBackup_macOS_Intel.dmg

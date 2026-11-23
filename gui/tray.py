@@ -2,7 +2,9 @@
 # patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: linux-wayland-sni-bridge-2.32
 # patch-id: linux-xorg-tray-menu-2.26
-# [ФАЙЛ: gui/tray.py (v2.07 | 23.11.2026 07:05)
+# patch-id: macos-tray-quit-apps-2.41
+# patch-id: cumulative-linux-tray-pcloud-menu-2.42
+# [ФАЙЛ: gui/tray.py (v2.09 | 23.11.2026 16:20)
 # patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
 import os
@@ -10,6 +12,32 @@ import time
 import ctypes
 import threading
 
+
+import queue as _queue_mod
+_TRAY_UI_QUEUE = _queue_mod.SimpleQueue()
+
+def _enqueue_tray_ui(fn):
+    if callable(fn):
+        _TRAY_UI_QUEUE.put(fn)
+
+def drain_tray_ui_queue():
+    while True:
+        try:
+            fn = _TRAY_UI_QUEUE.get_nowait()
+        except Exception:
+            break
+        try:
+            fn()
+        except Exception:
+            pass
+
+def _linux_tray_diag_line():
+    sess = os.environ.get("XDG_SESSION_TYPE", "?")
+    de = os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "?"
+    disp = os.environ.get("DISPLAY", "-")
+    wdisp = os.environ.get("WAYLAND_DISPLAY", "-")
+    dbus = "yes" if os.environ.get("DBUS_SESSION_BUS_ADDRESS") else "no"
+    return f"[TRAY DIAG] OS=Linux | session={sess} | DE={de} | DISPLAY={disp} | WAYLAND={wdisp} | DBUS={dbus} | backend={_LNX_TRAY_BE or 'none'}"
 
 def _clean_sys_env():
     env = os.environ.copy()
@@ -195,6 +223,7 @@ def _status_gradient_rgb(pct, is_run, pill_type):
 
 def _show_wayland_fallback_badge(engine):
     import sys
+    import tkinter as tk
     if not sys.platform.startswith("linux") or engine.app_ref is None:
         return
     app = engine.app_ref
@@ -256,15 +285,14 @@ def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
 
 def _force_quit_app(engine):
     _TRAY_STOP.set()
-    if os.sys.platform != "darwin":
-        try:
-            if engine.tray_icon is not None:
-                engine.tray_icon.visible = False
-                engine.tray_icon.stop()
-                engine.tray_icon = None
-                time.sleep(0.12)
-        except Exception:
-            pass
+    try:
+        if engine.tray_icon is not None:
+            engine.tray_icon.visible = False
+            engine.tray_icon.stop()
+            engine.tray_icon = None
+            time.sleep(0.12)
+    except Exception:
+        pass
     try:
         if engine.app_ref is not None:
             engine.app_ref.root.quit()
@@ -316,19 +344,6 @@ def _tray_problem():
 def _start_tray_thread(engine):
     global _TRAY_STARTED, _LNX_TRAY_BE, _LNX_TRAY_PROBED
 
-    if os.sys.platform == "darwin":
-        with _TRAY_LOCK:
-            if _TRAY_STARTED:
-                return
-            _TRAY_STARTED = True
-            engine.tray_icon = None
-            engine.tray_ready = True
-            engine.tray_error = ""
-            engine.tray_ready_event = threading.Event()
-            engine.tray_ready_event.set()
-        engine.log("Системний трей macOS не запускається — для керування використовується значок у Dock.", "info")
-        return
-
     if os.sys.platform.startswith("linux"):
         with _LNX_PROBE_LOCK:
             if not _LNX_TRAY_PROBED:
@@ -338,6 +353,7 @@ def _start_tray_thread(engine):
                 def _probe_linux_tray():
                     global _LNX_TRAY_BE
                     _LNX_TRAY_BE = _detect_linux_tray_backend()
+                    engine.log(_linux_tray_diag_line(), "info")
                     if _LNX_TRAY_BE == "sni-bridge":
                         if _start_wayland_sni_bridge(engine):
                             with _TRAY_LOCK:
@@ -353,8 +369,7 @@ def _start_tray_thread(engine):
                         engine.tray_icon = None
                         engine.tray_ready_event.set()
                         engine.log(_tray_problem(), "warn")
-                        if engine.app_ref is not None:
-                            engine.app_ref.root.after(0, lambda: _show_wayland_fallback_badge(engine))
+                        _enqueue_tray_ui(lambda: _show_wayland_fallback_badge(engine))
                         return
                     _start_tray_thread(engine)
 
@@ -390,7 +405,7 @@ def _start_tray_thread(engine):
 
     def _on_open(icon, item):
         if engine.app_ref is not None:
-            engine.app_ref.root.after(0, engine.app_ref.show_window)
+            _enqueue_tray_ui(engine.app_ref.show_window)
 
     def _on_backup(icon, item):
         if engine.is_running:
@@ -417,7 +432,7 @@ def _start_tray_thread(engine):
                     fn = getattr(engine.app_ref, method_name, None)
                     if callable(fn):
                         fn()
-                engine.app_ref.root.after(0, _run_ui_dlg)
+                _enqueue_tray_ui(_run_ui_dlg)
         return _cb
 
     run_started_at = None
@@ -443,6 +458,7 @@ def _start_tray_thread(engine):
             pystray.MenuItem(tr("Відкрити папку", lng_s), _on_open_folder),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tr("Статистика", lng_s), _on_open_dialog("open_stats_modal"), enabled=lambda item: engine.app_ref is not None),
+            pystray.MenuItem("☁ " + ("Статистика pCloud" if lng_s == "uk" else "pCloud Stats"), _on_open_dialog("open_cloud_stats_modal"), enabled=lambda item: engine.app_ref is not None),
             pystray.MenuItem(tr("Журнал операцій", lng_s), _on_open_dialog("open_ops_history"), enabled=lambda item: engine.app_ref is not None),
             pystray.MenuItem(tr("Аналіз GFS / SHA-256", lng_s), _on_open_dialog("open_analyze"), enabled=lambda item: engine.app_ref is not None),
             pystray.MenuItem(tr("Налаштування", lng_s), _on_open_dialog("open_settings"), enabled=lambda item: engine.app_ref is not None),
@@ -474,10 +490,7 @@ def _start_tray_thread(engine):
         engine.log("Не вдалося запустити значок системного трею.", "err")
         engine.log(f"[TRAY DETAIL] {engine.tray_error}", "err")
         if engine.app_ref is not None:
-            try:
-                engine.app_ref.root.after(0, engine.app_ref.root.deiconify)
-            except Exception:
-                pass
+            _enqueue_tray_ui(engine.app_ref.show_window)
 
     def _refresh_tray_menu():
         if engine.tray_icon is not None:
@@ -531,9 +544,7 @@ def _start_tray_thread(engine):
         try:
             ready_icon.visible = True
             engine.tray_ready = True
-            if "xorg" in type(ready_icon).__module__:
-                _attach_xorg_tk_menu(ready_icon, engine)
-                engine.log("Активовано X11-меню трею (Tkinter) для сумісності зі середовищем без AppIndicator.", "info")
+            engine.log(f"Значок системного трею активовано ({type(ready_icon).__module__}).", "info")
         except Exception as exc:
             _mark_tray_failed(exc)
         else:
@@ -546,84 +557,21 @@ def _start_tray_thread(engine):
             _mark_tray_failed(exc)
 
     threading.Thread(target=_anim_loop, daemon=True).start()
-    threading.Thread(target=_run_icon_safe, daemon=True).start()
-
-def _show_tk_tray_popup(engine, x_root, y_root):
-    import tkinter as tk
-    from core.backup import run_backup_task
-    from core.files import open_folder_native
-    from core.config import DEFAULT_BACKUP_DIR
-    from core.i18n import tr
-
-    app = engine.app_ref
-    if app is None:
-        return
-    lng = engine.state.get("lang", "en")
-    pal = app._get_palette() if hasattr(app, "_get_palette") else {"panel": "#1e293b", "text": "#f8fafc", "blue": "#2563eb", "muted": "#94a3b8"}
-    fs = app.metrics.get("font_sz", 10) if hasattr(app, "metrics") else 10
-    fam = getattr(app, "_base_fam", "Sans")
-    menu = tk.Menu(app.root, tearoff=0, bg=pal["panel"], fg=pal["text"], activebackground=pal["blue"], activeforeground="#ffffff", disabledforeground=pal["muted"], font=(fam, fs))
-    menu.add_command(label=tr("Відкрити HomeGrid Backup", lng), command=app.show_window, font=(fam, fs, "bold"))
-    menu.add_separator()
-    menu.add_command(label=_tray_status_text(engine, lng, 0), state="disabled")
-    menu.add_command(label=tr("▶ Запустити резервне копіювання", lng), state="disabled" if engine.is_running else "normal", command=lambda: threading.Thread(target=run_backup_task, args=(engine, engine.state.get("server", ""), False, False, False), daemon=True).start())
-    menu.add_command(label=tr("Відкрити папку", lng), command=lambda: open_folder_native(engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR))
-    menu.add_separator()
-    for title_key, method_name in (("Статистика", "open_stats_modal"), ("Журнал операцій", "open_ops_history"), ("Аналіз GFS / SHA-256", "open_analyze"), ("Налаштування", "open_settings")):
-        fn = getattr(app, method_name, None)
-        if callable(fn):
-            menu.add_command(label=tr(title_key, lng), command=lambda f=fn: (app.show_window(), f()))
-    menu.add_separator()
-    menu.add_command(label=tr("✖ Вихід", lng), command=lambda: _force_quit_app(engine))
-    try:
-        menu.tk_popup(x_root, y_root)
-    finally:
-        try:
-            menu.grab_release()
-        except Exception:
-            pass
-
-
-def _attach_xorg_tk_menu(icon, engine):
-    win_id = getattr(icon, "_window", None)
-    if not win_id or not os.environ.get("DISPLAY"):
-        return
-
-    def _x11_click_watcher():
-        try:
-            from ctypes.util import find_library
-            x11_path = find_library("X11")
-            if not x11_path:
-                return
-            x11 = ctypes.CDLL(x11_path)
-            class XButtonEvent(ctypes.Structure):
-                _fields_ = [("type", ctypes.c_int), ("serial", ctypes.c_ulong), ("send_event", ctypes.c_int), ("display", ctypes.c_void_p), ("window", ctypes.c_ulong), ("root", ctypes.c_ulong), ("subwindow", ctypes.c_ulong), ("time", ctypes.c_ulong), ("x", ctypes.c_int), ("y", ctypes.c_int), ("x_root", ctypes.c_int), ("y_root", ctypes.c_int), ("state", ctypes.c_uint), ("button", ctypes.c_uint), ("same_screen", ctypes.c_int)]
-            class XEvent(ctypes.Union):
-                _fields_ = [("type", ctypes.c_int), ("xbutton", XButtonEvent), ("pad", ctypes.c_long * 24)]
-            x11.XOpenDisplay.argtypes, x11.XOpenDisplay.restype = [ctypes.c_char_p], ctypes.c_void_p
-            x11.XSelectInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_long]
-            x11.XPending.argtypes, x11.XPending.restype = [ctypes.c_void_p], ctypes.c_int
-            x11.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.POINTER(XEvent)]
-            x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
-            disp = x11.XOpenDisplay(os.environ["DISPLAY"].encode("utf-8"))
-            if not disp:
-                return
-            x11.XSelectInput(disp, win_id, 1 << 2)
-            ev = XEvent()
+    if os.sys.platform == "darwin":
+        def _start_mac_detached():
             try:
-                while not _TRAY_STOP.is_set() and engine.tray_icon is not None:
-                    while x11.XPending(disp) > 0:
-                        x11.XNextEvent(disp, ctypes.byref(ev))
-                        if ev.type == 4 and engine.app_ref is not None:
-                            rx, ry = ev.xbutton.x_root, ev.xbutton.y_root
-                            engine.app_ref.root.after(0, lambda x=rx, y=ry: _show_tk_tray_popup(engine, x, y))
-                    _TRAY_STOP.wait(0.08)
-            finally:
-                x11.XCloseDisplay(disp)
-        except Exception:
-            pass
-
-    threading.Thread(target=_x11_click_watcher, daemon=True).start()
+                if hasattr(icon, "run_detached"):
+                    icon.run_detached(setup=_on_icon_setup)
+                else:
+                    _on_icon_setup(icon)
+            except Exception as exc:
+                _mark_tray_failed(exc)
+        if engine.app_ref is not None:
+            engine.app_ref.root.after(0, _start_mac_detached)
+        else:
+            _start_mac_detached()
+    else:
+        threading.Thread(target=_run_icon_safe, daemon=True).start()
 
 
 
@@ -739,7 +687,7 @@ def _start_wayland_sni_bridge(engine):
                 "settings": lambda: (app.show_window(), app.open_settings()),
             }
             if cmd in acts:
-                app.root.after(0, acts[cmd])
+                _enqueue_tray_ui(acts[cmd])
 
     def _read_loop():
         for ln in proc.stdout:
@@ -789,7 +737,7 @@ def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowW
                     data = conn.recv(16)
                     conn.close()
                     if b"SHOW" in data and engine.app_ref is not None:
-                        engine.app_ref.root.after(0, engine.app_ref.show_window)
+                        _enqueue_tray_ui(engine.app_ref.show_window)
             except Exception:
                 pass
         threading.Thread(target=_posix_wait_loop, daemon=True).start()

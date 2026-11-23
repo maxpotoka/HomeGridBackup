@@ -6,7 +6,9 @@ from core.i18n import tr, apply_widget_i18n
 # patch-id: mirror-btn-sig-2.22
 # patch-id: adaptive-ui-poll-2.11
 # patch-id: ui-widget-signatures-2.12
-# [ФАЙЛ: gui/window.py (v2.12 | 22.11.2026 09:40) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: macos-tray-quit-apps-2.41
+# patch-id: cumulative-linux-tray-pcloud-menu-2.42
+# [ФАЙЛ: gui/window.py (v2.14 | 23.11.2026 16:20) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -20,7 +22,7 @@ from core.network import normalize_server_url, run_connect_task, run_scan_task
 from core.backup import run_backup_task
 from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip, fix_mac_buttons
 from gui.widgets import StyledProgressBar
-from gui.tray import HAS_TRAY, _start_tray_thread
+from gui.tray import HAS_TRAY, _start_tray_thread, drain_tray_ui_queue
 from gui.dialogs import DialogsMixin
 
 class HomeGridApp(DialogsMixin):
@@ -113,9 +115,11 @@ class HomeGridApp(DialogsMixin):
             app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
             app_menu.add_separator()
             app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
-            app_menu.add_separator()
-            app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
             menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
+            try:
+                self.root.createcommand("tk::mac::Quit", self.confirm_exit)
+            except Exception:
+                pass
             self.root.configure(menu=menubar)
         except Exception:
             pass
@@ -832,6 +836,7 @@ class HomeGridApp(DialogsMixin):
 
     def _poll_ui(self):
         try:
+            drain_tray_ui_queue()
             if self.root.state() in ("iconic", "withdrawn"):
                 if self.engine.modal and self.engine.modal.get("id") != self.last_modal_id:
                     self.last_modal_id = self.engine.modal["id"]
