@@ -2,7 +2,11 @@
 # patch-id: stage-window-2.21
 # patch-id: android-storage-fallback-2.13
 # patch-id: linux-xorg-tray-menu-2.26
-# [ФАЙЛ: core/i18n.py (v2.14 | 23.11.2026 07:05) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# patch-id: card-conn-copies-2.59
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: dest-stats-bg-worker-2.61
+# patch-id: speed-journal-auto-target-2.62
+# [ФАЙЛ: core/i18n.py (v2.18 | 23.11.2026 23:00) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 from functools import lru_cache
 
@@ -432,6 +436,29 @@ EN_EXACT = {
     "4. Оформлення, мова та масштаб екрана": "4. Theme, Language & Screen Scale",
     "Журнал операцій": "Operations Log",
     "Статистика pCloud": "pCloud Stats",
+    "Джерело:": "Source:",
+    "Копії:": "Copies:",
+    "Дзеркало": "Mirror",
+    "Мережа": "Network",
+    "● онлайн": "● online",
+    "● офлайн": "● offline",
+    "● увімкнено": "● enabled",
+    "● вимкнено": "● disabled",
+    "Обрати мережеву папку": "Select network folder",
+    "Налаштування pCloud": "pCloud settings",
+    "Історія адрес та автопошук у LAN": "Address history and LAN auto-scan",
+    "Папка файлів протоколів (backup.log та звіти)": "Protocol files folder (backup.log & reports)",
+    "Як папка архівів": "Same as archives folder",
+    "Порожньо = зберігати поруч із ZIP-архівами (у папці «Архіви»).": "Empty = store alongside ZIP archives (in Archives folder).",
+    "ДЗЕРКАЛО:": "MIRROR:",
+    "МЕРЕЖА:": "NETWORK:",
+    "оновлення...": "updating...",
+    "недоступно": "unavailable",
+    "Авто (pCloud → Мережа при наявності)": "Auto (pCloud → Network if available)",
+    "Тільки pCloud": "pCloud only",
+    "Тільки мережева папка (Мережа)": "Network folder only (Network)",
+    "Обидва (pCloud + Мережа)": "Both (pCloud + Network)",
+    "Протоколи для рейтингу швидкості (між ОС):": "Speed ranking logs storage (cross-OS):",
     "Підключення та папки": "Connection & Folders",
     "Сховище та аналітика": "Storage & Analytics",
     "Сервер:": "Server:",
@@ -534,7 +561,7 @@ EN_SUBSTR = sorted([
     ("Швидкість:", "Speed:"), ("Архів завантажено:", "Archive downloaded:"),
     ("Цілісність перевірено", "Integrity verified"), ("Цілісність 100% підтверджена", "Integrity 100% verified"),
     ("файлів", "files"), ("файл(ів)", "file(s)"), ("Збережено", "Saved"),
-    ("Дзеркальну копію збережено у:", "Mirror copy saved to:"),
+    ("Мережеву копію збережено у:", "Network copy saved to:"), ("Папку мережі змінено на:", "Network folder changed to:"), ("Попередження: не вдалося скопіювати у мережеву папку", "Warning: failed to copy to network folder"), ("Попередження: не вдалося оновити мережевий журнал швидкості:", "Warning: failed to update network speed journal:"), ("Дзеркальну копію збережено у:", "Mirror copy saved to:"),
     ("Налаштування та ключі захищено збережено.", "Settings and keys securely saved."),
     ("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "Application, theme, font, and GFS settings applied."),
     ("Ротація бекапів за обраною стратегією...", "Running GFS backup rotation..."),

@@ -18,7 +18,11 @@
 # patch-id: pcloud-compact-sync-icon-2.54
 # patch-id: pcloud-disable-and-freespace-2.57
 # patch-id: destination-copies-network-journal-2.58-1a
-# [ФАЙЛ: core/config.py (v2.40 | 23.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: card-conn-copies-2.59
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: dest-stats-bg-worker-2.61
+# patch-id: speed-journal-auto-target-2.62
+# [ФАЙЛ: core/config.py (v2.44 | 23.11.2026 23:00) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -89,7 +93,7 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.58"
+SCRIPT_VER = "2.62"
 BUILD_DATE = "23.11.2026 20:30"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
@@ -325,6 +329,17 @@ _LOG_WRITE_CNT = {}
 _LOG_HANDLES = {}
 _LOG_LOCK = threading.Lock()
 
+def get_logs_dir(state=None):
+    if isinstance(state, dict):
+        ld = (state.get("logs_dir") or "").strip()
+        if ld:
+            return os.path.normpath(os.path.expanduser(ld))
+        bd = (state.get("backup_dir") or "").strip()
+        if bd:
+            return os.path.normpath(os.path.expanduser(bd))
+    return DEFAULT_BACKUP_DIR
+
+
 def write_file_log(text, target_dir=None):
     from datetime import datetime
     d = target_dir or DEFAULT_BACKUP_DIR
@@ -382,8 +397,8 @@ def record_server_history(state, srv_url):
 def load_state():
     state = {
         "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
-        "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR,
-        "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "journal_sync_target": "pcloud",
+        "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR, "logs_dir": "",
+        "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "journal_sync_target": "auto",
         "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
@@ -412,6 +427,8 @@ def load_state():
                 state["server_history"] = [str(x).strip() for x in data["server_history"] if str(x).strip()][:15]
             if data.get("backup_dir"):
                 state["backup_dir"] = os.path.expanduser(str(data["backup_dir"]).strip())
+            if data.get("logs_dir"):
+                state["logs_dir"] = os.path.expanduser(str(data["logs_dir"]).strip())
             if data.get("mirror_dir"):
                 state["mirror_dir"] = os.path.expanduser(str(data["mirror_dir"]).strip())
             if isinstance(data.get("mirror_enabled"), bool):
@@ -420,7 +437,7 @@ def load_state():
                 state["net_dir"] = os.path.expanduser(str(data["net_dir"]).strip())
             if isinstance(data.get("net_enabled"), bool):
                 state["net_enabled"] = data["net_enabled"] and bool(state["net_dir"])
-            if data.get("journal_sync_target") in ("pcloud", "network", "both"):
+            if data.get("journal_sync_target") in ("auto", "pcloud", "network", "both"):
                 state["journal_sync_target"] = data["journal_sync_target"]
             if not IS_ANDROID and isinstance(data.get("cloud_enabled"), bool):
                 state["cloud_enabled"] = data["cloud_enabled"]
@@ -526,7 +543,7 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "mirror_dir", "mirror_enabled",
+        "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "logs_dir", "mirror_dir", "mirror_enabled",
         "net_dir", "net_enabled", "journal_sync_target",
         "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",

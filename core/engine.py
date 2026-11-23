@@ -4,7 +4,9 @@ from core.i18n import tr
 # patch-id: stage-window-2.21
 # patch-id: archive-scan-cache-2.04
 # patch-id: android-storage-fallback-2.06
-# [ФАЙЛ: core/engine.py (v2.06 | 22.11.2026 08:51) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: dest-stats-bg-worker-2.61
+# [ФАЙЛ: core/engine.py (v2.08 | 23.11.2026 22:15) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -15,7 +17,7 @@ import threading
 from datetime import datetime
 from core.config import (
     SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN,
-    IS_WSL, WSL_DISTRO, load_state, write_file_log, get_fast_sysinfo
+    IS_WSL, WSL_DISTRO, load_state, write_file_log, get_logs_dir, get_fast_sysinfo
 )
 
 _CON_TR_MAP = (
@@ -118,6 +120,9 @@ class BackupEngine:
         self._archive_snapshot_cache = None
         self._archive_snapshot_cache_time = 0.0
         self._archive_snapshot_cache_dir = None
+        self._dest_stats = {"mirror": None, "network": None, "pcloud": None}
+        self._dest_stats_event = threading.Event()
+        self._dest_stats_started = False
 
         os.makedirs(self.state["backup_dir"], exist_ok=True)
         mode_lbl = "HIDDEN" if HIDDEN_MODE else ("SILENT" if SILENT_MODE else ("CLI" if CLI_MODE else "APP"))
@@ -141,7 +146,7 @@ class BackupEngine:
     def log(self, msg, level="info"):
         msg = tr(msg, self.state.get("lang", "en"))
         ts = datetime.now().strftime("%H:%M:%S")
-        write_file_log(f"[{level.upper()}] {msg}", self.state.get("backup_dir"))
+        write_file_log(f"[{level.upper()}] {msg}", get_logs_dir(self.state))
         if CLI_MODE or (SILENT_MODE and not HIDDEN_MODE):
             from console.terminal import _finish_cli_inline, _safe_con_write
             _finish_cli_inline(self)
@@ -207,6 +212,53 @@ class BackupEngine:
             self.modal = None
         self.modal_result = val
         self.modal_event.set()
+
+    def start_dest_stats_worker(self):
+        if getattr(self, "_dest_stats_started", False):
+            self._dest_stats_event.set()
+            return
+        self._dest_stats_started = True
+        threading.Thread(target=self._dest_stats_loop, name="dest-stats-worker", daemon=True).start()
+
+    def request_dest_stats_refresh(self):
+        if not getattr(self, "_dest_stats_started", False):
+            self.start_dest_stats_worker()
+        else:
+            self._dest_stats_event.set()
+
+    def _scan_dir_brief(self, raw_path):
+        p = os.path.expanduser((raw_path or "").strip())
+        if not p or not os.path.isdir(p):
+            return {"ok": False}
+        cnt, total_b = 0, 0
+        try:
+            with os.scandir(p) as it:
+                for entry in it:
+                    if not entry.name.startswith(".") and entry.name.lower().endswith(".zip") and entry.is_file(follow_symlinks=False):
+                        cnt += 1
+                        total_b += entry.stat(follow_symlinks=False).st_size
+            _, _, free_b = shutil.disk_usage(p)
+            free_gb = round(free_b / 1073741824.0, 1)
+        except Exception:
+            return {"ok": False}
+        return {"ok": True, "count": cnt, "mb": round(total_b / 1048576.0, 1), "free_gb": free_gb}
+
+    def _dest_stats_loop(self):
+        while True:
+            self._dest_stats_event.clear()
+            st = self.state
+            mir_res = self._scan_dir_brief(st.get("mirror_dir")) if (st.get("mirror_enabled") and (st.get("mirror_dir") or "").strip()) else None
+            net_res = self._scan_dir_brief(st.get("net_dir")) if (st.get("net_enabled") and (st.get("net_dir") or "").strip()) else None
+            cld_res = None
+            if st.get("cloud_enabled"):
+                try:
+                    from core.cloud import get_cloud_dest_stats
+                    cld_res = get_cloud_dest_stats(st)
+                except Exception:
+                    cld_res = {"ok": False}
+            with self.lock:
+                self._dest_stats = {"mirror": mir_res, "network": net_res, "pcloud": cld_res}
+            self._dest_stats_event.wait(150.0)
 
     def get_storage_stats(self, force=False):
         bdir = self.state["backup_dir"]
@@ -308,6 +360,7 @@ class BackupEngine:
         self._storage_stats_cache_time = 0.0
         self._last_backup_cache_time = 0.0
         self._archive_snapshot_cache_time = 0.0
+        self.request_dest_stats_refresh()
         try:
             commit_state(self.state)
         except Exception:

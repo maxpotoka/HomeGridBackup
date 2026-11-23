@@ -2,7 +2,9 @@
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
 # patch-id: adaptive-status-poll-2.11
-# [ФАЙЛ: core/backup.py (v2.12 | 22.11.2026 09:10) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: card-conn-copies-2.59
+# patch-id: speed-journal-auto-target-2.62
+# [ФАЙЛ: core/backup.py (v2.14 | 23.11.2026 23:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -37,17 +39,36 @@ def _cloud_sync_warning(engine, prefix, exc):
         engine.log(f"{prefix}{exc}", "warn")
 
 def _sync_cloud_reports(engine):
-    if not engine.state.get("cloud_enabled"):
-        return
-    try:
-        from core.cloud import sync_cloud_reports
-        sync_cloud_reports(engine)
-    except Exception as exc:
-        _cloud_sync_warning(engine, "Попередження: не вдалося передати хмарний звіт: ", exc)
-        from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            from core.cloud import start_cloud_sync_worker
-            start_cloud_sync_worker(engine)
+    st = engine.state
+    mode = st.get("journal_sync_target") or "auto"
+    cld_on = bool(st.get("cloud_enabled"))
+    net_dir = os.path.expanduser((st.get("net_dir") or "").strip())
+    net_avail = bool(net_dir and os.path.isdir(net_dir))
+    if mode == "auto":
+        use_cld = cld_on
+        use_net = (not cld_on) and net_avail
+    elif mode == "pcloud":
+        use_cld, use_net = cld_on, False
+    elif mode == "network":
+        use_cld, use_net = False, net_avail
+    else:
+        use_cld, use_net = cld_on, net_avail
+    if use_cld:
+        try:
+            from core.cloud import sync_cloud_reports
+            sync_cloud_reports(engine)
+        except Exception as exc:
+            _cloud_sync_warning(engine, "Попередження: не вдалося передати хмарний звіт: ", exc)
+            from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+            if WINDOWS7_CLOUD_SYNC_PREVIEW:
+                from core.cloud import start_cloud_sync_worker
+                start_cloud_sync_worker(engine)
+    if use_net:
+        try:
+            from core.cloud import sync_network_shared_journal
+            sync_network_shared_journal(engine)
+        except Exception as exc:
+            engine.log(f"Попередження: не вдалося оновити мережевий журнал швидкості: {exc}", "warn")
 
 def _sync_cloud_backups(engine, prune=False, progress_cb=None):
     if not engine.state.get("cloud_enabled"):
@@ -329,6 +350,25 @@ def _copy_to_mirror(engine, out_file, sha_file):
         engine.log(f"Дзеркальну копію збережено у: {dst_real}", "ok")
     except Exception as e:
         engine.log(f"Попередження: не вдалося скопіювати у дзеркальну папку ({mirror_dir}): {e}", "warn")
+
+def _copy_to_network(engine, out_file, sha_file):
+    if not bool(engine.state.get("net_enabled", False)):
+        return
+    net_dir = (engine.state.get("net_dir") or "").strip()
+    if not net_dir or net_dir in (".", "./", ".\\", "/", "\\"):
+        return
+    try:
+        src_real = os.path.normcase(os.path.realpath(os.path.dirname(out_file)))
+        dst_real = os.path.normcase(os.path.realpath(os.path.expanduser(net_dir)))
+        if src_real == dst_real:
+            return
+        os.makedirs(dst_real, exist_ok=True)
+        shutil.copy2(out_file, os.path.join(dst_real, os.path.basename(out_file)))
+        if os.path.exists(sha_file):
+            shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
+        engine.log(f"Мережеву копію збережено у: {dst_real}", "ok")
+    except Exception as e:
+        engine.log(f"Попередження: не вдалося скопіювати у мережеву папку ({net_dir}): {e}", "warn")
 
 def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
     engine.log(f"Збірка архіву на сервері {srv_label}...", "info")
@@ -647,6 +687,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
                 archive=out_file, duration_sec=mir_duration
             )
 
+        _copy_to_network(engine, out_file, sha_file)
         if engine.state["dirty"]:
             commit_state(engine.state)
             engine.log("Налаштування та ключі захищено збережено.", "ok")

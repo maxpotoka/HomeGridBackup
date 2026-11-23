@@ -8,14 +8,17 @@ from core.i18n import tr, apply_widget_i18n
 # patch-id: ui-widget-signatures-2.12
 # patch-id: macos-tray-quit-apps-2.41
 # patch-id: cumulative-linux-tray-pcloud-menu-2.42
-# [ФАЙЛ: gui/window.py (v2.14 | 23.11.2026 16:20) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# patch-id: card-conn-copies-2.59
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: dest-stats-bg-worker-2.61
+# [ФАЙЛ: gui/window.py (v2.17 | 23.11.2026 22:15) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
 import tkinter as tk
 # patch-id: center-storage-notepad-2.40
 # patch-id: dashboard-redesign-2.34
-from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY
+from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY, get_logs_dir
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 from core.files import open_folder_native, choose_folder_native, get_app_icon_path
 from core.network import normalize_server_url, run_connect_task, run_scan_task
@@ -66,6 +69,7 @@ class HomeGridApp(DialogsMixin):
         self.var_srv = tk.StringVar(value=self.engine.state.get("server", ""))
         self.var_dir = tk.StringVar(value=self.engine.state.get("backup_dir", ""))
         self.var_mirror = tk.StringVar(value=self.engine.state.get("mirror_dir", ""))
+        self.var_net_dir = tk.StringVar(value=self.engine.state.get("net_dir", ""))
         self.var_net = tk.StringVar(value="Не перевірено")
         self.var_disk = tk.StringVar(value="0 архівів (0 МБ)")
         self.var_last_bkp = tk.StringVar(value="Перевірка...")
@@ -100,6 +104,8 @@ class HomeGridApp(DialogsMixin):
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
+        if hasattr(self.engine, 'start_dest_stats_worker'):
+            self.engine.start_dest_stats_worker()
         if WINDOWS7_CLOUD_SYNC_PREVIEW and self.engine.state.get("cloud_enabled"):
             self.root.after(5000, self._retry_pending_cloud_sync)
 
@@ -333,55 +339,95 @@ class HomeGridApp(DialogsMixin):
 
         self.card_conn = tk.Frame(self.top_split, padx=px, pady=py, bd=0, highlightthickness=1)
         self.card_conn.grid(row=0, column=0, sticky="nsew", padx=(0, max(6, px // 2)))
-        c1_hdr = tk.Frame(self.card_conn)
-        c1_hdr.pack(fill="x", pady=(0, 6))
+        c1_hdr = tk.Frame(self.card_conn, bd=0, highlightthickness=0)
+        c1_hdr.pack(fill="x", pady=(0, 4))
         self.lbl_c1 = tk.Label(c1_hdr, text="Підключення та папки", font=(self._base_fam, fs, "bold"))
         self.lbl_c1.pack(side="left")
         self.var_srv_badge = tk.StringVar(value="")
         self.lbl_srv_badge = tk.Label(c1_hdr, textvariable=self.var_srv_badge, font=(self._base_fam, max(8, fs - 1), "bold"))
         self.lbl_srv_badge.pack(side="right")
 
-        cg = tk.Frame(self.card_conn)
+        cg = tk.Frame(self.card_conn, bd=0, highlightthickness=0)
         cg.pack(fill="x")
+        cg.columnconfigure(0, minsize=max(106, fs * 11))
         cg.columnconfigure(1, weight=1)
+        cg.columnconfigure(2, minsize=max(34, fs * 3), uniform="cc_mid")
+        cg.columnconfigure(3, minsize=max(102, fs * 10), uniform="cc_act")
+
         self.l_srv = tk.Label(cg, text="Сервер:", anchor="w", font=(self._base_fam, fs))
         self.l_srv.grid(row=0, column=0, sticky="w", padx=(0, 6), pady=3)
         self.ent_srv = tk.Entry(cg, width=1, textvariable=self.var_srv, bd=0, highlightthickness=1, font=(self._base_fam, fs))
         self.ent_srv.grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
-        self.btn_hist = tk.Button(cg, text="🕒", command=self.open_history_modal, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_hist.grid(row=0, column=2, padx=2, pady=3)
-        self.btn_scan = tk.Button(cg, text="🔍", command=self.do_scan, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_scan.grid(row=0, column=3, padx=2, pady=3)
-        self.btn_conn = tk.Button(cg, text="Підключити", command=self.do_connect, padx=10, pady=2, bd=0, cursor="hand2")
-        self.btn_conn.grid(row=0, column=4, sticky="ew", padx=(4, 0), pady=3)
-        self.btn_pick_lan = tk.Button(cg, text="Виявлені (0)", command=self.open_discovered_menu, state="disabled", padx=8, pady=2, bd=0, cursor="hand2")
+        self.btn_srv_more = tk.Button(cg, text="⋯", command=self.open_srv_more_menu, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_srv_more.grid(row=0, column=2, sticky="nsew", padx=2, pady=3)
+        self.btn_conn = tk.Button(cg, text="Підключити", command=self.do_connect, pady=2, bd=0, cursor="hand2")
+        self.btn_conn.grid(row=0, column=3, sticky="nsew", padx=(4, 0), pady=3)
 
         self.l_dir = tk.Label(cg, text="Архіви:", anchor="w", font=(self._base_fam, fs))
         self.l_dir.grid(row=1, column=0, sticky="w", padx=(0, 6), pady=3)
         self.ent_dir = tk.Entry(cg, width=1, textvariable=self.var_dir, bd=0, highlightthickness=1, font=(self._base_fam, fs))
         self.ent_dir.grid(row=1, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
-        self.btn_dir = tk.Button(cg, text="📂", command=self.choose_dir, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_dir.grid(row=1, column=2, columnspan=2, sticky="ew", padx=2, pady=3)
-        self.btn_open_dir = tk.Button(cg, text="↗ Відкрити", command=self.open_backup_folder, padx=10, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_open_dir.grid(row=1, column=4, sticky="ew", padx=(4, 0), pady=3)
+        self.btn_dir = tk.Button(cg, text="📂", command=self.choose_dir, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_dir.grid(row=1, column=2, sticky="nsew", padx=2, pady=3)
+        self.btn_open_dir = tk.Button(cg, text="↗ Відкрити", command=self.open_backup_folder, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_open_dir.grid(row=1, column=3, sticky="nsew", padx=(4, 0), pady=3)
 
-        self.l_mir = tk.Label(cg, text="Дзеркало:", anchor="w", font=(self._base_fam, fs))
-        self.l_mir.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=3)
-        self.ent_mir = tk.Entry(cg, width=1, textvariable=self.var_mirror, state="disabled", bd=0, highlightthickness=1, font=(self._base_fam, fs))
-        self.ent_mir.grid(row=2, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
-        self.btn_mir = tk.Button(cg, text="📂", command=self.choose_mirror, state="disabled", width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_mir.grid(row=2, column=2, padx=2, pady=3)
-        self.btn_net_mir = tk.Button(cg, text="🌐", command=lambda: self.open_settings(initial_tab=2), width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
-        self.btn_net_mir.grid(row=2, column=3, padx=2, pady=3)
+        self.conn_sep = tk.Frame(cg, height=1, bd=0, highlightthickness=0)
+        self.conn_sep.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(5, 4))
+
+        self.l_copies_hdr = tk.Label(cg, text="Копії:", anchor="w", font=(self._base_fam, max(8, fs - 1), "bold"))
+        self.l_copies_hdr.grid(row=3, column=0, columnspan=4, sticky="w", pady=(0, 2))
+
+        mir_box = tk.Frame(cg, bd=0, highlightthickness=0)
+        mir_box.grid(row=4, column=0, sticky="w", padx=(8, 6), pady=2)
         self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", False)) and bool(self.var_mirror.get().strip()))
-        self.chk_mir_tog = HomeGridToggle(cg, variable=self.var_mir_en, command=self.toggle_mirror, compact=True, palette=self._get_palette(), font_sz=fs)
-        self.chk_mir_tog.grid(row=2, column=4, sticky="w", padx=(8, 0), pady=3)
-        ToolTip(self.chk_mir_tog, "Увімкнути / вимкнути дзеркальне копіювання")
+        self.chk_mir_tog = HomeGridToggle(mir_box, variable=self.var_mir_en, command=self.toggle_mirror, compact=True, palette=self._get_palette(), font_sz=max(8, fs - 1))
+        self.chk_mir_tog.pack(side="left", padx=(0, 5))
+        self.l_mir = tk.Label(mir_box, text="Дзеркало", anchor="w", font=(self._base_fam, max(8, fs - 1)), cursor="hand2")
+        self.l_mir.pack(side="left")
+        self.l_mir.bind("<Button-1>", lambda _e: self.chk_mir_tog._on_click_compact())
+        self.ent_mir = tk.Entry(cg, width=1, textvariable=self.var_mirror, state="disabled", bd=0, highlightthickness=1, font=(self._base_fam, fs))
+        self.ent_mir.grid(row=4, column=1, sticky="ew", padx=(0, 4), pady=2, ipady=3)
+        self.btn_mir = tk.Button(cg, text="📂", command=self.choose_mirror, state="disabled", pady=1, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_mir.grid(row=4, column=2, sticky="nsew", padx=2, pady=2)
+        self.var_mir_st = tk.StringVar(value="—")
+        self.lbl_mir_st = tk.Label(cg, textvariable=self.var_mir_st, anchor="w", font=(self._base_fam, max(8, fs - 1)))
+        self.lbl_mir_st.grid(row=4, column=3, sticky="w", padx=(6, 0), pady=2)
+
+        net_box = tk.Frame(cg, bd=0, highlightthickness=0)
+        net_box.grid(row=5, column=0, sticky="w", padx=(8, 6), pady=2)
+        self.var_net_en = tk.BooleanVar(value=bool(self.engine.state.get("net_enabled", False)) and bool(self.var_net_dir.get().strip()))
+        self.chk_net_tog = HomeGridToggle(net_box, variable=self.var_net_en, command=self.toggle_net_dir, compact=True, palette=self._get_palette(), font_sz=max(8, fs - 1))
+        self.chk_net_tog.pack(side="left", padx=(0, 5))
+        self.l_net = tk.Label(net_box, text="Мережа", anchor="w", font=(self._base_fam, max(8, fs - 1)), cursor="hand2")
+        self.l_net.pack(side="left")
+        self.l_net.bind("<Button-1>", lambda _e: self.chk_net_tog._on_click_compact())
+        self.ent_net = tk.Entry(cg, width=1, textvariable=self.var_net_dir, state="disabled", bd=0, highlightthickness=1, font=(self._base_fam, fs))
+        self.ent_net.grid(row=5, column=1, sticky="ew", padx=(0, 4), pady=2, ipady=3)
+        self.btn_net = tk.Button(cg, text="📂", command=self.choose_net_dir, state="disabled", pady=1, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_net.grid(row=5, column=2, sticky="nsew", padx=2, pady=2)
+        self.var_net_st = tk.StringVar(value="—")
+        self.lbl_net_st = tk.Label(cg, textvariable=self.var_net_st, anchor="w", font=(self._base_fam, max(8, fs - 1)))
+        self.lbl_net_st.grid(row=5, column=3, sticky="w", padx=(6, 0), pady=2)
+
+        cld_box = tk.Frame(cg, bd=0, highlightthickness=0)
+        cld_box.grid(row=6, column=0, sticky="w", padx=(8, 6), pady=2)
+        self.var_cld_en = tk.BooleanVar(value=bool(self.engine.state.get("cloud_enabled", False)))
+        self.chk_cld_tog = HomeGridToggle(cld_box, variable=self.var_cld_en, command=self.toggle_cloud_quick, compact=True, palette=self._get_palette(), font_sz=max(8, fs - 1))
+        self.chk_cld_tog.pack(side="left", padx=(0, 5))
+        self.l_cld = tk.Label(cld_box, text="pCloud", anchor="w", font=(self._base_fam, max(8, fs - 1)), cursor="hand2")
+        self.l_cld.pack(side="left")
+        self.l_cld.bind("<Button-1>", lambda _e: self.open_settings(initial_tab=2))
+        self.var_cld_st = tk.StringVar(value="● вимкнено")
+        self.lbl_cld_st = tk.Label(cg, textvariable=self.var_cld_st, anchor="w", font=(self._base_fam, max(8, fs - 1)), cursor="hand2")
+        self.lbl_cld_st.grid(row=6, column=3, sticky="w", padx=(6, 0), pady=2)
+        self.lbl_cld_st.bind("<Button-1>", lambda _e: self.open_settings(initial_tab=2))
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
         self.ent_dir.bind("<FocusOut>", lambda e: self.save_dir_manual())
         self.ent_mir.bind("<FocusOut>", lambda e: self.save_mirror_manual())
+        self.ent_net.bind("<FocusOut>", lambda e: self.save_net_manual())
 
         self.card_stat = tk.Frame(self.top_split, padx=px, pady=py, bd=0, highlightthickness=1)
         self.card_stat.grid(row=0, column=1, sticky="nsew", padx=(max(6, px // 2), 0))
@@ -394,6 +440,16 @@ class HomeGridApp(DialogsMixin):
         self.t2_cap.pack(side="left", padx=(0, 6))
         self.t2_val = tk.Label(t2, textvariable=self.var_disk, font=(self._base_fam, fs, "bold"))
         self.t2_val.pack(side="left")
+
+        self.dest_rows = {}
+        for d_key, d_cap in (("mirror", "ДЗЕРКАЛО:"), ("network", "МЕРЕЖА:"), ("pcloud", "PCLOUD:")):
+            rf = tk.Frame(self.card_stat)
+            v_str = tk.StringVar(value="—")
+            c_lbl = tk.Label(rf, text=d_cap, font=(self._base_fam, max(8, fs - 2), "bold"))
+            c_lbl.pack(side="left", padx=(0, 5))
+            v_lbl = tk.Label(rf, textvariable=v_str, font=(self._base_fam, max(8, fs - 1), "bold"))
+            v_lbl.pack(side="left")
+            self.dest_rows[d_key] = (rf, c_lbl, v_lbl, v_str)
 
         t3 = tk.Frame(self.card_stat)
         t3.pack(anchor="center", pady=2)
@@ -456,12 +512,12 @@ class HomeGridApp(DialogsMixin):
         self.btn_about.pack(side="left", padx=6)
         self.btn_exit = tk.Button(self.footer, text="✖ Вихід", command=self.confirm_exit, padx=14, pady=5, bd=0, cursor="hand2")
         self.btn_exit.pack(side="right")
-        for w_tip, t_tip in ((self.btn_hist, "Історія адрес"), (self.btn_scan, "Автопошук у LAN"), (self.btn_dir, "Обрати папку"), (self.btn_open_dir, "Відкрити папку"), (self.btn_mir, "Обрати папку дзеркала"), (self.btn_open_log, "Відкрити текстовий файл backup.log")):
+        for w_tip, t_tip in ((self.btn_srv_more, "Історія адрес та автопошук у LAN"), (self.btn_dir, "Обрати папку"), (self.btn_open_dir, "Відкрити папку"), (self.btn_mir, "Обрати папку дзеркала"), (self.btn_net, "Обрати мережеву папку"), (self.lbl_cld_st, "Налаштування pCloud"), (self.btn_open_log, "Відкрити текстовий файл backup.log")):
             ToolTip(w_tip, t_tip)
 
     def open_raw_log_file(self):
         import sys, subprocess
-        bdir = self.engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR
+        bdir = get_logs_dir(self.engine.state)
         os.makedirs(bdir, exist_ok=True)
         lp = os.path.join(bdir, "backup.log")
         if not os.path.isfile(lp):
@@ -536,28 +592,33 @@ class HomeGridApp(DialogsMixin):
             self.btn_cloud_badge.configure(bg=p["card"], fg=p["green"] if c_on else p["muted"], font=f_sub)
         for frm in (self.header, self.card_conn, self.card_stat, self.card_prog, self.card_log, self.footer):
             frm.configure(bg=p["panel"], highlightbackground=p["border"], padx=px, pady=py, relief=rel, bd=bd_w)
+        def _paint_frames(node):
+            for ch in node.winfo_children():
+                if isinstance(ch, tk.Frame) and not isinstance(ch, HomeGridToggle):
+                    ch.configure(bg=p["border"] if ch is getattr(self, "conn_sep", None) else p["panel"], bd=0, highlightthickness=0)
+                    _paint_frames(ch)
         for parent_frm in (self.header, self.card_conn, self.card_stat, self.card_prog, self.card_log):
-            for sub in parent_frm.winfo_children():
-                if isinstance(sub, tk.Frame):
-                    sub.configure(bg=p["panel"])
-                    for sub2 in sub.winfo_children():
-                        if isinstance(sub2, tk.Frame):
-                            sub2.configure(bg=p["panel"])
+            _paint_frames(parent_frm)
 
         self.lbl_title.configure(bg=p["panel"], fg=p["text"], font=(fam, fs + 4, "bold"))
         self.lbl_sub.configure(bg=p["panel"], fg=p["muted"], font=f_sub)
+        self.lbl_srv_badge.configure(bg=p["panel"], bd=0, highlightthickness=0)
         for lbl in (self.lbl_c1, self.lbl_c4, self.lbl_stage):
             lbl.configure(bg=p["panel"], fg=p["text"], font=f_bold)
         self.lbl_pct.configure(bg=p["panel"], fg=p["green"], font=f_bold)
-        for lbl in (self.l_srv, self.l_dir, self.l_mir):
+        for lbl in (self.l_srv, self.l_dir):
             lbl.configure(bg=p["panel"], fg=p["muted"], font=f_main)
 
-        for ent in (self.ent_srv, self.ent_dir, self.ent_mir):
+        self.l_copies_hdr.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
+        for ent in (self.ent_srv, self.ent_dir, self.ent_mir, self.ent_net):
             ent.configure(bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], highlightbackground=p["border"], highlightcolor=p["blue"], font=f_main)
 
         f_big = f_bold
         self.t2_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
         self.t2_val.configure(bg=p["panel"], fg=p["green"], font=f_big)
+        for _rf, _cl, _vl, _ in getattr(self, 'dest_rows', {}).values():
+            _cl.configure(bg=p['panel'], fg=p['muted'], font=f_cap)
+            _vl.configure(bg=p['panel'], fg=p['cyan'], font=f_sub)
         if hasattr(self, "t3_cap"):
             self.t3_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
             self.t3_val.configure(bg=p["panel"], fg=p["cyan"], font=f_big)
@@ -577,7 +638,7 @@ class HomeGridApp(DialogsMixin):
         self.txt_log.tag_configure("b_err", background="#fee2e2", foreground="#b91c1c", font=(fam, max(8, fs - 1), "bold"))
 
         dis_fg = p["muted"]
-        for b in (self.btn_hist, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_net_mir, self.btn_about):
+        for b in (self.btn_srv_more, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_net, self.btn_about):
             b.configure(highlightbackground=p["border"])
             b.configure(bg=p["card"], fg=p["text"], disabledforeground=dis_fg, activebackground=p["border"], activeforeground=p["text"], font=f_main, padx=bpx, pady=bpy)
 
@@ -620,21 +681,19 @@ class HomeGridApp(DialogsMixin):
             self._setup_native_menubar()
 
 
-    def open_discovered_menu(self):
-        found = getattr(self.engine, "discovered_servers", []) or []
-        if not found:
-            return
+    def open_srv_more_menu(self):
+        lng = self.engine.state.get("lang", "en")
         p = self._get_palette()
         fs = self.metrics["font_sz"]
         menu = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=(self._base_fam, fs))
-        for url, t_ms, a_ms in found:
-            menu.add_command(
-                label=tr(f"📡 {url}   (TCP: {t_ms} мс, API: {a_ms} мс)", self.engine.state.get("lang", "en")),
-                command=lambda u=url: self._select_discovered_server(u)
-            )
-        x = self.btn_pick_lan.winfo_rootx()
-        y = self.btn_pick_lan.winfo_rooty() + self.btn_pick_lan.winfo_height()
-        menu.tk_popup(x, y)
+        menu.add_command(label=tr("Історія адрес", lng), command=self.open_history_modal)
+        menu.add_command(label=tr("Автопошук у LAN", lng), command=self.do_scan)
+        found = getattr(self.engine, "discovered_servers", []) or []
+        if found:
+            menu.add_separator()
+            for url, t_ms, a_ms in found:
+                menu.add_command(label=tr(f"{url}   (TCP: {t_ms} мс, API: {a_ms} мс)", lng), command=lambda u=url: self._select_discovered_server(u))
+        menu.tk_popup(self.btn_srv_more.winfo_rootx(), self.btn_srv_more.winfo_rooty() + self.btn_srv_more.winfo_height())
 
     def _select_discovered_server(self, url):
         self.var_srv.set(url)
@@ -696,27 +755,48 @@ class HomeGridApp(DialogsMixin):
         lang = self.engine.state.get("lang", "en")
         is_lite = bool(self.engine.state.get("lite_mode", False))
         is_run = bool(getattr(self.engine, "is_running", False))
-        checked = bool(self.engine.state.get("mirror_enabled", False))
+        mir_on = bool(self.engine.state.get("mirror_enabled", False))
+        net_on = bool(self.engine.state.get("net_enabled", False))
+        cld_on = bool(self.engine.state.get("cloud_enabled", False))
+        m_dir = (self.var_mirror.get() or "").strip()
+        n_dir = (self.var_net_dir.get() or "").strip()
         fs = self.metrics["font_sz"]
         theme = self.engine.state.get("theme", "dark")
-        _mir_sig = (checked, is_run, lang, is_lite, fs, theme)
+        _mir_sig = (mir_on, net_on, cld_on, m_dir, n_dir, is_run, lang, is_lite, fs, theme)
         if getattr(self, "_mir_btn_sig", None) == _mir_sig:
             return
         self._mir_btn_sig = _mir_sig
         p = self._get_palette()
         fam = getattr(self, "_mono_fam", "Consolas") if is_lite else getattr(self, "_base_fam", p.get("font", "Segoe UI"))
-        self.var_mir_en.set(checked)
-        f_state = "disabled" if (is_run or not checked) else "normal"
-        self.chk_mir_tog.apply_style(palette=p, state="disabled" if is_run else "normal", font_fam=fam, font_sz=fs)
-        self.ent_mir.configure(
-            state=f_state,
-            bg=p["inp_bg"], fg=p["text"],
-            disabledbackground=p["panel"], disabledforeground=p["muted"]
-        )
-        self.btn_mir.configure(
-            state=f_state,
-            cursor="hand2" if f_state == "normal" else ""
-        )
+        sub_f = (fam, max(8, fs - 1))
+        self.var_mir_en.set(mir_on)
+        self.var_net_en.set(net_on)
+        self.var_cld_en.set(cld_on)
+        for tog in (self.chk_mir_tog, self.chk_net_tog, self.chk_cld_tog):
+            tog.apply_style(palette=p, state="disabled" if is_run else "normal", font_fam=fam, font_sz=max(8, fs - 1))
+        self.l_mir.configure(bg=p["panel"], fg=p["text"] if mir_on else p["muted"], font=sub_f)
+        self.l_net.configure(bg=p["panel"], fg=p["text"] if net_on else p["muted"], font=sub_f)
+        self.l_cld.configure(bg=p["panel"], fg=p["text"] if cld_on else p["muted"], font=sub_f)
+        for en_fl, ent_w, btn_w, st_var, st_lbl, path_s in (
+            (mir_on, self.ent_mir, self.btn_mir, self.var_mir_st, self.lbl_mir_st, m_dir),
+            (net_on, self.ent_net, self.btn_net, self.var_net_st, self.lbl_net_st, n_dir),
+        ):
+            fst = "disabled" if (is_run or not en_fl) else "normal"
+            ent_w.configure(state=fst, bg=p["inp_bg"], fg=p["text"], disabledbackground=p["panel"], disabledforeground=p["muted"])
+            btn_w.configure(state=fst, cursor="hand2" if fst == "normal" else "")
+            if not en_fl or not path_s:
+                st_var.set("—")
+                st_lbl.configure(bg=p["panel"], fg=p["muted"], font=sub_f)
+            elif os.path.isdir(path_s):
+                st_var.set(tr("● онлайн", lang))
+                st_lbl.configure(bg=p["panel"], fg=p["green"], font=sub_f)
+            else:
+                st_var.set(tr("● офлайн", lang))
+                st_lbl.configure(bg=p["panel"], fg=p["red"], font=sub_f)
+        if hasattr(self.engine, 'request_dest_stats_refresh'):
+            self.engine.request_dest_stats_refresh()
+        self.var_cld_st.set(tr("● увімкнено", lang) if cld_on else tr("● вимкнено", lang))
+        self.lbl_cld_st.configure(bg=p["panel"], fg=p["green"] if cld_on else p["muted"], font=sub_f)
     def open_backup_folder(self):
         bdir = self.var_dir.get().strip() or self.engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR
         open_folder_native(bdir)
@@ -761,6 +841,7 @@ class HomeGridApp(DialogsMixin):
     def do_backup(self):
         self._apply_srv_autofill()
         self.save_mirror_manual()
+        self.save_net_manual()
         threading.Thread(target=run_backup_task, args=(self.engine, self.var_srv.get(), False, False, False), daemon=True).start()
 
     def reset_pins(self):
@@ -820,6 +901,41 @@ class HomeGridApp(DialogsMixin):
         self.engine.state["mirror_enabled"] = bool(self.var_mir_en.get()) and bool(self.engine.state["mirror_dir"])
         commit_state(self.engine.state)
         self._update_mirror_btn()
+
+    def choose_net_dir(self):
+        if not bool(self.var_net_en.get()):
+            return
+        chosen = choose_folder_native(self.engine.state.get("net_dir") or self.engine.state["backup_dir"])
+        if chosen:
+            self.engine.state["net_dir"] = chosen
+            self.engine.state["net_enabled"] = True
+            self.var_net_dir.set(chosen)
+            commit_state(self.engine.state)
+            self._update_mirror_btn()
+            self.engine.log(f"Папку мережі змінено на: {chosen}", "ok")
+
+    def toggle_net_dir(self):
+        en = bool(self.var_net_en.get())
+        self.engine.state["net_enabled"] = en
+        commit_state(self.engine.state)
+        self._update_mirror_btn()
+        if en and not self.var_net_dir.get().strip():
+            self.choose_net_dir()
+
+    def save_net_manual(self):
+        val = self.var_net_dir.get().strip()
+        self.engine.state["net_dir"] = os.path.normpath(os.path.expanduser(val)) if val else ""
+        self.engine.state["net_enabled"] = bool(self.var_net_en.get()) and bool(self.engine.state["net_dir"])
+        commit_state(self.engine.state)
+        self._update_mirror_btn()
+
+    def toggle_cloud_quick(self):
+        en = bool(self.var_cld_en.get())
+        self.engine.state["cloud_enabled"] = en
+        commit_state(self.engine.state)
+        self._update_mirror_btn()
+        if en:
+            self.open_settings(initial_tab=2)
     def _retry_pending_cloud_sync(self):
         if not WINDOWS7_CLOUD_SYNC_PREVIEW or not self.engine.state.get("cloud_enabled"):
             return
@@ -863,6 +979,38 @@ class HomeGridApp(DialogsMixin):
                 self._last_disk_sig = _disk_sig
                 free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
                 self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", cur_lang))
+            if hasattr(self, "dest_rows"):
+                with self.engine.lock:
+                    d_snap = dict(getattr(self.engine, "_dest_stats", {}) or {})
+                active_flags = {
+                    "mirror": bool(st.get("mirror_enabled") and (st.get("mirror_dir") or "").strip()),
+                    "network": bool(st.get("net_enabled") and (st.get("net_dir") or "").strip()),
+                    "pcloud": bool(st.get("cloud_enabled")),
+                }
+                p_cur = self._get_palette()
+                for d_k in ("mirror", "network", "pcloud"):
+                    rf, _cl, vl, v_str = self.dest_rows[d_k]
+                    is_on = active_flags[d_k]
+                    info = d_snap.get(d_k)
+                    _dsig = (is_on, repr(info), cur_lang, cur_theme)
+                    if getattr(rf, "_dsig", None) != _dsig:
+                        rf._dsig = _dsig
+                        if not is_on:
+                            if rf.winfo_ismapped():
+                                rf.pack_forget()
+                        else:
+                            if not rf.winfo_ismapped():
+                                rf.pack(anchor="center", pady=1, before=self.stat_btns)
+                            if info is None:
+                                v_str.set(tr("оновлення...", cur_lang))
+                                vl.configure(fg=p_cur["muted"])
+                            elif not info.get("ok"):
+                                v_str.set(tr("недоступно", cur_lang))
+                                vl.configure(fg=p_cur["red"])
+                            else:
+                                fr_t = f" — Вільно: {info['free_gb']} ГБ" if info.get("free_gb", -1) >= 0 else ""
+                                v_str.set(tr(f"{info['count']} архівів ({info['mb']} МБ){fr_t}", cur_lang))
+                                vl.configure(fg=p_cur["green"] if d_k == "pcloud" else p_cur["cyan"])
 
             if hasattr(self, "lbl_srv_badge"):
                 dn = getattr(self.engine, "diag_net", "") or ""
@@ -925,23 +1073,19 @@ class HomeGridApp(DialogsMixin):
             _action_btn_sig = (btn_state, cur_lang, cur_theme, cur_lite)
             if getattr(self, '_last_action_btn_sig', None) != _action_btn_sig:
                 self._last_action_btn_sig = _action_btn_sig
-                for b in (self.btn_hist, self.btn_conn, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
+                for b in (self.btn_srv_more, self.btn_conn, self.btn_dir, self.btn_open_dir, self.btn_start, self.btn_strat):
                     if str(b.cget("state")) != btn_state:
                         b.configure(state=btn_state)
                         btns_changed = True
             self._update_mirror_btn()
             disc = getattr(self.engine, "discovered_servers", []) or []
-            if hasattr(self, "btn_pick_lan"):
-                _lan_sig = (len(disc), self.engine.is_running, st.get("lang", "en"))
+            if hasattr(self, "btn_srv_more"):
+                _lan_sig = (len(disc), cur_theme)
                 if getattr(self, '_last_lan_sig', None) != _lan_sig:
                     self._last_lan_sig = _lan_sig
-                    if len(disc) >= 1 and not self.engine.is_running:
-                        self.btn_pick_lan.configure(text=tr(f"Виявлені ({len(disc)}) ▾", st.get("lang", "en")), state="normal")
-                        if not self.btn_pick_lan.winfo_ismapped():
-                            self.btn_pick_lan.grid(row=0, column=5, sticky="ew", padx=(4, 0), pady=2)
-                        btns_changed = True
-                    elif self.btn_pick_lan.winfo_ismapped():
-                        self.btn_pick_lan.grid_remove()
+                    p_c = self._get_palette()
+                    self.btn_srv_more.configure(text=f"⋯ ({len(disc)})" if disc else "⋯", fg=p_c["cyan"] if disc else p_c["text"])
+                    btns_changed = True
             if btns_changed:
                 fix_mac_buttons(self.root, self._get_palette())
 

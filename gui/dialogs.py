@@ -21,7 +21,9 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # patch-id: fix-tooltip-import-2.55
 # patch-id: pcloud-disable-and-freespace-2.57
 # patch-id: destination-copies-network-journal-2.58-p4
-# [ФАЙЛ: gui/dialogs.py (v2.25 | 23.11.2026 20:30)
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: speed-journal-auto-target-2.62
+# [ФАЙЛ: gui/dialogs.py (v2.27 | 23.11.2026 23:00)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -489,6 +491,7 @@ class DialogsMixin:
         v_font = tk.IntVar(value=int(st.get("ui_font", 0)))
         v_lang = tk.StringVar(value=st.get("lang", "en"))
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
+        v_logs_dir = tk.StringVar(value=st.get("logs_dir", ""))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
         v_cloud_provider = tk.StringVar(value="pCloud")
@@ -500,7 +503,7 @@ class DialogsMixin:
         v_cloud_max_cnt = tk.IntVar(value=int(st.get("cloud_max_archives", 0) or 0))
         v_cloud_max_gb = tk.DoubleVar(value=float(st.get("cloud_max_size_gb", 0.0) or 0.0))
         v_cloud_fit_free = tk.BooleanVar(value=bool(st.get("cloud_fit_free_space", True)))
-        v_journal_target = tk.StringVar(value=st.get("journal_sync_target", "pcloud"))
+        v_journal_target = tk.StringVar(value=st.get("journal_sync_target", "auto"))
 
         sch_parts = (st.get("sched_time") or "03:00").split(":")
         v_sh = tk.StringVar(value=sch_parts[0] if len(sch_parts) > 0 else "03")
@@ -728,14 +731,14 @@ class DialogsMixin:
             fg=p["text"], insertbackground=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs)
         )
         ent_c_path.pack(side="left", fill="x", expand=True, ipady=4)
-        j_row = tk.Frame(f_cloud, bg=p["card"]); j_row.pack(fill="x", pady=4)
-        tk.Label(j_row, text=tr("Куди надсилати спільний журнал обміну:", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         lng_j = st.get("lang", "en")
-        j_map = {tr("pCloud (за замовчуванням)", lng_j): "pcloud", tr("Мережева папка (Мережа)", lng_j): "network", tr("Обидва (pCloud + Мережа)", lng_j): "both"}
+        j_map = {
+            tr("Авто (pCloud → Мережа при наявності)", lng_j): "auto",
+            tr("Тільки pCloud", lng_j): "pcloud",
+            tr("Тільки мережева папка (Мережа)", lng_j): "network",
+            tr("Обидва (pCloud + Мережа)", lng_j): "both",
+        }
         rev_j = {v: k for k, v in j_map.items()}
-        cb_journal_target = ttk.Combobox(j_row, values=list(j_map.keys()), state="readonly", width=28, font=(self._ui_fam(), fs))
-        cb_journal_target.set(rev_j.get(v_journal_target.get(), tr("pCloud (за замовчуванням)", lng_j)))
-        cb_journal_target.pack(side="right")
         tk.Label(
             f_cloud, text="Архіви та журнал зберігаються у вказаній папці pCloud." if st.get("lang", "en") == "uk" else "Archives and log are stored in the specified pCloud folder.",
             bg=p["card"], fg=p["muted"], justify="left",
@@ -1273,6 +1276,29 @@ class DialogsMixin:
         tk.Label(g_r3, text=tr("Автоочищення у фоні (GFS)", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         HomeGridToggle(g_r3, variable=v_sclean, compact=True, palette=p, font_sz=fs).pack(side="right")
 
+        f_logs = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_logs.pack(fill="x", padx=12, pady=(0, 8))
+        tk.Label(f_logs, text=tr("Папка файлів протоколів (backup.log та звіти)", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 6))
+        lg_r1 = tk.Frame(f_logs, bg=p["card"])
+        lg_r1.pack(fill="x", pady=2)
+        ent_ld = tk.Entry(lg_r1, textvariable=v_logs_dir, bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs))
+        ent_ld.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 6))
+        def _pick_logs_d():
+            from core.files import choose_folder_native
+            ch = choose_folder_native(v_logs_dir.get().strip() or st.get("backup_dir", ""))
+            if ch:
+                v_logs_dir.set(ch)
+        tk.Button(lg_r1, text="📂", command=_pick_logs_d, bg=p["inp_bg"], fg=p["text"], bd=0, padx=10, pady=3, cursor="hand2").pack(side="left", padx=(0, 6))
+        tk.Button(lg_r1, text=tr("Як папка архівів", st.get("lang", "en")), command=lambda: v_logs_dir.set(""), bg=p["inp_bg"], fg=p["muted"], bd=0, padx=10, pady=3, cursor="hand2").pack(side="left")
+        tk.Label(f_logs, text=tr("Порожньо = зберігати поруч із ZIP-архівами (у папці «Архіви»).", st.get("lang", "en")), bg=p["card"], fg=p["muted"], font=(self._ui_fam(), max(8, fs - 1))).pack(anchor="w", pady=(4, 6))
+        tk.Frame(f_logs, height=1, bg=p["border"]).pack(fill="x", pady=4)
+        j_row = tk.Frame(f_logs, bg=p["card"])
+        j_row.pack(fill="x", pady=(4, 2))
+        tk.Label(j_row, text=tr("Протоколи для рейтингу швидкості (між ОС):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        cb_journal_target = ttk.Combobox(j_row, values=list(j_map.keys()), state="readonly", width=32, font=(self._ui_fam(), fs))
+        cb_journal_target.set(rev_j.get(v_journal_target.get(), tr("Авто (pCloud → Мережа при наявності)", lng_j)))
+        cb_journal_target.pack(side="right")
+
         f_sch = tk.Frame(tab_sched, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
         f_sch.pack(fill="x", padx=12, pady=(8, 8))
         tk.Label(f_sch, text=tr("Автозапуск за розкладом", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
@@ -1474,6 +1500,10 @@ class DialogsMixin:
                     return
             else:
                 cloud_path = cloud_path or "HomeGridBackup"
+            raw_ld = v_logs_dir.get().strip()
+            st["logs_dir"] = os.path.normpath(os.path.expanduser(raw_ld)) if raw_ld else ""
+            if st["logs_dir"]:
+                os.makedirs(st["logs_dir"], exist_ok=True)
             st["keep_last_count"] = max(1, int(v_keep_n.get()))
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))
@@ -1493,7 +1523,7 @@ class DialogsMixin:
             st["cloud_max_archives"] = max(0, int(v_cloud_max_cnt.get() or 0))
             st["cloud_max_size_gb"] = max(0.0, round(float(v_cloud_max_gb.get() or 0.0), 2))
             st["cloud_fit_free_space"] = bool(v_cloud_fit_free.get())
-            j_val = j_map.get(cb_journal_target.get(), "pcloud")
+            j_val = j_map.get(cb_journal_target.get(), "auto")
             if j_val in ("network", "both") and not (st.get("net_dir") or "").strip():
                 cloud_msg.configure(text=tr("Для обміну через мережеву папку вкажіть шлях у рядку «Мережа» головного вікна.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
                 _select_pill_tab(2); return

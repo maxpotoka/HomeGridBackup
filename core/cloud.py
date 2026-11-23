@@ -19,7 +19,9 @@ from uuid import uuid4
 # patch-id: pcloud-retention-count-size-2.52
 # patch-id: destination-copies-network-journal-2.58-1b
 # patch-id: pcloud-speed-progress-gradient-2.33
-from core.config import SCRIPT_VER
+# patch-id: archives-label-and-logs-dir-2.60
+# patch-id: dest-stats-bg-worker-2.61
+from core.config import SCRIPT_VER, get_logs_dir
 _PCT_RE = re.compile(r"(\d+)%")
 
 def _rclone_upload_with_progress(src_path, dst_remote_file, progress_cb=None, timeout=3600):
@@ -484,7 +486,7 @@ def cloud_sync_queue_state(engine):
         return {"archives": 0, "reports": 0, "total": 0}
     backup_dir = os.path.abspath(engine.state["backup_dir"])
     archives_pending = bool(engine.state.get("cloud_save_archives", True)) and os.path.isfile(os.path.join(backup_dir, ".cloud-archives.pending"))
-    report_dir = os.path.join(backup_dir, "reports", _device_id(engine.state))
+    report_dir = os.path.join(get_logs_dir(engine.state), "reports", _device_id(engine.state))
     reports_pending = 0
     if engine.state.get("cloud_save_logs", True) and os.path.isdir(report_dir):
         names = set(os.listdir(report_dir))
@@ -668,7 +670,7 @@ def sync_network_shared_journal(engine):
     if not net_dir or not os.path.isdir(net_dir):
         raise RuntimeError("Мережева папка недоступна для обміну журналом.")
     device_id = _device_id(state)
-    report_dir = os.path.join(os.path.abspath(state["backup_dir"]), "reports", device_id)
+    report_dir = os.path.join(get_logs_dir(state), "reports", device_id)
     net_sources = os.path.join(net_dir, ".HomeGridBackup-sources")
     os.makedirs(net_sources, exist_ok=True)
     own_records = _collect_report_records((net_sources, report_dir), device_id=device_id)
@@ -731,7 +733,7 @@ def _sync_shared_root_report(engine, device_id, report_dir):
 def record_operation_event(engine, operation_id, event, stage="", archive="", size_mb=0.0, duration_sec=None, **details):
     device_id = _device_id(engine.state)
     now = datetime.now().astimezone()
-    report_dir = os.path.join(os.path.abspath(engine.state["backup_dir"]), "reports", device_id)
+    report_dir = os.path.join(get_logs_dir(engine.state), "reports", device_id)
     os.makedirs(report_dir, mode=0o700, exist_ok=True)
     report_path = os.path.join(report_dir, now.strftime("%Y-%m-%d") + ".jsonl")
     marker_path = report_path + ".pending"
@@ -793,7 +795,7 @@ def sync_cloud_reports(engine):
 
 def _sync_cloud_reports(engine):
     device_id = _device_id(engine.state)
-    report_dir = os.path.join(os.path.abspath(engine.state["backup_dir"]), "reports", device_id)
+    report_dir = os.path.join(get_logs_dir(engine.state), "reports", device_id)
     if WINDOWS7_CLOUD_SYNC_PREVIEW:
         os.makedirs(report_dir, mode=0o700, exist_ok=True)
         _recover_report_upload_markers(report_dir)
@@ -991,3 +993,35 @@ def fetch_cloud_speed_stats(engine, refresh=True):
         })
     dev_stats.sort(key=lambda d: (-d["avg_spd"], d["avg_dur"]))
     return {"ops": ops, "devices": dev_stats}
+
+
+def get_cloud_dest_stats(state):
+    if not state.get("cloud_enabled"):
+        return None
+    remote = str(state.get("cloud_remote") or "pcloud").strip()
+    device_id = _device_id(state)
+    shared = WINDOWS7_CLOUD_SYNC_PREVIEW
+    remote_dir = _remote_path(state, "backups") if shared else _remote_path(state, "backups", device_id)
+    prefix = (device_id + "_") if shared else ""
+    cnt, total_b = 0, 0
+    try:
+        raw_ls = _rclone("lsjson", "--files-only", remote_dir, timeout=35)
+        entries = json.loads(raw_ls) if raw_ls.strip() else []
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            nm = str(e.get("Name", ""))
+            if nm.lower().endswith(".zip") and _ARCHIVE_RE.search(nm) and nm.startswith(prefix):
+                cnt += 1
+                total_b += max(0, int(e.get("Size", 0) or 0))
+    except Exception:
+        pass
+    free_gb = -1.0
+    try:
+        usage = check_rclone_remote(remote)
+        if usage.get("free") is not None:
+            free_gb = round(float(usage["free"]) / 1073741824.0, 1)
+    except Exception:
+        pass
+    return {"ok": True, "count": cnt, "mb": round(total_b / 1048576.0, 1), "free_gb": free_gb}
+
