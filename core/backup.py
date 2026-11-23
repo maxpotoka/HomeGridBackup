@@ -4,7 +4,8 @@
 # patch-id: adaptive-status-poll-2.11
 # patch-id: card-conn-copies-2.59
 # patch-id: speed-journal-auto-target-2.62
-# [ФАЙЛ: core/backup.py (v2.14 | 23.11.2026 23:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: tall-pbar-server-marquee-2.70
+# [ФАЙЛ: core/backup.py (v2.15 | 24.11.2026 01:15) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -458,12 +459,9 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
 
         if ph == "checking":
             engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({elapsed_ph:.1f} с)...")
-        else:
-            has_cl = bool(engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True))
-            phase_ranges = {"preparing": (15, 20), "copying": (20, 32), "processing": (32, 37), "packing": (37, 45), "ready": (45, 45)} if has_cl else {"preparing": (25, 30), "copying": (30, 55), "processing": (55, 60), "packing": (60, 75), "ready": (75, 75)}
-            p_start, p_end = phase_ranges.get(ph, (25, 75))
-            overall_pct = p_start + int((pct / 100.0) * (p_end - p_start))
-            engine.set_progress(overall_pct, f"[{srv_label}] {pretty_phase(ph)}: {pct}%{sz_txt}")
+        elif ph != "ready" and st.get("ready") is not True:
+            pct_part = f": {pct}%" if pct > 0 else f" ({elapsed_ph:.1f} с)"
+            engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)}{pct_part}{sz_txt}")
 
         if ph == "ready" or st.get("ready") is True:
             if last_phase and last_phase != "ready":

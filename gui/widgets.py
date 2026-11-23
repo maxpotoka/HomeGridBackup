@@ -1,5 +1,7 @@
 # ==============================================================================
-# [ФАЙЛ: gui/widgets.py (v2.08 | 21.11.2026 18:18) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
+# patch-id: tall-pbar-server-marquee-2.70
+# patch-id: force-tall-pbar-and-grid-2.74
+# [ФАЙЛ: gui/widgets.py (v2.10 | 24.11.2026 02:15) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
 # patch-id: progress-2.09
 # ==============================================================================
 import sys
@@ -215,7 +217,7 @@ class StyledProgressBar(tk.Canvas):
         if self.indet:
             self._phase = (self._phase + 1) % 40
         lite = bool(lite_mode)
-        if lite != self.lite_mode or theme != self.theme or self._cw == 0:
+        if lite != self.lite_mode or theme != self.theme or self._cw == 0 or abs(self.winfo_height() - self._ch) > 2:
             self.lite_mode = lite
             self.theme = theme
             self._rebuild()
@@ -231,7 +233,8 @@ class StyledProgressBar(tk.Canvas):
         self._cw, self._ch = w, h
         if self.lite_mode:
             self.configure(bg=self.theme["bg"])
-            self._text = self.create_text(4, h // 2, anchor="w", text="", fill=self.theme["cyan"], font=(MONO, 11, "bold"))
+            l_fs = max(11, min(18, h // 3))
+            self._text = self.create_text(4, h // 2, anchor="w", text="", fill=self.theme["cyan"], font=(MONO, l_fs, "bold"))
         else:
             self.configure(bg=self.theme.get("pbar_bg", "#1e293b"))
             self.create_rectangle(0, 0, w - 1, h - 1, outline=self.theme.get("pbar_brd", "#475569"), width=1)

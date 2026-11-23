@@ -998,7 +998,21 @@ def fetch_cloud_speed_stats(engine, refresh=True):
 def get_cloud_dest_stats(state):
     if not state.get("cloud_enabled"):
         return None
+    if not _rclone_executable():
+        return {"ok": False, "reason": "немає rclone"}
     remote = str(state.get("cloud_remote") or "pcloud").strip()
+    try:
+        if remote not in list_rclone_remotes():
+            return {"ok": False, "reason": "не підключено"}
+    except Exception:
+        return {"ok": False, "reason": "не підключено"}
+    free_gb = -1.0
+    try:
+        usage = check_rclone_remote(remote)
+        if usage.get("free") is not None:
+            free_gb = round(float(usage["free"]) / 1073741824.0, 1)
+    except Exception:
+        return {"ok": False, "reason": "не підключено"}
     device_id = _device_id(state)
     shared = WINDOWS7_CLOUD_SYNC_PREVIEW
     remote_dir = _remote_path(state, "backups") if shared else _remote_path(state, "backups", device_id)
@@ -1016,12 +1030,7 @@ def get_cloud_dest_stats(state):
                 total_b += max(0, int(e.get("Size", 0) or 0))
     except Exception:
         pass
-    free_gb = -1.0
-    try:
-        usage = check_rclone_remote(remote)
-        if usage.get("free") is not None:
-            free_gb = round(float(usage["free"]) / 1073741824.0, 1)
-    except Exception:
-        pass
-    return {"ok": True, "count": cnt, "mb": round(total_b / 1048576.0, 1), "free_gb": free_gb}
+    bdir = os.path.abspath(state.get("backup_dir") or "")
+    pending = bool(bdir and os.path.isfile(os.path.join(bdir, ".cloud-archives.pending")))
+    return {"ok": True, "count": cnt, "mb": round(total_b / 1048576.0, 1), "free_gb": free_gb, "pending": pending}
 

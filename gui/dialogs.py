@@ -23,7 +23,9 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # patch-id: destination-copies-network-journal-2.58-p4
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: speed-journal-auto-target-2.62
-# [ФАЙЛ: gui/dialogs.py (v2.27 | 23.11.2026 23:00)
+# patch-id: pcloud-inline-path-2.63
+# patch-id: fav-servers-pills-2.65
+# [ФАЙЛ: gui/dialogs.py (v2.29 | 23.11.2026 23:55)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk
@@ -439,33 +441,48 @@ class DialogsMixin:
             self.engine.state["server"] = url
             self._last_synced_srv = url
             commit_state(self.engine.state)
+            if hasattr(self, "_render_fav_servers"):
+                self._render_fav_servers()
             dlg.destroy()
+
+        def _toggle_fav(url):
+            norm_u = (url or "").strip().rstrip("/")
+            favs = [x.strip().rstrip("/") for x in (self.engine.state.get("favorite_servers") or []) if x.strip()]
+            favs = [x for x in favs if x != norm_u] if norm_u in favs else favs + [norm_u]
+            self.engine.state["favorite_servers"] = favs[:8]
+            commit_state(self.engine.state)
+            if hasattr(self, "_render_fav_servers"):
+                self._render_fav_servers()
+            _render()
 
         def _render():
             for ch in box.winfo_children():
                 ch.destroy()
             hist = self.engine.state.get("server_history") or []
+            favs = {x.strip().rstrip("/") for x in (self.engine.state.get("favorite_servers") or [])}
             if not hist:
                 tk.Label(box, text="Історія адрес порожня.", bg=p["panel"], fg=p["muted"], font=("Segoe UI", fs)).pack(pady=20)
                 return
             for i, u in enumerate(hist):
+                is_f = u.strip().rstrip("/") in favs
                 row = tk.Frame(box, bg=p["card"], padx=8, pady=5, bd=1, relief="solid")
                 row.pack(fill="x", pady=3)
+                tk.Button(row, text="★" if is_f else "☆", bg=p["card"], fg=p["amber"] if is_f else p["muted"], bd=0, font=("Segoe UI", fs + 1, "bold"), padx=6, cursor="hand2", command=lambda url=u: _toggle_fav(url)).pack(side="left", padx=(0, 4))
                 tk.Label(row, text=f"#{i+1}  {u}", bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs, "bold")).pack(side="left")
                 tk.Button(row, text="✖", bg=p["card"], fg=p["red"], font=("Segoe UI", fs), padx=8, command=lambda url=u: _del(url)).pack(side="right", padx=4)
                 tk.Button(row, text="Обрати", bg=p["blue"], fg="#ffffff", font=("Segoe UI", fs), padx=10, command=lambda url=u: _pick(url)).pack(side="right", padx=6)
 
         def _del(url):
             norm_u = (url or "").strip().rstrip("/")
-            self.engine.state["server_history"] = [
-                x for x in (self.engine.state.get("server_history") or [])
-                if x.strip().rstrip("/") != norm_u
-            ]
+            self.engine.state["server_history"] = [x for x in (self.engine.state.get("server_history") or []) if x.strip().rstrip("/") != norm_u]
+            self.engine.state["favorite_servers"] = [x for x in (self.engine.state.get("favorite_servers") or []) if x.strip().rstrip("/") != norm_u]
             if (self.engine.state.get("server") or "").strip().rstrip("/") == norm_u:
                 self.engine.state["server"] = ""
                 self.var_srv.set("")
                 self._last_synced_srv = ""
             commit_state(self.engine.state)
+            if hasattr(self, "_render_fav_servers"):
+                self._render_fav_servers()
             _render()
 
         _render()
@@ -1520,6 +1537,8 @@ class DialogsMixin:
             st["cloud_save_archives"] = bool(v_cloud_save_archives.get())
             st["cloud_save_logs"] = bool(v_cloud_save_logs.get())
             st["cloud_path"] = cloud_path
+            if hasattr(self, "var_cloud_path"):
+                self.var_cloud_path.set(cloud_path)
             st["cloud_max_archives"] = max(0, int(v_cloud_max_cnt.get() or 0))
             st["cloud_max_size_gb"] = max(0.0, round(float(v_cloud_max_gb.get() or 0.0), 2))
             st["cloud_fit_free_space"] = bool(v_cloud_fit_free.get())

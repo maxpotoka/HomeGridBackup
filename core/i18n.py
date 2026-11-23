@@ -6,7 +6,11 @@
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: dest-stats-bg-worker-2.61
 # patch-id: speed-journal-auto-target-2.62
-# [ФАЙЛ: core/i18n.py (v2.18 | 23.11.2026 23:00) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# patch-id: pcloud-inline-path-2.63
+# patch-id: lan-btn-layout68-2.64
+# patch-id: fav-servers-pills-2.65
+# patch-id: pcloud-stats-refresh-compact-2.67
+# [ФАЙЛ: core/i18n.py (v2.22 | 24.11.2026 00:25) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 from functools import lru_cache
 
@@ -446,6 +450,16 @@ EN_EXACT = {
     "● вимкнено": "● disabled",
     "Обрати мережеву папку": "Select network folder",
     "Налаштування pCloud": "pCloud settings",
+    "Автопошук LAN": "LAN Auto-scan",
+    "Локально": "Local Stats",
+    "Журнал": "Journal",
+    "Перевірка SHA": "Verify SHA",
+    "немає rclone": "rclone missing",
+    "не підключено": "not connected",
+    "в черзі": "queued",
+    "Обрані:": "Favorites:",
+    "+ Додати": "+ Add",
+    "Папка у хмарі pCloud (напр. HomeGridBackup)": "Cloud folder in pCloud (e.g. HomeGridBackup)",
     "Історія адрес та автопошук у LAN": "Address history and LAN auto-scan",
     "Папка файлів протоколів (backup.log та звіти)": "Protocol files folder (backup.log & reports)",
     "Як папка архівів": "Same as archives folder",

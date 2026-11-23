@@ -6,7 +6,8 @@ from core.i18n import tr
 # patch-id: android-storage-fallback-2.06
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: dest-stats-bg-worker-2.61
-# [ФАЙЛ: core/engine.py (v2.08 | 23.11.2026 22:15) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: split-last-backup-2.68
+# [ФАЙЛ: core/engine.py (v2.09 | 24.11.2026 00:35) — ЯДРО ДВИЖКА BACKUPENGINE]
 # ==============================================================================
 import os
 import re
@@ -415,9 +416,9 @@ class BackupEngine:
                         except (TypeError, ValueError, OverflowError):
                             pass
                     if has_sha:
-                        res = (f"{dt_s}  •  {mb_s} МБ{duration_label}  •  SHA-256 ✔", "ok")
+                        res = (f"{dt_s}\n{mb_s} МБ{duration_label}  •  SHA-256 ✔", "ok")
                     else:
-                        res = (f"{dt_s}  •  {mb_s} МБ{duration_label}  •  Без .sha256", "warn")
+                        res = (f"{dt_s}\n{mb_s} МБ{duration_label}  •  Без .sha256", "warn")
             except Exception:
                 res = ("Невідомо", "idle")
         self._last_backup_cache = res

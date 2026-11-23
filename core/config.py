@@ -22,7 +22,16 @@
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: dest-stats-bg-worker-2.61
 # patch-id: speed-journal-auto-target-2.62
-# [ФАЙЛ: core/config.py (v2.44 | 23.11.2026 23:00) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: pcloud-inline-path-2.63
+# patch-id: lan-btn-layout68-2.64
+# patch-id: fav-servers-pills-2.65
+# patch-id: big-bottom-pbar-2.66
+# patch-id: pcloud-stats-refresh-compact-2.67
+# patch-id: split-last-backup-2.68
+# patch-id: pretty-last-backup-2.69
+# patch-id: tall-pbar-server-marquee-2.70
+# patch-id: force-tall-pbar-and-grid-2.74
+# [ФАЙЛ: core/config.py (v2.56 | 24.11.2026 02:15) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -93,8 +102,8 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.62"
-BUILD_DATE = "23.11.2026 20:30"
+SCRIPT_VER = "2.74"
+BUILD_DATE = "24.11.2026 02:15"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -396,7 +405,7 @@ def record_server_history(state, srv_url):
 
 def load_state():
     state = {
-        "server": "", "server_history": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
+        "server": "", "server_history": [], "favorite_servers": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR, "logs_dir": "",
         "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "journal_sync_target": "auto",
         "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
@@ -425,6 +434,8 @@ def load_state():
                 state["all_time_mb"] = round(float(data["all_time_mb"]), 1)
             if isinstance(data.get("server_history"), list):
                 state["server_history"] = [str(x).strip() for x in data["server_history"] if str(x).strip()][:15]
+            if isinstance(data.get("favorite_servers"), list):
+                state["favorite_servers"] = [str(x).strip() for x in data["favorite_servers"] if str(x).strip()][:8]
             if data.get("backup_dir"):
                 state["backup_dir"] = os.path.expanduser(str(data["backup_dir"]).strip())
             if data.get("logs_dir"):
@@ -543,7 +554,7 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "logs_dir", "mirror_dir", "mirror_enabled",
+        "server", "server_history", "favorite_servers", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "logs_dir", "mirror_dir", "mirror_enabled",
         "net_dir", "net_enabled", "journal_sync_target",
         "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
