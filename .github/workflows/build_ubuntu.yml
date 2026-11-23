@@ -145,13 +145,11 @@ jobs:
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
-      - name: Delete old releases and tags
+           - name: Delete old releases and tags
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for rel in $(gh release list --json tagName -q '.[].tagName'); do
-            gh release delete "$rel" --yes || true
-          done
+          gh release delete ubuntu-x64-latest --yes || true
           git push origin --delete ubuntu-x64-latest || true
 
       - name: Publish clean .7z to GitHub Releases
