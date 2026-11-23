@@ -15,7 +15,41 @@ from uuid import uuid4
 # patch-id: pcloud-only-simple-ui-2.27
 # patch-id: pcloud-clean-hints-2.30
 # patch-id: cloud-speed-stats-2.31
+# patch-id: pcloud-speed-progress-gradient-2.33
 from core.config import SCRIPT_VER
+_PCT_RE = re.compile(r"(\d+)%")
+
+def _rclone_upload_with_progress(src_path, dst_remote_file, progress_cb=None, timeout=3600):
+    exe = _rclone_executable()
+    if not exe:
+        raise RuntimeError("Не знайдено rclone. Покладіть rclone.exe (або rclone) поруч із програмою.")
+    cmd = [
+        exe, "copyto", src_path, dst_remote_file,
+        "--transfers", "4", "--multi-thread-streams", "4",
+        "--buffer-size", "32M", "--pcloud-upload-cutoff", "64M",
+        "--retries", "3", "--low-level-retries", "10",
+        "--stats", "1s", "--stats-one-line",
+    ]
+    proc = subprocess.Popen(
+        cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=_NO_WINDOW
+    )
+    tail = []
+    for raw in proc.stdout:
+        ln = raw.strip()
+        if ln:
+            tail.append(ln)
+            if len(tail) > 8: tail.pop(0)
+            if progress_cb:
+                m = _PCT_RE.search(ln)
+                pct = int(m.group(1)) if m else None
+                parts = [p.strip() for p in ln.split(",") if p.strip()]
+                info = " | ".join(parts[:3]) if parts else ln
+                progress_cb(pct, info)
+    rc = proc.wait(timeout=timeout)
+    if rc != 0:
+        raise RuntimeError((" ".join(tail) or "rclone upload failed")[-700:])
+
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 
 _REMOTE_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -292,7 +326,7 @@ def _rclone(*args, timeout=3600):
     return result.stdout
 
 
-def sync_cloud_backups(engine, prune=False):
+def sync_cloud_backups(engine, prune=False, progress_cb=None):
     if not engine.state.get("cloud_enabled") or not engine.state.get("cloud_save_archives", True):
         return
     pending_path = None
@@ -325,7 +359,7 @@ def sync_cloud_backups(engine, prune=False):
             keep_names.add(remote_name)
             try:
                 _write_cloud_archive_status(engine, path, "queued")
-                _rclone("copyto", path, f"{remote_dir}/{remote_name}")
+                _rclone_upload_with_progress(path, f"{remote_dir}/{remote_name}", progress_cb=progress_cb)
                 sha_path = path + ".sha256"
                 if os.path.isfile(sha_path):
                     if shared_user_folder:
@@ -803,9 +837,12 @@ def fetch_cloud_speed_stats(engine, refresh=True):
         mb = float(op.get("size_mb") or 0.0)
         if dur <= 0.0 or (mb <= 0.0 and not str(op.get("archive", "")).lower().endswith(".zip")):
             continue
-        spd = float(op.get("speed_mbps") or op.get("download_speed_mbps") or 0.0)
-        if spd <= 0.0 and mb > 0.0:
-            spd = round(mb / dur, 2)
+        dl_d = float(op.get("download_duration_sec") or 0.0)
+        spd = float(op.get("download_speed_mbps") or 0.0)
+        if spd <= 0.0 and mb > 0.0 and dl_d > 0.0:
+            spd = round(mb / dl_d, 2)
+        if spd <= 0.0:
+            spd = float(op.get("speed_mbps") or (round(mb / dur, 2) if mb > 0.0 else 0.0))
         os_n = " ".join(str(op.get(k) or "").strip() for k in ("platform", "platform_version") if op.get(k)).strip() or "OS"
         did = op["device_id"]
         tag = f"#{did[:4]}" if len(did) >= 4 else ""

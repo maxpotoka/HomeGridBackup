@@ -393,7 +393,17 @@ EN_EXACT = {
     "Помилка мережі": "Network error",
     # patch-id: pcloud-only-simple-ui-2.27
     "Завдання Linux не знайдено або вже видалено.": "Linux task not found or already deleted.",
+    # patch-id: center-storage-notepad-2.40
     "5. Налаштування pCloud": "5. pCloud Settings",
+    "Підключення та папки": "Connection & Folders",
+    "Сховище та аналітика": "Storage & Analytics",
+    "Сервер:": "Server:",
+    "Архіви:": "Archives:",
+    "Дзеркало:": "Mirror:",
+    "ЛОКАЛЬНО:": "LOCAL:",
+    "ОСТАННІЙ:": "LAST:",
+    "↗ Відкрити": "↗ Open",
+    "Статистика pCloud": "pCloud Stats",
     "Увімкнути синхронізацію з pCloud": "Enable pCloud sync",
     "Зберігати архів у pCloud": "Save archive to pCloud",
     "Зберігати журнал у pCloud": "Save log to pCloud",

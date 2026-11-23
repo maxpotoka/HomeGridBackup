@@ -15,6 +15,7 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
+# patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: cloud-speed-stats-2.31
 from core.config import SCRIPT_VER, commit_state
 from core.files import format_duration
@@ -1593,7 +1594,7 @@ class DialogsMixin:
 
         chart_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=10, pady=6)
         chart_f.pack(fill="x", padx=14, pady=4)
-        tk.Label(chart_f, text="ПОРІВНЯННЯ ШВИДКОСТІ СИСТЕМ ЗА ОСТАННІМИ 2 АРХІВАМИ (МБ/с та час):" if lang == "uk" else "SYSTEM SPEED COMPARISON (LAST 2 ARCHIVES, MB/s & duration):", bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
+        tk.Label(chart_f, text="ЧИСТА ШВИДКІСТЬ ЗАВАНТАЖЕННЯ ЗА ОСТАННІМИ 2 АРХІВАМИ (МБ/с та повний час):" if lang == "uk" else "SYSTEM SPEED COMPARISON (LAST 2 ARCHIVES, MB/s & duration):", bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
         cv = tk.Canvas(chart_f, height=int(128 * k), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
         cv.pack(fill="x", pady=(4, 0))
 

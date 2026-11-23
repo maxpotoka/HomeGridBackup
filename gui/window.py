@@ -11,6 +11,8 @@ from core.i18n import tr, apply_widget_i18n
 import os
 import threading
 import tkinter as tk
+# patch-id: center-storage-notepad-2.40
+# patch-id: dashboard-redesign-2.34
 from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 from core.files import open_folder_native, choose_folder_native, get_app_icon_path
@@ -100,57 +102,43 @@ class HomeGridApp(DialogsMixin):
 
     def _setup_native_menubar(self):
         import sys
+        if sys.platform != "darwin":
+            try: self.root.configure(menu="")
+            except Exception: pass
+            return
         try:
             lng = self.engine.state.get("lang", "en")
-            p = self._get_palette()
-            m_kw = {} if sys.platform == "darwin" else {"bg": p["panel"], "fg": p["text"], "activebackground": p["blue"], "activeforeground": "#ffffff"}
-            menubar = tk.Menu(self.root, **m_kw)
-
-            if sys.platform == "darwin":
-                app_menu = tk.Menu(menubar, name="apple", tearoff=0)
-                app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
-                app_menu.add_separator()
-                app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
-                app_menu.add_separator()
-                app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
-                menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
-                try:
-                    self.root.createcommand("tk::mac::Quit", self.confirm_exit)
-                    self.root.createcommand("tk::mac::ShowPreferences", self.open_settings)
-                    self.root.createcommand("tk::mac::ReopenApplication", self.show_window)
-                except Exception:
-                    pass
-
-            file_menu = tk.Menu(menubar, tearoff=0, **m_kw)
-            file_menu.add_command(label=tr("ЗАПУСТИТИ БЕКАП", lng), command=self.do_backup)
-            file_menu.add_command(label=tr("Автопошук", lng), command=self.do_scan)
-            file_menu.add_separator()
-            file_menu.add_command(label=tr("Відкрити папку", lng), command=self.open_backup_folder)
-            file_menu.add_separator()
-            file_menu.add_command(label=tr("Закрити", lng), command=self.on_window_close)
-            if sys.platform != "darwin":
-                file_menu.add_command(label=tr("Вихід", lng), command=self.confirm_exit)
-            menubar.add_cascade(label="Файл" if lng == "uk" else "File", menu=file_menu)
-
-            tools_menu = tk.Menu(menubar, tearoff=0, **m_kw)
-            tools_menu.add_command(label=tr("Статистика", lng), command=self.open_stats_modal)
-            tools_menu.add_command(label=tr("Журнал операцій", lng), command=self.open_ops_history)
-            tools_menu.add_command(label=tr("Аналіз GFS / SHA-256", lng), command=self.open_analyze)
-            tools_menu.add_separator()
-            is_dk = (self.engine.state.get("theme", "dark") == "dark")
-            tools_menu.add_command(label=tr("Світла тема" if is_dk else "Темна тема", lng), command=self.toggle_theme_quick)
-            if sys.platform != "darwin":
-                tools_menu.add_command(label=tr("Налаштування", lng), command=self.open_settings)
-            menubar.add_cascade(label="Інструменти" if lng == "uk" else "Tools", menu=tools_menu)
-
-            if sys.platform != "darwin":
-                help_menu = tk.Menu(menubar, tearoff=0, **m_kw)
-                help_menu.add_command(label=tr("Про програму", lng), command=self.open_about)
-                menubar.add_cascade(label="Довідка" if lng == "uk" else "Help", menu=help_menu)
-
+            menubar = tk.Menu(self.root)
+            app_menu = tk.Menu(menubar, name="apple", tearoff=0)
+            app_menu.add_command(label=tr("Про програму", lng) + " HomeGrid Backup", command=self.open_about)
+            app_menu.add_separator()
+            app_menu.add_command(label=tr("Налаштування", lng) + "...", accelerator="Command+,", command=self.open_settings)
+            app_menu.add_separator()
+            app_menu.add_command(label=tr("Вихід", lng), accelerator="Command+Q", command=self.confirm_exit)
+            menubar.add_cascade(label="HomeGrid Backup", menu=app_menu)
             self.root.configure(menu=menubar)
         except Exception:
             pass
+
+    def open_burger_menu(self):
+        lng = self.engine.state.get("lang", "en")
+        p = self._get_palette()
+        m = tk.Menu(self.root, tearoff=0, bg=p["panel"], fg=p["text"], activebackground=p["blue"], activeforeground="#ffffff", font=(self._base_fam, self.metrics["font_sz"]))
+        m.add_command(label="▶  " + tr("ЗАПУСТИТИ БЕКАП", lng), command=self.do_backup)
+        m.add_command(label="🔍  " + tr("Автопошук", lng), command=self.do_scan)
+        m.add_command(label="📂  " + tr("Відкрити папку", lng), command=self.open_backup_folder)
+        m.add_separator()
+        m.add_command(label="📊  " + tr("Статистика", lng), command=self.open_stats_modal)
+        m.add_command(label="☁  " + ("Статистика pCloud" if lng == "uk" else "pCloud Speed Stats"), command=self.open_cloud_stats_modal)
+        m.add_command(label="📋  " + tr("Журнал операцій", lng), command=self.open_ops_history)
+        m.add_command(label="🛡  " + tr("Аналіз GFS / SHA-256", lng), command=self.open_analyze)
+        m.add_separator()
+        m.add_command(label="⚙  " + tr("Налаштування", lng), command=self.open_settings)
+        m.add_command(label="ℹ  " + tr("Про програму", lng), command=self.open_about)
+        m.add_separator()
+        m.add_command(label="✖  " + tr("Вихід", lng), command=self.confirm_exit)
+        m.tk_popup(self.btn_burger.winfo_rootx(), self.btn_burger.winfo_rooty() + self.btn_burger.winfo_height())
+
 
     def _apply_window_icon(self):
         ico = get_app_icon_path()
@@ -306,114 +294,122 @@ class HomeGridApp(DialogsMixin):
     def _build_ui(self):
         py, px = self.metrics["pad_y"], self.metrics["pad_x"]
         fs = self.metrics["font_sz"]
-        self.header = tk.Frame(self.root, padx=px, pady=py, bd=1, relief="solid")
-        self.header.pack(side="top", fill="x")
+        self.var_cloud_st = tk.StringVar(value="pCloud: вимкнено")
 
+        self.header = tk.Frame(self.root, padx=px, pady=max(6, py), bd=0, highlightthickness=1)
+        self.header.pack(side="top", fill="x")
         hdr_left = tk.Frame(self.header)
         hdr_left.pack(side="left", fill="x", expand=True)
+        self.btn_burger = tk.Button(hdr_left, text="☰", command=self.open_burger_menu, padx=8, pady=2, bd=0, cursor="hand2")
+        self.btn_burger.pack(side="left", padx=(0, 8))
         self.lbl_title = tk.Label(hdr_left, text="HomeGrid Backup", font=(self._base_fam, fs + 4, "bold"))
-        self.lbl_title.pack(anchor="w")
+        self.lbl_title.pack(side="left")
         self.lbl_sub = tk.Label(hdr_left, text="", font=(self._base_fam, 1))
 
         hdr_right = tk.Frame(self.header)
         hdr_right.pack(side="right")
-        self.btn_theme = tk.Button(hdr_right, text="☀️ Світла тема", command=self.toggle_theme_quick, padx=10, pady=4, cursor="hand2")
+        self.btn_cloud_badge = tk.Button(hdr_right, textvariable=self.var_cloud_st, command=lambda: self.open_settings(initial_tab=2), padx=10, pady=3, bd=0, cursor="hand2")
+        self.btn_cloud_badge.pack(side="left", padx=(0, 8))
+        self.btn_theme = tk.Button(hdr_right, text="☀️ Світла тема", command=self.toggle_theme_quick, padx=10, pady=3, bd=0, cursor="hand2")
         self.btn_theme.pack(side="left", padx=(0, 6))
-        ToolTip(self.btn_theme, "Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)")
-        self.btn_mode = tk.Button(hdr_right, text="Графіка (1920×1080) ▾", command=self.open_mode_menu, padx=10, pady=4, cursor="hand2")
-        self.btn_mode.pack(side="left", padx=(6, 0))
-        ToolTip(self.btn_mode, "Оберіть режим (Графіка / LITE) або роздільну здатність вікна")
+        self.btn_mode = tk.Button(hdr_right, text="Графіка ▾", command=self.open_mode_menu, padx=8, pady=3, bd=0, cursor="hand2")
+        self.btn_mode.pack(side="left")
 
-        self.footer = tk.Frame(self.root, padx=px, pady=py, bd=1, relief="solid")
+        self.footer = tk.Frame(self.root, padx=px, pady=max(6, py), bd=0, highlightthickness=1)
         self.footer.pack(side="bottom", fill="x")
 
         self.body = tk.Frame(self.root, padx=px, pady=py)
         self.body.pack(side="top", fill="both", expand=True)
 
-        self.card_conn = tk.Frame(self.body, padx=px, pady=py, bd=1, relief="solid")
-        self.card_conn.pack(fill="x", pady=(0, py))
-        self.lbl_c1 = tk.Label(self.card_conn, text="Підключення до сервера та папки збереження", font=(self._base_fam, fs, "bold"))
-        self.lbl_c1.pack(anchor="w", pady=(0, 4))
+        self.top_split = tk.Frame(self.body)
+        self.top_split.pack(fill="x", pady=(0, py))
+        self.top_split.columnconfigure(0, weight=3)
+        self.top_split.columnconfigure(1, weight=2)
 
-        conn_grid = tk.Frame(self.card_conn)
-        conn_grid.pack(fill="x", pady=(2, 0))
-        conn_grid.columnconfigure(1, weight=1)
-        for c_btn in (2, 3, 4):
-            conn_grid.columnconfigure(c_btn, weight=0, uniform="b")
+        self.card_conn = tk.Frame(self.top_split, padx=px, pady=py, bd=0, highlightthickness=1)
+        self.card_conn.grid(row=0, column=0, sticky="nsew", padx=(0, max(6, px // 2)))
+        c1_hdr = tk.Frame(self.card_conn)
+        c1_hdr.pack(fill="x", pady=(0, 6))
+        self.lbl_c1 = tk.Label(c1_hdr, text="Підключення та папки", font=(self._base_fam, fs, "bold"))
+        self.lbl_c1.pack(side="left")
+        self.var_srv_badge = tk.StringVar(value="")
+        self.lbl_srv_badge = tk.Label(c1_hdr, textvariable=self.var_srv_badge, font=(self._base_fam, max(8, fs - 1), "bold"))
+        self.lbl_srv_badge.pack(side="right")
 
-        self.l_srv = tk.Label(conn_grid, text="Адреса:", anchor="w", font=(self._base_fam, fs))
-        self.l_srv.grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_srv = tk.Entry(conn_grid, width=1, textvariable=self.var_srv, bd=1, relief="solid", font=(self._base_fam, fs))
-        self.ent_srv.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
-        self.btn_hist = tk.Button(conn_grid, text="Історія", command=self.open_history_modal, padx=8, pady=2, cursor="hand2")
-        self.btn_hist.grid(row=0, column=2, sticky="ew", padx=(0, 4), pady=2)
-        self.btn_conn = tk.Button(conn_grid, text="Підключити", command=self.do_connect, padx=10, pady=2, cursor="hand2")
-        self.btn_conn.grid(row=0, column=3, sticky="ew", padx=(0, 4), pady=2)
-        self.btn_scan = tk.Button(conn_grid, text="Автопошук", command=self.do_scan, padx=8, pady=2, cursor="hand2")
-        self.btn_scan.grid(row=0, column=4, sticky="ew", pady=2)
-        self.btn_pick_lan = tk.Button(conn_grid, text="Виявлені (0)", command=self.open_discovered_menu, state="disabled", padx=8, pady=2, cursor="hand2")
-        ToolTip(self.btn_pick_lan, "Список серверів, виявлених під час останнього сканування локальної мережі")
+        cg = tk.Frame(self.card_conn)
+        cg.pack(fill="x")
+        cg.columnconfigure(1, weight=1)
+        self.l_srv = tk.Label(cg, text="Сервер:", anchor="w", font=(self._base_fam, fs))
+        self.l_srv.grid(row=0, column=0, sticky="w", padx=(0, 6), pady=3)
+        self.ent_srv = tk.Entry(cg, width=1, textvariable=self.var_srv, bd=0, highlightthickness=1, font=(self._base_fam, fs))
+        self.ent_srv.grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
+        self.btn_hist = tk.Button(cg, text="🕒", command=self.open_history_modal, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_hist.grid(row=0, column=2, padx=2, pady=3)
+        self.btn_scan = tk.Button(cg, text="🔍", command=self.do_scan, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_scan.grid(row=0, column=3, padx=2, pady=3)
+        self.btn_conn = tk.Button(cg, text="Підключити", command=self.do_connect, padx=10, pady=2, bd=0, cursor="hand2")
+        self.btn_conn.grid(row=0, column=4, sticky="ew", padx=(4, 0), pady=3)
+        self.btn_pick_lan = tk.Button(cg, text="Виявлені (0)", command=self.open_discovered_menu, state="disabled", padx=8, pady=2, bd=0, cursor="hand2")
+
+        self.l_dir = tk.Label(cg, text="Архіви:", anchor="w", font=(self._base_fam, fs))
+        self.l_dir.grid(row=1, column=0, sticky="w", padx=(0, 6), pady=3)
+        self.ent_dir = tk.Entry(cg, width=1, textvariable=self.var_dir, bd=0, highlightthickness=1, font=(self._base_fam, fs))
+        self.ent_dir.grid(row=1, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
+        self.btn_dir = tk.Button(cg, text="📂", command=self.choose_dir, width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_dir.grid(row=1, column=2, columnspan=2, sticky="ew", padx=2, pady=3)
+        self.btn_open_dir = tk.Button(cg, text="↗ Відкрити", command=self.open_backup_folder, padx=10, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_open_dir.grid(row=1, column=4, sticky="ew", padx=(4, 0), pady=3)
+
+        self.l_mir = tk.Label(cg, text="Дзеркало:", anchor="w", font=(self._base_fam, fs))
+        self.l_mir.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=3)
+        self.ent_mir = tk.Entry(cg, width=1, textvariable=self.var_mirror, state="disabled", bd=0, highlightthickness=1, font=(self._base_fam, fs))
+        self.ent_mir.grid(row=2, column=1, sticky="ew", padx=(0, 4), pady=3, ipady=4)
+        self.btn_mir = tk.Button(cg, text="📂", command=self.choose_mirror, state="disabled", width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_mir.grid(row=2, column=2, padx=2, pady=3)
+        self.btn_net_mir = tk.Button(cg, text="🌐", command=lambda: self.open_settings(initial_tab=2), width=3, pady=2, bd=0, highlightthickness=1, cursor="hand2")
+        self.btn_net_mir.grid(row=2, column=3, padx=2, pady=3)
+        self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", False)) and bool(self.var_mirror.get().strip()))
+        self.chk_mir_tog = tk.Checkbutton(cg, text="Увімкнено", variable=self.var_mir_en, command=self.toggle_mirror, cursor="hand2")
+        self.chk_mir_tog.grid(row=2, column=4, sticky="w", padx=(4, 0), pady=3)
         self.ent_srv.bind("<Return>", lambda e: (self._apply_srv_autofill(), self.do_connect()))
         self.ent_srv.bind("<FocusOut>", lambda e: self._apply_srv_autofill())
         self.ent_srv.bind("<KeyRelease>", self._on_srv_key_release)
-
-        self.l_dir = tk.Label(conn_grid, text="Папка:", anchor="w", font=(self._base_fam, fs))
-        self.l_dir.grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_dir = tk.Entry(conn_grid, width=1, textvariable=self.var_dir, bd=1, relief="solid", font=(self._base_fam, fs))
-        self.ent_dir.grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
-        self.btn_dir = tk.Button(conn_grid, text="Папка архівів...", command=self.choose_dir, padx=8, pady=2, cursor="hand2")
-        self.btn_dir.grid(row=1, column=2, columnspan=2, sticky="ew", padx=(0, 4), pady=2)
-        self.btn_open_dir = tk.Button(conn_grid, text="Відкрити папку", command=self.open_backup_folder, padx=8, pady=2, cursor="hand2")
-        self.btn_open_dir.grid(row=1, column=4, sticky="ew", pady=2)
         self.ent_dir.bind("<FocusOut>", lambda e: self.save_dir_manual())
-
-        self.l_mir = tk.Label(conn_grid, text="Дзеркало:", anchor="w", font=(self._base_fam, fs))
-        self.l_mir.grid(row=2, column=0, sticky="w", padx=(0, 6), pady=2)
-        self.ent_mir = tk.Entry(conn_grid, width=1, textvariable=self.var_mirror, state="disabled", bd=1, relief="solid", font=(self._base_fam, fs))
-        self.ent_mir.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=2, ipady=2)
-        self.btn_mir = tk.Button(conn_grid, text="Папка дзеркала...", command=self.choose_mirror, state="disabled", padx=8, pady=2)
-        self.btn_mir.grid(row=2, column=2, columnspan=2, sticky="ew", padx=(0, 4), pady=2)
-        self.var_mir_en = tk.BooleanVar(value=bool(self.engine.state.get("mirror_enabled", False)) and bool(self.var_mirror.get().strip()))
-        self.chk_mir_tog = tk.Checkbutton(conn_grid, text="Увімкнено", variable=self.var_mir_en, command=self.toggle_mirror, cursor="hand2")
-        self.chk_mir_tog.grid(row=2, column=4, sticky="w", pady=2)
         self.ent_mir.bind("<FocusOut>", lambda e: self.save_mirror_manual())
 
-        self.card_stat = tk.Frame(self.body, padx=12, pady=py, bd=1, relief="solid")
-        self.card_stat.pack(fill="x", pady=(0, py))
-        stat_row = tk.Frame(self.card_stat)
-        stat_row.pack(fill="x")
+        self.card_stat = tk.Frame(self.top_split, padx=px, pady=py, bd=0, highlightthickness=1)
+        self.card_stat.grid(row=0, column=1, sticky="nsew", padx=(max(6, px // 2), 0))
+        self.lbl_c2 = tk.Label(self.card_stat, text="Сховище та аналітика", font=(self._base_fam, fs, "bold"), anchor="center")
+        self.lbl_c2.pack(fill="x", pady=(0, 6))
 
-        stat_row.columnconfigure(0, weight=1)
-        stat_row.columnconfigure(1, weight=0)
-
-        t2 = tk.Frame(stat_row)
-        t2.grid(row=0, column=0, sticky="w", padx=(0, 12))
-        self.t2_cap = tk.Label(t2, text="ЛОКАЛЬНЕ СХОВИЩЕ:", font=(self._base_fam, max(8, fs - 1), "bold"))
+        t2 = tk.Frame(self.card_stat)
+        t2.pack(anchor="center", pady=2)
+        self.t2_cap = tk.Label(t2, text="ЛОКАЛЬНО:", font=(self._base_fam, max(8, fs - 1), "bold"))
         self.t2_cap.pack(side="left", padx=(0, 6))
         self.t2_val = tk.Label(t2, textvariable=self.var_disk, font=(self._base_fam, fs, "bold"))
         self.t2_val.pack(side="left")
 
-        t3 = tk.Frame(stat_row)
-        t3.grid(row=1, column=0, sticky="w", padx=(0, 12), pady=(3, 0))
-        self.t3_cap = tk.Label(t3, text="ОСТАННІЙ АРХІВ:", font=(self._base_fam, max(8, fs - 1), "bold"))
+        t3 = tk.Frame(self.card_stat)
+        t3.pack(anchor="center", pady=2)
+        self.t3_cap = tk.Label(t3, text="ОСТАННІЙ:", font=(self._base_fam, max(8, fs - 1), "bold"))
         self.t3_cap.pack(side="left", padx=(0, 6))
         self.t3_val = tk.Label(t3, textvariable=self.var_last_bkp, font=(self._base_fam, fs, "bold"))
         self.t3_val.pack(side="left")
 
-        self.stat_btns = tk.Frame(stat_row)
-        self.stat_btns.grid(row=2, column=0, sticky="w", pady=(6, 0))
-# patch-id: cloud-stats-btn-2.31
-        self.btn_stats = tk.Button(self.stat_btns, text="Статистика", command=self.open_stats_modal, padx=10, pady=5, cursor="hand2")
-        self.btn_stats.pack(side="left", padx=(0, 6))
-        self.btn_cstats = tk.Button(self.stat_btns, text="☁ Статистика pCloud", command=self.open_cloud_stats_modal, padx=10, pady=5, cursor="hand2")
-        self.btn_cstats.pack(side="left", padx=(0, 6))
-        self.btn_ops_hist = tk.Button(self.stat_btns, text="Журнал операцій", command=self.open_ops_history, padx=10, pady=5, cursor="hand2")
-        self.btn_ops_hist.pack(side="left", padx=(0, 6))
-        self.btn_analyze = tk.Button(self.stat_btns, text="Аналіз GFS / SHA-256", command=self.open_analyze, padx=12, pady=5, cursor="hand2")
-        self.btn_analyze.pack(side="left")
-        ToolTip(self.btn_analyze, "Відкрити список архівів, керування мітками KEEP та перевірку цілісності SHA-256")
+        self.stat_btns = tk.Frame(self.card_stat)
+        self.stat_btns.pack(fill="x", pady=(8, 0))
+        self.stat_btns.columnconfigure(0, weight=1)
+        self.stat_btns.columnconfigure(1, weight=1)
+        self.btn_stats = tk.Button(self.stat_btns, text="📊 Статистика", command=self.open_stats_modal, pady=4, bd=0, cursor="hand2")
+        self.btn_stats.grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=2)
+        self.btn_cstats = tk.Button(self.stat_btns, text="☁ Статистика pCloud", command=self.open_cloud_stats_modal, pady=4, bd=0, cursor="hand2")
+        self.btn_cstats.grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=2)
+        self.btn_ops_hist = tk.Button(self.stat_btns, text="📋 Журнал операцій", command=self.open_ops_history, pady=4, bd=0, cursor="hand2")
+        self.btn_ops_hist.grid(row=1, column=0, sticky="ew", padx=(0, 4), pady=2)
+        self.btn_analyze = tk.Button(self.stat_btns, text="🛡 Аналіз GFS / SHA-256", command=self.open_analyze, pady=4, bd=0, cursor="hand2")
+        self.btn_analyze.grid(row=1, column=1, sticky="ew", padx=(4, 0), pady=2)
 
-        self.card_prog = tk.Frame(self.body, padx=12, pady=py, bd=1, relief="solid")
+        self.card_prog = tk.Frame(self.body, padx=px, pady=py, bd=0, highlightthickness=1)
         self.card_prog.pack(fill="x", pady=(0, py))
         p_top = tk.Frame(self.card_prog)
         p_top.pack(fill="x", pady=(0, 4))
@@ -421,57 +417,60 @@ class HomeGridApp(DialogsMixin):
         self.lbl_stage.pack(side="left")
         self.lbl_pct = tk.Label(p_top, textvariable=self.var_pct, font=(self._base_fam, fs, "bold"))
         self.lbl_pct.pack(side="right")
-        self.lbl_pill = tk.Label(p_top, text="Очікування", padx=8, pady=1, bd=1, relief="solid", font=(self._base_fam, max(8, fs - 1), "bold"))
+        self.lbl_pill = tk.Label(p_top, text="Очікування", padx=8, pady=1, bd=0, font=(self._base_fam, max(8, fs - 1), "bold"))
         self.lbl_pill.pack(side="right", padx=(0, 10))
         self.pbar = StyledProgressBar(self.card_prog, height=18)
         self.pbar.pack(fill="x")
 
-        self.card_log = tk.Frame(self.body, padx=12, pady=py, bd=1, relief="solid")
+        self.card_log = tk.Frame(self.body, padx=px, pady=py, bd=0, highlightthickness=1)
         self.card_log.pack(fill="both", expand=True)
         log_hdr = tk.Frame(self.card_log)
         log_hdr.pack(fill="x", pady=(0, 4))
         self.lbl_c4 = tk.Label(log_hdr, text="Системний лог", font=(self._base_fam, fs, "bold"))
         self.lbl_c4.pack(side="left")
-        self.btn_clear_log = tk.Button(log_hdr, text="Очистити", command=self.clear_log_view, padx=8, pady=1, cursor="hand2")
+        self.btn_clear_log = tk.Button(log_hdr, text="Очистити", command=self.clear_log_view, padx=8, pady=1, bd=0, cursor="hand2")
         self.btn_clear_log.pack(side="right")
+        self.btn_open_log = tk.Button(log_hdr, text="📄 backup.log", command=self.open_raw_log_file, padx=8, pady=1, bd=0, cursor="hand2")
+        self.btn_open_log.pack(side="right", padx=(0, 6))
 
         log_wrap = tk.Frame(self.card_log)
         log_wrap.pack(fill="both", expand=True)
-        self.txt_log = tk.Text(log_wrap, height=10, wrap="word", state="disabled", font=(self._base_fam, fs), bd=1, relief="solid", padx=10, pady=6, spacing1=1, spacing3=1)
+        self.txt_log = tk.Text(log_wrap, height=10, wrap="word", state="disabled", font=(self._base_fam, fs), bd=0, highlightthickness=1, padx=10, pady=6, spacing1=1, spacing3=1)
         sb = tk.Scrollbar(log_wrap, command=self.txt_log.yview)
         self.txt_log.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.txt_log.pack(side="left", fill="both", expand=True)
         self.txt_log.bind("<Configure>", lambda _e: self._center_log_vertically(), add="+")
 
-        self.btn_start = tk.Button(self.footer, text="ЗАПУСТИТИ БЕКАП", command=self.do_backup, font=(self._base_fam, fs, "bold"), padx=16, pady=5, cursor="hand2")
+        self.btn_start = tk.Button(self.footer, text="▶ ЗАПУСТИТИ БЕКАП", command=self.do_backup, font=(self._base_fam, fs, "bold"), padx=18, pady=5, bd=0, cursor="hand2")
         self.btn_start.pack(side="left", padx=(0, 10))
-        self.btn_strat = tk.Button(self.footer, text="Налаштування", command=self.open_settings, padx=12, pady=5, cursor="hand2")
-        self.btn_strat.pack(side="left", padx=8)
-        self.btn_about = tk.Button(self.footer, text="Про програму", command=self.open_about, padx=12, pady=5, cursor="hand2")
-        self.btn_about.pack(side="left", padx=8)
-        self.btn_exit = tk.Button(self.footer, text="Вихід", command=self.confirm_exit, padx=14, pady=5, cursor="hand2")
-        self.btn_exit.pack(side="right", padx=(8, 0))
-        for w_tip, t_tip in (
-            (self.ent_srv, "IP-адреса або URL сервера HomeGrid Monitor (додайте ! в кінці, щоб пропустити перевірку)"),
-            (self.btn_hist, "Відкрити список раніше збережених адрес серверів"),
-            (self.btn_conn, "Перевірити зв'язок із вказаним сервером та авторизуватися"),
-            (self.btn_scan, "Автоматичний пошук серверів HomeGrid Monitor у локальній мережі"),
-            (self.ent_dir, "Локальна папка для збереження ZIP-архівів та файлів .sha256"),
-            (self.btn_dir, "Обрати іншу папку для збереження резервних копій"),
-            (self.btn_open_dir, "Відкрити папку з архівами у файловому менеджері"),
-            (self.ent_mir, "Додаткова папка для автоматичного дублювання кожного нового бекапу"),
-            (self.btn_mir, "Обрати папку для дзеркального копіювання архівів"),
-            (self.chk_mir_tog, "Увімкнути або вимкнути автоматичне копіювання у дзеркальну папку"),
-            (self.btn_stats, "Зведена статистика копій за періодами та стан захисту SHA-256"),
-            (self.btn_ops_hist, "Журнал останніх 25 операцій резервного копіювання"),
-            (self.btn_clear_log, "Очистити поточні повідомлення у вікні системного логу"),
-            (self.btn_start, "Запустити створення та перевірку нової резервної копії зараз"),
-            (self.btn_strat, "Налаштування глибини GFS, розкладу, трею, мови та теми"),
-            (self.btn_about, "Інформація про версію та можливості програми"),
-            (self.btn_exit, "Завершити роботу програми та вийти"),
-        ):
+        self.btn_strat = tk.Button(self.footer, text="⚙ Налаштування", command=self.open_settings, padx=12, pady=5, bd=0, cursor="hand2")
+        self.btn_strat.pack(side="left", padx=6)
+        self.btn_about = tk.Button(self.footer, text="ℹ Про програму", command=self.open_about, padx=12, pady=5, bd=0, cursor="hand2")
+        self.btn_about.pack(side="left", padx=6)
+        self.btn_exit = tk.Button(self.footer, text="✖ Вихід", command=self.confirm_exit, padx=14, pady=5, bd=0, cursor="hand2")
+        self.btn_exit.pack(side="right")
+        for w_tip, t_tip in ((self.btn_hist, "Історія адрес"), (self.btn_scan, "Автопошук у LAN"), (self.btn_dir, "Обрати папку"), (self.btn_open_dir, "Відкрити папку"), (self.btn_mir, "Обрати папку дзеркала"), (self.btn_open_log, "Відкрити текстовий файл backup.log")):
             ToolTip(w_tip, t_tip)
+
+    def open_raw_log_file(self):
+        import sys, subprocess
+        bdir = self.engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR
+        os.makedirs(bdir, exist_ok=True)
+        lp = os.path.join(bdir, "backup.log")
+        if not os.path.isfile(lp):
+            with open(lp, "w", encoding="utf-8") as f:
+                f.write("")
+        try:
+            if os.name == "nt":
+                os.startfile(lp)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-t", lp])
+            else:
+                subprocess.Popen(["xdg-open", lp], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as ex:
+            self.engine.log(f"Не вдалося відкрити backup.log: {ex}", "warn")
+
 
     def apply_theme_and_mode(self, resize_win=False, live_outer_wh=None):
         self.metrics = _calc_screen_metrics(
@@ -521,6 +520,14 @@ class HomeGridApp(DialogsMixin):
 
         self.root.configure(bg=p["bg"])
         self.body.configure(bg=p["bg"], padx=px, pady=py)
+        if hasattr(self, "top_split"): self.top_split.configure(bg=p["bg"])
+        if hasattr(self, "lbl_c2"): self.lbl_c2.configure(bg=p["panel"], fg=p["text"], font=f_bold)
+        if hasattr(self, "btn_burger"): self.btn_burger.configure(bg=p["card"], fg=p["text"], font=f_bold)
+        if hasattr(self, "btn_open_log"): self.btn_open_log.configure(bg=p["card"], fg=p["cyan"], font=f_sub)
+        if hasattr(self, "btn_cloud_badge"):
+            c_on = bool(self.engine.state.get("cloud_enabled"))
+            self.var_cloud_st.set("☁ pCloud: ON" if c_on else "☁ pCloud: OFF")
+            self.btn_cloud_badge.configure(bg=p["card"], fg=p["green"] if c_on else p["muted"], font=f_sub)
         for frm in (self.header, self.card_conn, self.card_stat, self.card_prog, self.card_log, self.footer):
             frm.configure(bg=p["panel"], highlightbackground=p["border"], padx=px, pady=py, relief=rel, bd=bd_w)
         for parent_frm in (self.header, self.card_conn, self.card_stat, self.card_prog, self.card_log):
@@ -540,7 +547,7 @@ class HomeGridApp(DialogsMixin):
             lbl.configure(bg=p["panel"], fg=p["muted"], font=f_main)
 
         for ent in (self.ent_srv, self.ent_dir, self.ent_mir):
-            ent.configure(bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], font=f_main)
+            ent.configure(bg=p["inp_bg"], fg=p["text"], insertbackground=p["text"], highlightbackground=p["border"], highlightcolor=p["blue"], font=f_main)
 
         f_big = f_bold
         self.t2_cap.configure(bg=p["panel"], fg=p["muted"], font=f_cap)
@@ -564,7 +571,8 @@ class HomeGridApp(DialogsMixin):
         self.txt_log.tag_configure("b_err", background="#fee2e2", foreground="#b91c1c", font=(fam, max(8, fs - 1), "bold"))
 
         dis_fg = p["muted"]
-        for b in (self.btn_hist, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_about):
+        for b in (self.btn_hist, self.btn_scan, self.btn_dir, self.btn_open_dir, self.btn_mir, self.btn_net_mir, self.btn_about):
+            b.configure(highlightbackground=p["border"])
             b.configure(bg=p["card"], fg=p["text"], disabledforeground=dis_fg, activebackground=p["border"], activeforeground=p["text"], font=f_main, padx=bpx, pady=bpy)
 
         self.btn_clear_log.configure(bg=p["card"], fg=p["muted"], disabledforeground=dis_fg, activebackground=p["border"], activeforeground=p["text"], font=f_sub, padx=max(6, bpx - 2), pady=1)
@@ -855,6 +863,19 @@ class HomeGridApp(DialogsMixin):
                 free_txt = f" — Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
                 self.var_disk.set(tr(f"{z_cnt} архівів ({z_mb} МБ){free_txt}", cur_lang))
 
+            if hasattr(self, "lbl_srv_badge"):
+                dn = getattr(self.engine, "diag_net", "") or ""
+                dp = getattr(self.engine, "diag_ping", "") or ""
+                _s_sig = (dn, dp, cur_theme)
+                if getattr(self, "_last_srv_b_sig", None) != _s_sig:
+                    self._last_srv_b_sig = _s_sig
+                    p_c = self._get_palette()
+                    if "ОНЛАЙН" in dn:
+                        self.var_srv_badge.set(f"● {dp}" if dp else "● Online")
+                        self.lbl_srv_badge.configure(bg=p_c["panel"], fg=p_c["green"])
+                    elif "ОФЛАЙН" in dn:
+                        self.var_srv_badge.set("● Offline")
+                        self.lbl_srv_badge.configure(bg=p_c["panel"], fg=p_c["red"])
             if hasattr(self.engine, "get_last_backup_info") and hasattr(self, "t3_val"):
                 lb_txt, lb_st = self.engine.get_last_backup_info()
                 _lb_sig = (lb_txt, lb_st, cur_lang, cur_theme, cur_lite)

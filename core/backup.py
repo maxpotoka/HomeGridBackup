@@ -16,6 +16,7 @@ import urllib.request
 import http.cookiejar
 from urllib.parse import urlparse
 from datetime import datetime
+# patch-id: pcloud-speed-progress-gradient-2.33
 from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state, SCRIPT_VER, get_fast_sysinfo
 from core.files import pretty_phase, format_duration, format_backup_dt
 from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
@@ -48,12 +49,12 @@ def _sync_cloud_reports(engine):
             from core.cloud import start_cloud_sync_worker
             start_cloud_sync_worker(engine)
 
-def _sync_cloud_backups(engine, prune=False):
+def _sync_cloud_backups(engine, prune=False, progress_cb=None):
     if not engine.state.get("cloud_enabled"):
         return False
     try:
         from core.cloud import sync_cloud_backups
-        return sync_cloud_backups(engine, prune=prune) is not False
+        return sync_cloud_backups(engine, prune=prune, progress_cb=progress_cb) is not False
     except Exception as exc:
         _cloud_sync_warning(engine, "Попередження: не вдалося синхронізувати хмарні архіви: ", exc)
         from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
@@ -418,7 +419,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
         if ph == "checking":
             engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({elapsed_ph:.1f} с)...")
         else:
-            phase_ranges = {"preparing": (25, 30), "copying": (30, 55), "processing": (55, 60), "packing": (60, 75), "ready": (75, 75)}
+            has_cl = bool(engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True))
+            phase_ranges = {"preparing": (15, 20), "copying": (20, 32), "processing": (32, 37), "packing": (37, 45), "ready": (45, 45)} if has_cl else {"preparing": (25, 30), "copying": (30, 55), "processing": (55, 60), "packing": (60, 75), "ready": (75, 75)}
             p_start, p_end = phase_ranges.get(ph, (25, 75))
             overall_pct = p_start + int((pct / 100.0) * (p_end - p_start))
             engine.set_progress(overall_pct, f"[{srv_label}] {pretty_phase(ph)}: {pct}%{sz_txt}")
@@ -433,7 +435,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 )
             engine._last_srv_timings = {k: round(v, 1) for k, v in srv_times.items()}
             engine._last_srv_timings["dl_t0"] = time.time()
-            engine.set_progress(75, f"[{srv_label}] Архів готовий (75%). Завантаження...")
+            p_rdy = 45 if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else 75
+            engine.set_progress(p_rdy, f"[{srv_label}] Архів готовий ({p_rdy}%). Завантаження...")
             break
         if st.get("status") == "error" or ph == "error":
             raise RuntimeError(f"Сервер {srv_label} повідомив про помилку під час створення архіву!")
@@ -501,7 +504,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                             att_lbl = f" [спроба {attempt}/{max_attempts}]" if attempt > 1 else ""
                             if eb > 0:
                                 dpct = min(99, int((cb / eb) * 100))
-                                engine.set_progress(75 + int(dpct * 0.17), f"Завантаження{att_lbl}: {cm:.1f}/{eb/1048576.0:.1f} МБ | Швидкість: {speed_txt}")
+                                dl_b, dl_s = (45, 20) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (75, 17)
+                                engine.set_progress(dl_b + int(dpct * (dl_s / 100.0)), f"Завантаження{att_lbl}: {cm:.1f}/{eb/1048576.0:.1f} МБ | Швидкість: {speed_txt}")
                             else:
                                 engine.set_progress(83, f"Завантаження{att_lbl}: {cm:.1f} МБ | Швидкість: {speed_txt}")
                 dl_ok = True
@@ -608,7 +612,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
                 processed += len(blk)
                 if time.time() - last_ui >= 0.8:
                     last_ui = time.time()
-                    pct = 92 + int((processed / max(1, total_bytes)) * 5)
+                    h_b, h_s = (66, 5) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (92, 5)
+                    pct = h_b + int((processed / max(1, total_bytes)) * h_s)
                     engine.set_progress(pct, f"Розрахунок SHA-256: {processed / 1048576.0:.1f} / {total_mb:.1f} МБ")
 
         disk_sha_low = h.hexdigest().lower()
@@ -661,7 +666,10 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             archive=out_file, duration_sec=time.time() - gfs_started
         )
         cloud_sync_started = time.time()
-        cloud_synced = _sync_cloud_backups(engine, prune=gfs_cleanup_applied)
+        def _pcloud_cb(cpct, cinfo):
+            p_val = 73 + int(((cpct or 0) / 100.0) * 26)
+            engine.set_progress(min(99, p_val), f"pCloud: {cinfo}")
+        cloud_synced = _sync_cloud_backups(engine, prune=gfs_cleanup_applied, progress_cb=_pcloud_cb)
         _record_cloud_event(
             engine, operation_id, "stage_completed", stage="cloud_archive_sync",
             archive=out_file, duration_sec=time.time() - cloud_sync_started,

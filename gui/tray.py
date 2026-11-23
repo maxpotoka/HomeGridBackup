@@ -1,4 +1,5 @@
 # ==============================================================================
+# patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: linux-wayland-sni-bridge-2.32
 # patch-id: linux-xorg-tray-menu-2.26
 # [ФАЙЛ: gui/tray.py (v2.07 | 23.11.2026 07:05)
@@ -177,7 +178,49 @@ def _get_tray_font():
     _TRAY_FONT = ImageFont.load_default()
     return _TRAY_FONT
 
-def create_tray_image(pct=0, spin_idx=0):
+
+def _status_gradient_rgb(pct, is_run, pill_type):
+    if pill_type == "err":
+        return (239, 68, 68, 255)
+    if pill_type == "warn":
+        return (245, 158, 11, 255)
+    if not is_run:
+        return (16, 185, 129, 255)
+    t = max(0.0, min(1.0, float(pct) / 100.0))
+    if t <= 0.5:
+        k = t / 0.5
+        return (int(16 + (14 - 16) * k), int(185 + (165 - 185) * k), int(129 + (233 - 129) * k), 255)
+    k = (t - 0.5) / 0.5
+    return (int(14 + (245 - 14) * k), int(165 + (158 - 165) * k), int(233 + (11 - 233) * k), 255)
+
+def _show_wayland_fallback_badge(engine):
+    import sys
+    if not sys.platform.startswith("linux") or engine.app_ref is None:
+        return
+    app = engine.app_ref
+    if getattr(app, "_wl_badge", None) is not None:
+        return
+    try:
+        top = tk.Toplevel(app.root)
+        top.wm_overrideredirect(True)
+        top.attributes("-topmost", True)
+        lbl = tk.Label(top, text="● HomeGrid", fg="#ffffff", bg="#10b981", font=("Ubuntu", 9, "bold"), padx=10, pady=4, cursor="hand2")
+        lbl.pack()
+        lbl.bind("<Button-1>", lambda _e: app.show_window())
+        top.geometry("+14+38")
+        app._wl_badge = top
+        def _tick():
+            if not top.winfo_exists(): return
+            r, g, b, _ = _status_gradient_rgb(engine.progress if engine.is_running else 0, engine.is_running, getattr(engine, "pill_type", "idle"))
+            hx = f"#{r:02x}{g:02x}{b:02x}"
+            txt = f"● {int(engine.progress)}%" if engine.is_running else "● HGB OK"
+            lbl.configure(bg=hx, text=txt)
+            top.after(1000, _tick)
+        _tick()
+    except Exception:
+        pass
+
+def create_tray_image(pct=0, spin_idx=0, pill_type="idle"):
     from core.files import get_app_icon_path
     ico_p = get_app_icon_path()
     base_img = None
@@ -197,12 +240,13 @@ def create_tray_image(pct=0, spin_idx=0):
         return img
     img = Image.new("RGBA", (64, 64), (11, 18, 32, 255))
     drw = ImageDraw.Draw(img)
-    drw.ellipse([3, 3, 61, 61], outline=(43, 127, 255, 255), width=6)
+    col_g = _status_gradient_rgb(pct, pct > 0, pill_type)
+    drw.ellipse([3, 3, 61, 61], fill=col_g, outline=(255, 255, 255, 220), width=4)
     return img
 
 def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
     try:
-        return create_tray_image(pct, spin_idx)
+        return create_tray_image(pct, spin_idx, pill_type)
     except Exception:
         img = Image.new("RGBA", (64, 64), (16, 185, 129, 255) if pill_type == "ok" else (43, 127, 255, 255))
         drw = ImageDraw.Draw(img)
@@ -309,6 +353,8 @@ def _start_tray_thread(engine):
                         engine.tray_icon = None
                         engine.tray_ready_event.set()
                         engine.log(_tray_problem(), "warn")
+                        if engine.app_ref is not None:
+                            engine.app_ref.root.after(0, lambda: _show_wayland_fallback_badge(engine))
                         return
                     _start_tray_thread(engine)
 
