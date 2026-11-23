@@ -136,6 +136,7 @@ jobs:
           fi
           echo "[OK] Shortcut created: $DESKTOP_FILE"
           EOF
+          sed -i 's/^          //' dist/install_shortcut.sh
           chmod +x dist/install_shortcut.sh
 
       - name: Package application into single .7z
@@ -145,7 +146,7 @@ jobs:
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
-           - name: Delete old releases and tags
+      - name: Delete old releases and tags
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
