@@ -191,20 +191,30 @@ except Exception:
 _TRAY_LOCK = threading.Lock()
 _TRAY_STARTED = False
 _TRAY_STOP = threading.Event()
-_TRAY_FONT = None
 
-def _get_tray_font():
-    global _TRAY_FONT
-    if _TRAY_FONT is not None:
-        return _TRAY_FONT
-    for fp in ("arialbd.ttf", "segoeui.ttf", "DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
-        try:
-            _TRAY_FONT = ImageFont.truetype(fp, 18)
-            return _TRAY_FONT
-        except Exception:
-            pass
-    _TRAY_FONT = ImageFont.load_default()
-    return _TRAY_FONT
+# Режимы трея, которые пользователь выбирает вручную в настройках (state["tray_backend"]).
+# "auto" — как раньше, автоопределение.
+_LINUX_TRAY_MODES = ("auto", "appindicator", "sni-bridge", "gtk", "xorg", "none")
+_MAC_TRAY_MODES = ("auto", "pystray", "none")
+TRAY_MODE_HINTS = {
+    "appindicator": "Ubuntu/GNOME/XFCE с AppIndicator: нужен пакет gir1.2-ayatanaappindicator3-0.1. Значок должен появиться в верхней панели.",
+    "sni-bridge": "Wayland или панель StatusNotifier без доступного gi: используется системный /usr/bin/python3. Смотрите строку «AppIndicator bridge» в логе.",
+    "gtk": "X11: Tkinter-меню внутри окна/панели, запасной вариант, если нет AppIndicator.",
+    "xorg": "Классический XEmbed-трей: работает только на панелях с X11 System Tray.",
+    "none": "Трей выключен, программа работает без значка.",
+    "pystray": "macOS: значок в верхнем Menu Bar через pystray. Если значка нет, смотрите «[TRAY DETAIL]» в логе.",
+}
+
+
+def _requested_tray_backend(engine):
+    raw = str(engine.state.get("tray_backend", "auto") or "auto").strip().lower()
+    allowed = _LINUX_TRAY_MODES if os.sys.platform.startswith("linux") else _MAC_TRAY_MODES
+    if raw in ("", "auto"):
+        return ""
+    if raw not in allowed:
+        engine.log(f"[TRAY MODE] невідомий режим '{raw}', використано auto", "warn")
+        return ""
+    return raw
 
 
 def _status_gradient_rgb(pct, is_run, pill_type):
@@ -249,15 +259,22 @@ def _show_wayland_fallback_badge(engine):
     except Exception:
         pass
 
+_BASE_ICON_CACHE = {}
+
+def _get_base_icon(ico_p):
+    if not ico_p:
+        return None
+    if ico_p not in _BASE_ICON_CACHE:
+        try:
+            _BASE_ICON_CACHE[ico_p] = Image.open(ico_p).convert("RGBA").resize((64, 64), Image.LANCZOS)
+        except Exception:
+            _BASE_ICON_CACHE[ico_p] = None
+    return _BASE_ICON_CACHE[ico_p]
+
 def create_tray_image(pct=0, spin_idx=0, pill_type="idle"):
     from core.files import get_app_icon_path
     ico_p = get_app_icon_path()
-    base_img = None
-    if ico_p:
-        try:
-            base_img = Image.open(ico_p).convert("RGBA").resize((64, 64), Image.LANCZOS)
-        except Exception:
-            base_img = None
+    base_img = _get_base_icon(ico_p)
     if base_img is not None:
         img = base_img.copy()
         p_val = max(0, min(100, int(pct)))
@@ -352,7 +369,12 @@ def _start_tray_thread(engine):
 
                 def _probe_linux_tray():
                     global _LNX_TRAY_BE
-                    _LNX_TRAY_BE = _detect_linux_tray_backend()
+                    forced = _requested_tray_backend(engine)
+                    if forced:
+                        _LNX_TRAY_BE = "" if forced == "none" else forced
+                        engine.log(f"[TRAY MODE] вибрано вручну: {forced}. {TRAY_MODE_HINTS.get(forced, '')} Після зміни режиму перезапустіть застосунок.", "info")
+                    else:
+                        _LNX_TRAY_BE = _detect_linux_tray_backend()
                     engine.log(_linux_tray_diag_line(), "info")
                     if _LNX_TRAY_BE == "sni-bridge":
                         if _start_wayland_sni_bridge(engine):
@@ -368,7 +390,10 @@ def _start_tray_thread(engine):
                         engine.tray_ready = False
                         engine.tray_icon = None
                         engine.tray_ready_event.set()
-                        engine.log(_tray_problem(), "warn")
+                        if forced == "none":
+                            engine.log("[TRAY MODE] трей вимкнено вручну в налаштуваннях.", "info")
+                        else:
+                            engine.log(_tray_problem(), "warn")
                         _enqueue_tray_ui(lambda: _show_wayland_fallback_badge(engine))
                         return
                     _start_tray_thread(engine)
@@ -389,6 +414,11 @@ def _start_tray_thread(engine):
             _TRAY_STARTED = True
             engine.tray_icon = None
             engine.log("Системний трей недоступний у середовищі WSL — робота продовжується без іконки в треї.", "info")
+            return
+        if os.sys.platform == "darwin" and _requested_tray_backend(engine) == "none":
+            _TRAY_STARTED = True
+            engine.tray_icon = None
+            engine.log("[TRAY MODE] трей вимкнено вручну в налаштуваннях.", "info")
             return
         if not _tray_backend_available():
             _TRAY_STARTED = True
@@ -492,14 +522,10 @@ def _start_tray_thread(engine):
         if engine.app_ref is not None:
             _enqueue_tray_ui(engine.app_ref.show_window)
 
-    def _refresh_tray_menu():
-        if engine.tray_icon is not None:
-            engine.tray_icon.menu = _build_tray_menu()
-            engine.tray_icon.update_menu()
-
     def _anim_loop():
         err_streak = 0
         last_sig, last_menu_sig, last_title = None, None, ""
+        last_menu_ts = 0.0
         while not _TRAY_STOP.is_set():
             _TRAY_STOP.wait(1.0)
             if _TRAY_STOP.is_set():
@@ -523,10 +549,13 @@ def _start_tray_thread(engine):
                 if sig != last_sig:
                     engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
                     last_sig = sig
-                if engine.is_running or menu_sig != last_menu_sig:
+                now_m = time.monotonic()
+                menu_due = (now_m - last_menu_ts) >= 3.0
+                if menu_sig != last_menu_sig or (engine.is_running and menu_due):
                     engine.tray_icon.menu = _build_tray_menu()
                     engine.tray_icon.update_menu()
                     last_menu_sig = menu_sig
+                    last_menu_ts = now_m
                 if new_title != last_title:
                     engine.tray_icon.title = new_title
                     last_title = new_title
@@ -698,18 +727,21 @@ def _start_wayland_sni_bridge(engine):
                 pass
 
     def _sync_loop():
-        t0, last_st, last_run = None, "", None
+        t0, last_st, last_run, last_send = None, "", None, 0.0
         while not _TRAY_STOP.is_set() and proc.poll() is None:
             _TRAY_STOP.wait(1.0)
             if not engine.is_running: t0 = None
             elif t0 is None: t0 = time.monotonic()
             sec = int(time.monotonic() - t0) if t0 else 0
             st_s = _tray_status_text(engine, engine.state.get("lang", "en"), sec)
+            now_s = time.monotonic()
             if st_s != last_st or engine.is_running != last_run:
+                if engine.is_running == last_run and (now_s - last_send) < 2.0:
+                    continue
                 try:
                     proc.stdin.write(json.dumps({"status": st_s, "running": bool(engine.is_running)}, ensure_ascii=False) + "\n")
                     proc.stdin.flush()
-                    last_st, last_run = st_s, bool(engine.is_running)
+                    last_st, last_run, last_send = st_s, bool(engine.is_running), now_s
                 except Exception:
                     break
 
