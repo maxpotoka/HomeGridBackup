@@ -7,7 +7,6 @@ import os
 import re
 import sys
 import time
-from ctypes import wintypes
 from datetime import datetime
 
 from core.config import BUILD_DATE, CLI_MODE, HIDDEN_MODE, SCRIPT_VER, SILENT_MODE
@@ -56,7 +55,7 @@ def _safe_con_write(text):
             k32 = ctypes.windll.kernel32
             h_out = k32.GetStdHandle(-11)
             if h_out and h_out != -1 and h_out != 0:
-                written = wintypes.DWORD(0)
+                written = ctypes.c_ulong(0)
                 if k32.WriteConsoleW(h_out, ctypes.c_wchar_p(text), len(text), ctypes.byref(written), None):
                     return
         except Exception:
