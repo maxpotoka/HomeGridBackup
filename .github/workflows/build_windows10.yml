@@ -1,167 +1,101 @@
-name: Build HomeGrid Backup for Windows 10/11 (Folder x64)
+name: Build HomeGrid Backup Windows 10/11 (folder + installer)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
+
+concurrency:
+  group: build-win10-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-win10-onefile:
+  build-win10:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout repository
+      - name: Checkout selected branch
         uses: actions/checkout@v4
 
-      - name: Set up 64-bit Python 3.12 (Windows 10/11)
+      - name: Set up 64-bit Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           architecture: "x64"
 
-      - name: Install Python build dependencies
+      - name: Install Python dependencies
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           python -m pip install --upgrade pip
           pip install nuitka pillow pystray keyring send2trash
+          python -c "import sys,struct; assert sys.version_info[:2]==(3,12) and struct.calcsize('P')*8==64"
 
-      - name: Build single-file Windows 10/11 binary with Nuitka (minimal compression)
-        shell: cmd
-        run: |
-          set "ICON_FLAG="
-          if exist "icon.ico" set "ICON_FLAG=--windows-icon-from-ico=icon.ico"
-          python -m nuitka ^
-            --standalone ^
-            --lto=yes ^
-            --msvc=latest ^
-            --jobs=4 ^
-            --python-flag=no_site ^
-            --python-flag=no_asserts ^
-            --python-flag=no_docstrings ^
-            --noinclude-pytest-mode=nofollow ^
-            --noinclude-setuptools-mode=nofollow ^
-            --noinclude-unittest-mode=nofollow ^
-            --assume-yes-for-downloads ^
-            --windows-console-mode=attach ^
-            --enable-plugin=tk-inter ^
-            --company-name="HomeGrid" ^
-            --product-name="HomeGrid Backup" ^
-            --include-data-files=icon.ico=icon.ico ^
-            --file-version="1.0.55.0" ^
-            --product-version="1.0.55.0" ^
-            --file-description="HomeGrid Backup Utility (Windows 10/11 x64)" ^
-            %ICON_FLAG% ^
-            --include-package=core ^
-            --include-package=console ^
-            --include-package=gui ^
-            --include-package=pystray ^
-            --include-module=pystray._win32 ^
-            --include-package=PIL ^
-            --include-package=keyring ^
-            --include-module=keyring.backends.Windows ^
-            --include-package=send2trash ^
-            --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo,tkinter.test,PIL.ImageQt,PIL.ImageTk,PIL.SpiderImagePlugin ^
-            --output-dir=dist_win10 ^
-            --output-filename=HomeGridBackup.exe ^
-            main.py
-
-      - name: Bundle verified rclone for Windows x64
+      - name: Set build variant (Windows 10/11)
         shell: pwsh
         run: |
-          $asset = "rclone-v1.76.0-windows-amd64.zip"
-          Invoke-WebRequest "https://downloads.rclone.org/v1.76.0/$asset" -OutFile $asset
-          $expected = "8b4fd2737ade4e70c057ef4a49deb7cffe94b0fb9d7587c189d149823f21a1dc"
-          $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) { throw "rclone SHA-256 mismatch" }
-          Expand-Archive $asset -DestinationPath rclone-win -Force
-          $rcloneDir = Get-ChildItem rclone-win -Directory | Select-Object -First 1
-          Copy-Item "$($rcloneDir.FullName)/rclone.exe" dist_win10/rclone.exe
-          Invoke-WebRequest "https://raw.githubusercontent.com/rclone/rclone/v1.76.0/COPYING" -OutFile dist_win10/rclone-LICENSE.txt
-          Compress-Archive -Path "dist_win10/*" -DestinationPath HomeGridBackup_win10_x64.zip -Force
+          $ErrorActionPreference = 'Stop'
+          Set-Content -Path core\build_variant.py -Value 'WINDOWS7_CLOUD_SYNC_PREVIEW = False' -Encoding ascii
 
-      - name: Build per-user Windows 10 installer
+      - name: Build folder with Nuitka
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $nuitkaArgs = @(
+            '--standalone', '--lto=yes', '--msvc=latest', '--jobs=4',
+            '--python-flag=no_site', '--python-flag=no_asserts', '--python-flag=no_docstrings',
+            '--enable-plugin=tk-inter', '--windows-console-mode=attach', '--assume-yes-for-downloads',
+            '--company-name=HomeGrid', '--product-name=HomeGrid Backup',
+            '--file-version=1.0.55.0', '--product-version=1.0.55.0',
+            '--file-description=HomeGrid Backup Utility (Windows 10/11 x64)',
+            '--include-data-files=icon.ico=icon.ico', '--windows-icon-from-ico=icon.ico',
+            '--include-package=core', '--include-package=console', '--include-package=gui',
+            '--include-package=pystray', '--include-module=pystray._win32',
+            '--include-package=PIL', '--include-package=keyring',
+            '--include-module=keyring.backends.Windows', '--include-package=send2trash',
+            '--nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo',
+            '--output-dir=dist_win10', '--output-filename=HomeGridBackup.exe', 'main.py'
+          )
+          python -m nuitka @nuitkaArgs
+          if ($LASTEXITCODE -ne 0) { throw "Nuitka failed: $LASTEXITCODE" }
+          if (-not (Test-Path 'dist_win10\main.dist\HomeGridBackup.exe')) {
+            throw 'HomeGridBackup.exe was not created'
+          }
+
+      - name: Prepare installer payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'packaging\installer_payload' | Out-Null
+          robocopy 'dist_win10\main.dist' 'packaging\installer_payload' /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+          if ($LASTEXITCODE -ge 8) { throw "robocopy failed: $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
           choco install innosetup -y --no-progress
-          New-Item -ItemType Directory -Force -Path "packaging\installer_payload" | Out-Null
-          Copy-Item -Path "dist_win10\*" -Destination "packaging\installer_payload" -Recurse -Force
-          $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
-          & $compiler /DAppVersion=2.25 /DOutputBaseFilename=HomeGridBackup_Win10_x64_Setup packaging\windows_user_setup.iss
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed: $LASTEXITCODE" }
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "Inno Setup not found: $iscc" }
+          New-Item -ItemType Directory -Force -Path 'release' | Out-Null
+          & $iscc '/DAppVersion=2.25' '/DOutputBaseFilename=HomeGridBackup_Win10_x64_Setup' '/Orelease' 'packaging\windows_user_setup.iss'
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+          if (-not (Test-Path 'release\HomeGridBackup_Win10_x64_Setup.exe')) { throw 'Installer was not created' }
 
-      - name: Set build completion timestamp
-        id: build_time
+      - name: Collect output
         shell: pwsh
         run: |
-          $utcNow = [DateTime]::UtcNow
-          $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
-          $buildDate = $utcNow.ToString("yyyy.MM.dd")
-          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
-          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'output' | Out-Null
+          Copy-Item 'dist_win10\main.dist' 'output\HomeGridBackup_win10_folder' -Recurse -Force
+          Copy-Item 'release\HomeGridBackup_Win10_x64_Setup.exe' 'output\'
 
-      - name: Generate version tag
-        id: tag
-        shell: pwsh
-        run: |
-          $date = "${{ steps.build_time.outputs.date }}"
-          $runNumber = "${{ github.run_number }}"
-          $tag = "win10-x64-v$date.$runNumber"
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
-
-      - name: Delete old Windows 10/11 releases
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = "Continue"
-          $releasesJson = gh release list --json tagName 2>$null
-          if ([string]::IsNullOrWhiteSpace($releasesJson)) {
-            Write-Host "No releases found, skipping cleanup."
-            exit 0
-          }
-          $releases = $releasesJson | ConvertFrom-Json
-          if ($null -eq $releases -or $releases.Count -eq 0) {
-            Write-Host "Release list is empty, skipping cleanup."
-            exit 0
-          }
-          foreach ($release in $releases) {
-            if ($release.tagName -match "^win10-x64-v\d{4}\.\d{2}\.\d{2}") {
-              Write-Host "Deleting old release: $($release.tagName)"
-              gh release delete $release.tagName --yes 2>$null
-              $tagExists = git ls-remote --tags origin $release.tagName 2>$null
-              if (-not [string]::IsNullOrWhiteSpace($tagExists)) {
-                git push origin --delete $release.tagName 2>$null
-                Write-Host "Deleted remote tag: $($release.tagName)"
-              } else {
-                Write-Host "Remote tag already deleted: $($release.tagName)"
-              }
-            }
-          }
-          Write-Host "Cleanup completed successfully."
-
-      - name: Publish clean .exe to GitHub Releases
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: HomeGrid Backup — Windows 10/11 (OneFile x64) — ${{ steps.build_time.outputs.value }}
-          body: |
-            ## HomeGrid Backup для Windows 10/11 (x64 OneFile)
-            
-            **Версія:** ${{ steps.tag.outputs.tag }}  
-            **Дата збірки:** ${{ steps.build_time.outputs.value }}
-            
-            Установщик **HomeGridBackup_Win10_x64_Setup.exe** устанавливает приложение и rclone 1.76.0 для текущего пользователя в `%LOCALAPPDATA%\Programs\HomeGridBackup`. Права администратора не нужны.
-            Портативные варианты **HomeGridBackup.exe** и **HomeGridBackup_win10_x64.zip** также сохранены.
-            
-            ### Системні вимоги:
-            - Windows 10 / 11 (64-bit)
-            - .NET Framework не потрібен
-          files: |
-            dist_win10/HomeGridBackup.exe
-            HomeGridBackup_win10_x64.zip
-            packaging/installer_output/HomeGridBackup_Win10_x64_Setup.exe
-          fail_on_unmatched_files: true
-          make_latest: true
+          name: HomeGridBackup_win10_${{ github.run_number }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 30
