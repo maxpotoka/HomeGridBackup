@@ -1,4 +1,4 @@
-name: Build HomeGrid Backup for Windows 10/11 (OneFile x64)
+name: Build HomeGrid Backup for Windows 10/11 (Folder x64)
 
 on:
   workflow_dispatch:
@@ -33,9 +33,7 @@ jobs:
           set "ICON_FLAG="
           if exist "icon.ico" set "ICON_FLAG=--windows-icon-from-ico=icon.ico"
           python -m nuitka ^
-            --onefile ^
-            --onefile-no-compression ^
-            --onefile-tempdir-spec="{CACHE_DIR}\HomeGridBackup" ^
+            --standalone ^
             --lto=yes ^
             --msvc=latest ^
             --jobs=4 ^
