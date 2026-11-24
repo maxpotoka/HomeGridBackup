@@ -31,7 +31,9 @@
 # patch-id: pretty-last-backup-2.69
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: force-tall-pbar-and-grid-2.74
-# [ФАЙЛ: core/config.py (v2.56 | 24.11.2026 02:15) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# patch-id: single-pass-verify-speed-2.75
+# patch-id: fix-linux-tray-menu-2.76
+# [ФАЙЛ: core/config.py (v2.58 | 24.11.2026 09:25) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import os
 import re
@@ -102,8 +104,8 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.74"
-BUILD_DATE = "24.11.2026 02:15"
+SCRIPT_VER = "2.76"
+BUILD_DATE = "24.11.2026 09:25"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")

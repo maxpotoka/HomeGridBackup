@@ -37,7 +37,7 @@ from core.files import format_duration
 from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
 from core.backup import verify_all_archives
 from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage_windows_scheduler
-from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES, fix_mac_buttons
+from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, fix_mac_buttons
 # patch-id: settings-all-tabs-homegrid-2.46
 # patch-id: homegrid-design-system-2.45
 from gui.tray import _force_quit_app, _LINUX_TRAY_MODES, _MAC_TRAY_MODES, TRAY_MODE_HINTS

@@ -5,7 +5,8 @@
 # patch-id: card-conn-copies-2.59
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: tall-pbar-server-marquee-2.70
-# [ФАЙЛ: core/backup.py (v2.15 | 24.11.2026 01:15) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 И ЗЕРКАЛО]
+# patch-id: single-pass-verify-speed-2.75
+# [ФАЙЛ: core/backup.py (v2.16 | 24.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 # ==============================================================================
 import os
 import re
@@ -238,16 +239,62 @@ def _backup_stage1_prepare(engine, raw_url, force_skip):
 
 VERIFY_PAUSE_LITE = 0.012  # пауза в LITE, с на каждые 4 МБ (подбирается замером)
 
+class _HashingReader:
+    def __init__(self, raw_file):
+        self._f = raw_file
+        self.hasher = hashlib.sha256()
+        self.hashed_pos = 0
+
+    def read(self, size=-1):
+        pos = self._f.tell()
+        data = self._f.read(size)
+        if not data:
+            return data
+        end = pos + len(data)
+        if pos == self.hashed_pos:
+            self.hasher.update(data)
+            self.hashed_pos = end
+        elif pos < self.hashed_pos < end:
+            self.hasher.update(data[self.hashed_pos - pos :])
+            self.hashed_pos = end
+        return data
+
+    def seek(self, offset, whence=0):
+        return self._f.seek(offset, whence)
+
+    def tell(self):
+        return self._f.tell()
+
+    def finalize_tail(self, buf_size=1048576):
+        self._f.seek(self.hashed_pos)
+        while True:
+            blk = self._f.read(buf_size)
+            if not blk:
+                break
+            self.hasher.update(blk)
+            self.hashed_pos += len(blk)
+
 def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=1048576, cancel_flag=None, io_pause=0.0):
     name = os.path.basename(zip_path)
     if not os.path.isfile(zip_path):
         return {"name": name, "status": "err", "detail": "Файл не знайдено"}
+    sha_path = zip_path + ".sha256"
+    has_sha = os.path.exists(sha_path)
+    expected_hash = ""
+    if has_sha:
+        try:
+            with open(sha_path, "r", encoding="utf-8") as fs:
+                expected_hash = next(iter(fs.read().split()), "").strip().lower()
+        except Exception as e:
+            return {"name": name, "status": "err", "detail": f"Помилка читання .sha256: {e}"}
+
     processed = 0
     since_sleep = 0
     last_rep_t = 0.0
     chunk_sz = max(4096, int(buf_size))
+    stage_lbl = "CRC32 + SHA-256" if has_sha else "CRC32"
 
-    def report(stage):
+    def report():
         nonlocal last_rep_t
         if not progress_callback:
             return
@@ -256,70 +303,63 @@ def verify_single_archive(zip_path, progress_callback=None, overall_start=0, ove
             return
         last_rep_t = now
         pct = int(min(99, (overall_start + processed) * 100.0 / overall_total)) if overall_total else 0
-        progress_callback(pct, f"{stage}: {name}")
+        progress_callback(pct, f"{stage_lbl} {processed / 1048576.0:.1f} МБ: {name}")
 
     try:
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            infos = zf.infolist()
-            cnt = len(infos)
-            if cnt < 1:
-                return {"name": name, "status": "err", "detail": "Порожній ZIP-архів"}
-            for info in infos:
-                crc = 0
-                with zf.open(info, "r") as member:
-                    while True:
-                        if cancel_flag and cancel_flag.get("stop"):
-                            return {"name": name, "status": "warn", "detail": "Перевірку перервано"}
-                        chunk = member.read(chunk_sz)
-                        if not chunk:
-                            break
-                        crc = zlib.crc32(chunk, crc)
-                        processed += len(chunk)
-                        since_sleep += len(chunk)
-                        if io_pause and since_sleep >= 4194304:
-                            since_sleep = 0
-                            time.sleep(io_pause)
-                        report(f"CRC32 {processed / 1048576.0:.1f} МБ")
-                if (crc & 0xFFFFFFFF) != info.CRC:
-                    return {"name": name, "status": "err", "detail": f"Пошкоджений CRC32 у файлі: {info.filename}"}
+        with open(zip_path, "rb", buffering=max(1048576, chunk_sz)) as raw_f:
+            reader = _HashingReader(raw_f)
+            with zipfile.ZipFile(reader, "r") as zf:
+                infos = zf.infolist()
+                cnt = len(infos)
+                if cnt < 1:
+                    return {"name": name, "status": "err", "detail": "Порожній ZIP-архів"}
+                for info in infos:
+                    crc = 0
+                    with zf.open(info, "r") as member:
+                        while True:
+                            if cancel_flag and cancel_flag.get("stop"):
+                                return {"name": name, "status": "warn", "detail": "Перевірку перервано"}
+                            chunk = member.read(chunk_sz)
+                            if not chunk:
+                                break
+                            crc = zlib.crc32(chunk, crc)
+                            processed += len(chunk)
+                            since_sleep += len(chunk)
+                            if io_pause and since_sleep >= 4194304:
+                                since_sleep = 0
+                                time.sleep(io_pause)
+                            report()
+                    if (crc & 0xFFFFFFFF) != info.CRC:
+                        return {"name": name, "status": "err", "detail": f"Пошкоджений CRC32 у файлі: {info.filename}"}
+            if has_sha:
+                reader.finalize_tail(max(1048576, chunk_sz))
     except Exception as e:
-        return {"name": name, "status": "err", "detail": f"Помилка читання ZIP: {e}"}
+        return {"name": name, "status": "err", "detail": f"Помилка перевірки архіву: {e}"}
 
-    sha_path = zip_path + ".sha256"
-    if not os.path.exists(sha_path):
+    if not has_sha:
         return {"name": name, "status": "warn", "detail": f"ZIP OK ({cnt} файлів), але файл .sha256 відсутній"}
-
-    try:
-        with open(sha_path, "r", encoding="utf-8") as fs:
-            expected_hash = next(iter(fs.read().split()), "").strip().lower()
-        h = hashlib.sha256()
-        with open(zip_path, "rb") as f_in:
-            while True:
-                if cancel_flag and cancel_flag.get("stop"):
-                    return {"name": name, "status": "warn", "detail": "Перевірку перервано"}
-                blk = f_in.read(chunk_sz)
-                if not blk:
-                    break
-                h.update(blk)
-                processed += len(blk)
-                since_sleep += len(blk)
-                if io_pause and since_sleep >= 4194304:
-                    since_sleep = 0
-                    time.sleep(io_pause)
-                report(f"SHA-256 {processed / 1048576.0:.1f} МБ")
-        if h.hexdigest().lower() == expected_hash and expected_hash:
-            return {"name": name, "status": "ok", "detail": f"Цілісність 100% підтверджена ({cnt} файлів)"}
-        return {"name": name, "status": "err", "detail": "УВАГА! Контрольна сума SHA-256 не збігається"}
-    except Exception as e:
-        return {"name": name, "status": "err", "detail": f"Помилка перевірки SHA-256: {e}"}
+    if reader.hasher.hexdigest().lower() == expected_hash and expected_hash:
+        return {"name": name, "status": "ok", "detail": f"Цілісність 100% підтверджена ({cnt} файлів)"}
+    return {"name": name, "status": "err", "detail": "УВАГА! Контрольна сума SHA-256 не збігається"}
 
 def verify_all_archives(state, progress_callback=None, buf_size=1048576, cancel_flag=None):
     t0 = time.time()
     io_pause = VERIFY_PAUSE_LITE if state.get("lite_mode") else 0.0
     bdir = state["backup_dir"]
     os.makedirs(bdir, exist_ok=True)
-    zips = sorted([os.path.join(bdir, f) for f in os.listdir(bdir) if f.lower().endswith(".zip")], key=os.path.getmtime, reverse=True)
-    work_sizes = [os.path.getsize(p) * 3 for p in zips]
+    file_entries = []
+    for f in os.listdir(bdir):
+        if f.lower().endswith(".zip"):
+            p = os.path.join(bdir, f)
+            try:
+                st_f = os.stat(p)
+                file_entries.append((p, st_f.st_size, st_f.st_mtime))
+            except OSError:
+                pass
+    file_entries.sort(key=lambda x: x[2], reverse=True)
+    zips = [x[0] for x in file_entries]
+    raw_sizes = [x[1] for x in file_entries]
+    work_sizes = [sz * 2 for sz in raw_sizes]
     total_work, completed_work, results = sum(work_sizes), 0, []
     for index, path in enumerate(zips, 1):
         if cancel_flag and cancel_flag.get("stop"):
@@ -329,7 +369,7 @@ def verify_all_archives(state, progress_callback=None, buf_size=1048576, cancel_
         results.append(verify_single_archive(path, progress_callback, completed_work, total_work, buf_size=buf_size, cancel_flag=cancel_flag, io_pause=io_pause))
         completed_work += work_sizes[index - 1]
     elapsed = max(0.001, time.time() - t0)
-    total_mb = sum(os.path.getsize(p) for p in zips) / 1048576.0
+    total_mb = sum(raw_sizes) / 1048576.0
     speed_mbs = total_mb / elapsed
     return {"total": len(results), "ok_cnt": sum(1 for r in results if r["status"] == "ok"), "warn_cnt": sum(1 for r in results if r["status"] == "warn"), "err_cnt": sum(1 for r in results if r["status"] == "err"), "elapsed": round(elapsed, 2), "speed_mbs": round(speed_mbs, 1), "total_mb": round(total_mb, 1), "cancelled": bool(cancel_flag and cancel_flag.get("stop")), "items": results}
 
@@ -562,7 +602,9 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 os.remove(part_file)
         if dl_ok and size_valid:
             os.replace(part_file, out_file)
-            download_duration = time.time() - download_started
+            download_duration = max(0.05, time.time() - d0)
+            if hasattr(engine, "_last_srv_timings"):
+                engine._last_srv_timings["dl_t0"] = d0
             engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(download_duration, 1)} с", "ok")
             _record_cloud_event(
                 engine, operation_id, "stage_completed", stage="archive_download",
@@ -617,44 +659,47 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         total_bytes = os.path.getsize(out_file)
         total_mb = total_bytes / 1048576.0
         _record_cloud_event(engine, operation_id, "stage_started", stage="archive_crc32_verification", archive=out_file)
-        engine.set_progress(None, f"Перевірка CRC32 ({total_mb:.1f} МБ)...")
-        with zipfile.ZipFile(out_file, "r") as zf:
-            infos = zf.infolist()
-            cnt = len(infos)
-            if cnt < 1:
-                os.remove(out_file)
-                raise RuntimeError("ZIP-архів порожній!")
-            for info in infos:
-                crc = 0
-                with zf.open(info, "r") as member:
-                    for chunk in iter(lambda: member.read(1048576), b""):
-                        crc = zlib.crc32(chunk, crc)
-                if (crc & 0xFFFFFFFF) != info.CRC:
+        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_sha256_verification", archive=out_file)
+        h_b, h_s = (66, 5) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (92, 5)
+        engine.set_progress(h_b, f"Перевірка CRC32 + SHA-256: 0.0 / {total_mb:.1f} МБ")
+        processed_uncomp = 0
+        last_ui = time.time()
+        with open(out_file, "rb", buffering=1048576) as raw_f:
+            reader = _HashingReader(raw_f)
+            with zipfile.ZipFile(reader, "r") as zf:
+                infos = zf.infolist()
+                cnt = len(infos)
+                if cnt < 1:
                     os.remove(out_file)
-                    raise RuntimeError(f"Пошкоджений файл в архіві: {info.filename}")
-        t_sha0 = time.time()
-        crc_duration = max(0.001, t_sha0 - t_ver0)
+                    raise RuntimeError("ZIP-архів порожній!")
+                for info in infos:
+                    crc = 0
+                    with zf.open(info, "r") as member:
+                        for chunk in iter(lambda: member.read(1048576), b""):
+                            crc = zlib.crc32(chunk, crc)
+                            processed_uncomp += len(chunk)
+                            now_v = time.time()
+                            if now_v - last_ui >= 0.5:
+                                last_ui = now_v
+                                pct = h_b + int(min(1.0, reader.hashed_pos / max(1, total_bytes)) * h_s)
+                                engine.set_progress(pct, f"Перевірка CRC32 + SHA-256: {reader.hashed_pos / 1048576.0:.1f} / {total_mb:.1f} МБ")
+                    if (crc & 0xFFFFFFFF) != info.CRC:
+                        os.remove(out_file)
+                        raise RuntimeError(f"Пошкоджений файл в архіві: {info.filename}")
+            t_tail0 = time.time()
+            reader.finalize_tail(1048576)
+        t_ver_end = time.time()
+        crc_duration = max(0.001, t_tail0 - t_ver0)
+        sha_duration = max(0.001, t_ver_end - t_tail0)
         crc_sec = round(max(0.1, crc_duration), 1)
+        sha_sec = round(max(0.1, sha_duration), 1)
+        ver_sec = round(max(0.1, t_ver_end - t_ver0), 1)
         _record_cloud_event(
             engine, operation_id, "stage_completed", stage="archive_crc32_verification",
             archive=out_file, duration_sec=crc_duration, files_count=cnt
         )
 
-        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_sha256_verification", archive=out_file)
-        h = hashlib.sha256()
-        processed = 0
-        last_ui = time.time()
-        with open(out_file, "rb") as f_in:
-            for blk in iter(lambda: f_in.read(1048576), b""):
-                h.update(blk)
-                processed += len(blk)
-                if time.time() - last_ui >= 0.8:
-                    last_ui = time.time()
-                    h_b, h_s = (66, 5) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (92, 5)
-                    pct = h_b + int((processed / max(1, total_bytes)) * h_s)
-                    engine.set_progress(pct, f"Розрахунок SHA-256: {processed / 1048576.0:.1f} / {total_mb:.1f} МБ")
-
-        disk_sha_low = h.hexdigest().lower()
+        disk_sha_low = reader.hasher.hexdigest().lower()
         if net_sha_hex and disk_sha_low != net_sha_hex:
             os.remove(out_file)
             raise RuntimeError("Помилка запису на диск: SHA-256 файлу на носії не збігається зі завантаженим потоком!")
@@ -662,10 +707,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         sha_file = out_file + ".sha256"
         with open(sha_file, "w", encoding="utf-8") as f_sha:
             f_sha.write(f"{zip_hash.lower()}  {os.path.basename(out_file)}\n")
-        sha_duration = max(0.001, time.time() - t_sha0)
-        sha_sec = round(max(0.1, sha_duration), 1)
-        ver_sec = round(crc_sec + sha_sec, 1)
-        engine.log(f"Цілісність перевірено ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
+        engine.log(f"Цілісність перевірено в 1 прохід ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
         _record_cloud_event(
             engine, operation_id, "stage_completed", stage="archive_sha256_verification",
             archive=out_file, size_mb=total_mb, duration_sec=sha_duration, files_count=cnt,

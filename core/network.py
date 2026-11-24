@@ -150,7 +150,7 @@ def ping_host(host, timeout_ms=2000):
                 cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=4
             )
         if res.returncode == 0:
-            m = re.search(r"time[=<]\s*([\d.,]+)\s*ms", res.stdout or "", re.I)
+            m = re.search(r"time[=<]\s*([\d.,]+)\s*ms", res.stdout or "", re.IGNORECASE)
             if m:
                 return True, round(float(m.group(1).replace(",", ".")), 1)
             return True, round((time.time() - t0) * 1000, 1)
@@ -172,7 +172,7 @@ def _tcp_probe(host, port, timeout):
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return "open", round((time.time() - t0) * 1000, 1)
-    except socket.timeout:
+    except TimeoutError:
         return "timeout", 0.0
     except ConnectionRefusedError:
         return "refused", 0.0
@@ -190,9 +190,9 @@ def _os_gateway_and_arp():
     try:
         if os.name == "nt":
             out = subprocess.run(["route", "print", "0.0.0.0"], **kw).stdout or ""
-            gw_ips = re.findall(r"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d+\.\d+\.\d+\.\d+)", out, re.M)
+            gw_ips = re.findall(r"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d+\.\d+\.\d+\.\d+)", out, re.MULTILINE)
             out = subprocess.run(["arp", "-a"], **kw).stdout or ""
-            arp_ips = re.findall(r"^\s*(\d+\.\d+\.\d+\.\d+)\s+[0-9a-fA-F-]{17}\s+dynamic", out, re.M | re.I)
+            arp_ips = re.findall(r"^\s*(\d+\.\d+\.\d+\.\d+)\s+[0-9a-fA-F-]{17}\s+dynamic", out, re.MULTILINE | re.IGNORECASE)
         else:
             out = subprocess.run(["route", "-n", "get", "default"], **kw).stdout or ""
             gw_ips = re.findall(r"gateway:\s*(\d+\.\d+\.\d+\.\d+)", out)
@@ -219,8 +219,8 @@ def test_hgm_stage2(base_url, state, timeout=6.0):
         f"{base_url}/login", state, timeout=timeout, send_cli=True, send_ses=False
     )
     if code_l == 200 and html_l:
-        has_title = bool(re.search(r"HomeGrid\s+Monitor", html_l, re.I))
-        has_signature = bool(re.search(r"PV\s+аналітики|PIN-захист|hg_client|DashboardPanelHeader", html_l, re.I))
+        has_title = bool(re.search(r"HomeGrid\s+Monitor", html_l, re.IGNORECASE))
+        has_signature = bool(re.search(r"PV\s+аналітики|PIN-захист|hg_client|DashboardPanelHeader", html_l, re.IGNORECASE))
         if has_title and has_signature:
             return True, (lat_l or lat)
 
@@ -389,7 +389,7 @@ def normalize_server_url(raw):
     if "://" not in s and "." not in s and ":" not in s and s.lower() != "localhost":
         return f"https://{s}.homegridmonitor.com", skip
 
-    if not re.match(r"^https?://", s, re.I):
+    if not re.match(r"^https?://", s, re.IGNORECASE):
         host_only, _, _ = s.partition(":")
         is_ip = bool(re.match(r"^\d{1,3}(\.\d{1,3}){3}$", host_only))
         s = f"http://{s}" if (is_ip or "." not in host_only) else f"https://{s}"

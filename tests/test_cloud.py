@@ -257,7 +257,7 @@ class RcloneExecutableTests(unittest.TestCase):
                 cloud.sync_cloud_reports(engine)
             rclone.assert_called_once_with(
                 "copyto", report_path,
-                "drive:HomeGridBackup/operations/{}/2025-01-02.jsonl".format(device_id)
+                f"drive:HomeGridBackup/operations/{device_id}/2025-01-02.jsonl"
             )
             self.assertFalse(os.path.exists(marker_path))
 
@@ -325,7 +325,7 @@ class RcloneExecutableTests(unittest.TestCase):
                     with open(os.path.join(legacy_dir, "2025-01-02.jsonl"), "w", encoding="utf-8") as source:
                         source.write(json.dumps(legacy_event) + "\n")
                 elif args[0] == "copyto" and args[2] == (
-                    "drive:HomeGridBackup/.HomeGridBackup-sources/{}.jsonl".format(device_id)
+                    f"drive:HomeGridBackup/.HomeGridBackup-sources/{device_id}.jsonl"
                 ):
                     with open(args[1], encoding="utf-8") as source:
                         own_source_records.extend(json.loads(line) for line in source)
@@ -402,7 +402,7 @@ class RcloneExecutableTests(unittest.TestCase):
 
             def append_during_upload(*args):
                 if args[0] == "copyto" and args[2] == (
-                    "drive:HomeGridBackup/.HomeGridBackup-sources/{}.jsonl".format(device_id)
+                    f"drive:HomeGridBackup/.HomeGridBackup-sources/{device_id}.jsonl"
                 ):
                     with open(marker_path, "a", encoding="utf-8"):
                         pass
@@ -487,7 +487,7 @@ class RcloneExecutableTests(unittest.TestCase):
                         self.assertEqual(
                             sidecar.read(),
                             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "
-                            "{}_{}\n".format(device_id, archive_name),
+                            f"{device_id}_{archive_name}\n",
                         )
 
             with mock.patch("core.gfs.compute_gfs_plan", return_value=(None, [{"path": archive_path}], [])), \
@@ -498,15 +498,15 @@ class RcloneExecutableTests(unittest.TestCase):
 
             shared_dir = "drive:HomeGridBackup/backups"
             mocked_rclone.assert_any_call(
-                "copyto", archive_path, "{}/{}_{}".format(shared_dir, device_id, archive_name)
+                "copyto", archive_path, f"{shared_dir}/{device_id}_{archive_name}"
             )
             delete_targets = {
                 call.args[1] for call in mocked_rclone.call_args_list
                 if call.args[0] == "deletefile"
             }
             self.assertEqual(delete_targets, {
-                "{}/{}".format(shared_dir, own_stale),
-                "{}/{}.sha256".format(shared_dir, own_stale),
+                f"{shared_dir}/{own_stale}",
+                f"{shared_dir}/{own_stale}.sha256",
             })
 
     def test_archive_sync_is_queued_if_another_sync_is_active(self):

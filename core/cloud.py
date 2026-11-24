@@ -209,8 +209,7 @@ def create_rclone_remote(remote, backend, username, password):
 
 def test_rclone_remote(remote):
     remote = (remote or "").strip()
-    if remote.endswith(":"):
-        remote = remote[:-1]
+    remote = remote.removesuffix(":")
     if not _REMOTE_RE.fullmatch(remote):
         raise ValueError("Select a valid rclone remote.")
     remote_path = f"{remote}:"
@@ -230,8 +229,7 @@ def check_rclone_remote(remote):
     что облако не сообщает объем (подключение при этом работает).
     """
     remote = (remote or "").strip()
-    if remote.endswith(":"):
-        remote = remote[:-1]
+    remote = remote.removesuffix(":")
     if not _REMOTE_RE.fullmatch(remote):
         raise ValueError("Select a valid rclone remote.")
     remote_path = f"{remote}:"
@@ -261,8 +259,7 @@ def check_rclone_remote(remote):
 
 def delete_rclone_remote(remote):
     remote = (remote or "").strip()
-    if remote.endswith(":"):
-        remote = remote[:-1]
+    remote = remote.removesuffix(":")
     if not _REMOTE_RE.fullmatch(remote):
         raise ValueError("Select a valid rclone remote.")
     _rclone("config", "delete", remote)
@@ -613,8 +610,7 @@ def _ordered_report_records(records):
 def _write_jsonl_report(records, output_path):
     ordered = _ordered_report_records(records)
     with open(output_path, "w", encoding="utf-8", newline="\n") as output:
-        for record in ordered:
-            output.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        output.writelines(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in ordered)
     return len(ordered)
 
 

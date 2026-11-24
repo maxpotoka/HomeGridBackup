@@ -50,7 +50,7 @@ if not _IS_PY_CONSOLE_LAUNCHER:
             _APP_MUTEX = open(_lock_p, "w")
             try:
                 fcntl.flock(_APP_MUTEX.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except (IOError, OSError):
+            except OSError:
                 if os.path.exists(_port_p):
                     with open(_port_p, "r") as pf:
                         p_num = int(pf.read().strip() or "0")

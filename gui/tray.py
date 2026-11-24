@@ -4,7 +4,8 @@
 # patch-id: linux-xorg-tray-menu-2.26
 # patch-id: macos-tray-quit-apps-2.41
 # patch-id: cumulative-linux-tray-pcloud-menu-2.42
-# [ФАЙЛ: gui/tray.py (v2.09 | 23.11.2026 16:20)
+# patch-id: fix-linux-tray-menu-2.76
+# [ФАЙЛ: gui/tray.py (v2.10 | 24.11.2026 09:25)
 # patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
 import os
@@ -113,7 +114,7 @@ def _has_sni_watcher(env):
                 stderr=subprocess.DEVNULL,
                 timeout=0.9,
             ).decode("utf-8", errors="ignore")
-            if re.search(r"\btrue\b", out, re.I):
+            if re.search(r"\btrue\b", out, re.IGNORECASE):
                 return True
         except (OSError, subprocess.SubprocessError):
             continue
@@ -572,6 +573,10 @@ def _start_tray_thread(engine):
     def _on_icon_setup(ready_icon):
         try:
             ready_icon.visible = True
+            try:
+                ready_icon.update_menu()
+            except Exception:
+                pass
             engine.tray_ready = True
             engine.log(f"Значок системного трею активовано ({type(ready_icon).__module__}).", "info")
         except Exception as exc:
@@ -615,11 +620,11 @@ except Exception:
     from gi.repository import AppIndicator3 as AI
 from gi.repository import Gtk, GLib
 
-ind = AI.Indicator.new("homegrid-backup", sys.argv, AI.IndicatorCategory.APPLICATION_STATUS)
+ind = AI.Indicator.new("homegrid-backup", next(iter(sys.argv[1:])), AI.IndicatorCategory.APPLICATION_STATUS)
 ind.set_status(AI.IndicatorStatus.ACTIVE)
 menu = Gtk.Menu()
 items = {}
-for k, lbl in json.loads(sys.argv):
+for k, lbl in json.loads(next(iter(sys.argv[2:]))):
     if lbl is None:
         menu.append(Gtk.SeparatorMenuItem())
         continue
@@ -632,6 +637,8 @@ for k, lbl in json.loads(sys.argv):
     items[k] = mi
 menu.show_all()
 ind.set_menu(menu)
+if "open" in items:
+    ind.set_secondary_activate_target(items["open"])
 print(json.dumps({"ready": True}), flush=True)
 
 def _in_loop():
@@ -677,7 +684,8 @@ def _start_wayland_sni_bridge(engine):
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", bufsize=1, env=_clean_sys_env()
         )
-        if '"ready": true' not in proc.stdout.readline().lower():
+        first_ln = proc.stdout.readline()
+        if '"ready": true' not in first_ln.lower():
             proc.terminate()
             return False
     except Exception:
