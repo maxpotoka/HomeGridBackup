@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-win7:
@@ -84,18 +84,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
           if (-not (Test-Path 'release\HomeGridBackup_Win7_x86_Setup.exe')) { throw 'Installer was not created' }
 
-      - name: Collect output
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path 'output' | Out-Null
-          Copy-Item 'dist_win7\main.dist' 'output\HomeGridBackup_win7_folder' -Recurse -Force
-          Copy-Item 'release\HomeGridBackup_Win7_x86_Setup.exe' 'output\'
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup_win7_${{ github.run_number }}
-          path: output/
-          if-no-files-found: error
-          retention-days: 30
+          tag_name: v2.99-win7-x86-${{ github.run_number }}
+          name: HomeGrid Backup 2.99 (Windows 7 x86)
+          files: release/HomeGridBackup_Win7_x86_Setup.exe
