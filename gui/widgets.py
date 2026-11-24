@@ -6,8 +6,9 @@
 # ==============================================================================
 import sys
 import tkinter as tk
-from gui.styles import THEMES
+
 from core.i18n import tr
+from gui.styles import THEMES
 
 # Цвета градиента по умолчанию; тема может переопределить ключами pbar_from / pbar_to
 PBAR_FROM = "#2563eb"

@@ -2,6 +2,7 @@
 # [ФАЙЛ: mobile/android_app.py (v2.00 | 21.11.2026 03:24) — МОБИЛЬНЫЙ ИНТЕРФЕЙС ANDROID (KIVY)]
 # ==============================================================================
 import threading
+
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
@@ -13,10 +14,10 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 
-from core.config import SCRIPT_VER, BUILD_DATE, commit_state
+from core.backup import run_backup_task, verify_all_archives
+from core.config import BUILD_DATE, SCRIPT_VER, commit_state
 from core.i18n import tr
 from core.network import normalize_server_url, run_connect_task, run_scan_task
-from core.backup import run_backup_task, verify_all_archives
 
 Window.clearcolor = (0.04, 0.06, 0.10, 1)
 

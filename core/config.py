@@ -35,16 +35,17 @@
 # patch-id: fix-linux-tray-menu-2.76
 # [ФАЙЛ: core/config.py (v2.58 | 24.11.2026 09:25) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
+import atexit
+import json
 import os
+import platform
 import re
 import sys
-import json
-import platform
+import tempfile
 import threading
 import time
-import atexit
-import tempfile
 import uuid
+
 
 def is_wsl():
     if not sys.platform.startswith("linux"):
@@ -65,7 +66,8 @@ WIN_VER = (sys.getwindowsversion().major, sys.getwindowsversion().minor) if IS_W
 
 if IS_WSL:
     try:
-        import time as _t_mod, subprocess as _sp_mod
+        import subprocess as _sp_mod
+        import time as _t_mod
         if _t_mod.tzname == ("UTC", "UTC") and not os.environ.get("TZ"):
             _ps_tz = _sp_mod.check_output(
                 ["powershell.exe", "-NoProfile", "-Command", "[TimeZoneInfo]::Local.BaseUtcOffset.TotalMinutes"],

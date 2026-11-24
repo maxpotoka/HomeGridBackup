@@ -2,14 +2,15 @@
 # patch-id: stage-window-2.21
 # [ФАЙЛ: console/terminal.py (v2.02 | 22.11.2026 09:10) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
 # ==============================================================================
+import ctypes
 import os
 import re
 import sys
 import time
-import ctypes
 from ctypes import wintypes
 from datetime import datetime
-from core.config import SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE
+
+from core.config import BUILD_DATE, CLI_MODE, HIDDEN_MODE, SCRIPT_VER, SILENT_MODE
 
 _STAGE_TR_MAP = (
     ("Обробка на сервері", "Processing on server"),

@@ -22,6 +22,7 @@ from uuid import uuid4
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: dest-stats-bg-worker-2.61
 from core.config import SCRIPT_VER, get_logs_dir
+
 _PCT_RE = re.compile(r"(\d+)%")
 
 def _rclone_upload_with_progress(src_path, dst_remote_file, progress_cb=None, timeout=3600):

@@ -4,10 +4,10 @@
 # patch-id: android-no-pip-install-2.02
 # [ФАЙЛ: main.py (v2.03 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 # ==============================================================================
-import os
-import sys
 import ctypes
+import os
 import subprocess
+import sys
 
 try:
     import faulthandler
@@ -18,8 +18,8 @@ try:
 except Exception:
     pass
 
-from core.scheduler import is_compiled_app
 from core.config import IS_ANDROID
+from core.scheduler import is_compiled_app
 
 _APP_MUTEX = None
 _SHOW_EVENT_NAME = "Global\\HomeGridBackup_ShowWindow_v1"
@@ -43,7 +43,10 @@ if not _IS_PY_CONSOLE_LAUNCHER:
         pass
     if os.name != "nt":
         try:
-            import fcntl, hashlib, socket, tempfile
+            import fcntl
+            import hashlib
+            import socket
+            import tempfile
             _inst_id = hashlib.md5(os.path.realpath(sys.argv[0]).encode("utf-8", errors="ignore")).hexdigest()[:10]
             _lock_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.lock")
             _port_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.port")
@@ -79,9 +82,10 @@ if not is_compiled_app() and not IS_ANDROID:
         except Exception:
             pass
 
-from core.config import GUI_MODE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN
-from core.engine import BackupEngine
 from core.backup import run_backup_task
+from core.config import CLI_MODE, GUI_MODE, HIDDEN_MODE, NO_CLEAN, SILENT_MODE
+from core.engine import BackupEngine
+
 
 def main():
     if (SILENT_MODE or CLI_MODE) and not HIDDEN_MODE:
@@ -100,7 +104,7 @@ def main():
 
     if (SILENT_MODE or HIDDEN_MODE) and not GUI_MODE:
         if HIDDEN_MODE:
-            from gui.tray import _start_tray_thread, _force_quit_app
+            from gui.tray import _force_quit_app, _start_tray_thread
             _start_tray_thread(engine)
             run_backup_task(engine, state.get("server", ""), True, silent_skip_clean, True)
             _force_quit_app(engine)
@@ -117,8 +121,9 @@ def main():
         return
 
     import tkinter as tk
+
+    from gui.tray import _start_show_window_listener, _start_tray_thread
     from gui.window import HomeGridApp
-    from gui.tray import _start_tray_thread, _start_show_window_listener
 
     # DPI-awareness нужно включать ДО создания первого окна Tk
     try:

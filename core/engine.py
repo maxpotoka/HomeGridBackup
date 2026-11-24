@@ -1,4 +1,5 @@
-from core.i18n import tr
+import getpass
+
 # ==============================================================================
 # patch-id: idle-ui-cache-2.19
 # patch-id: stage-window-2.21
@@ -11,15 +12,26 @@ from core.i18n import tr
 # ==============================================================================
 import os
 import re
-import time
 import shutil
-import getpass
 import threading
+import time
 from datetime import datetime
+
 from core.config import (
-    SCRIPT_VER, BUILD_DATE, HIDDEN_MODE, SILENT_MODE, CLI_MODE, NO_CLEAN,
-    IS_WSL, WSL_DISTRO, load_state, write_file_log, get_logs_dir, get_fast_sysinfo
+    BUILD_DATE,
+    CLI_MODE,
+    HIDDEN_MODE,
+    IS_WSL,
+    NO_CLEAN,
+    SCRIPT_VER,
+    SILENT_MODE,
+    WSL_DISTRO,
+    get_fast_sysinfo,
+    get_logs_dir,
+    load_state,
+    write_file_log,
 )
+from core.i18n import tr
 
 _CON_TR_MAP = (
     ("Обробка на сервері", "Processing on server"),
@@ -342,6 +354,7 @@ class BackupEngine:
 
     def record_op_event(self, status_lbl, detail_txt, size_mb=0.0, dur_sec=None, started_at=None, finished_at=None):
         from datetime import datetime
+
         from core.config import commit_state
         entry = {
             "ts": datetime.now().strftime("%d.%m.%Y %H:%M"),

@@ -1,8 +1,7 @@
-import re
 import os
+import re
 import time
-from core.i18n import tr, apply_widget_i18n
-from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
@@ -30,18 +29,31 @@ from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 # ==============================================================================
 import tkinter as tk
 from tkinter import ttk
+
+from core.backup import verify_all_archives
+from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+
 # patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: cloud-speed-stats-2.31
 from core.config import SCRIPT_VER, commit_state
 from core.files import format_duration
-from core.gfs import compute_gfs_plan, toggle_keep_tag, apply_gfs_cleanup
-from core.backup import verify_all_archives
-from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage_windows_scheduler
-from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, fix_mac_buttons
+from core.gfs import apply_gfs_cleanup, compute_gfs_plan, toggle_keep_tag
+from core.i18n import apply_widget_i18n, tr
+from core.scheduler import (
+    _build_run_cmd,
+    _manage_windows_scheduler,
+    _sync_scheduler_from_windows,
+)
+from gui.styles import UI_FONT_LABELS, UI_SCALE_LABELS, fix_mac_buttons
+
 # patch-id: settings-all-tabs-homegrid-2.46
 # patch-id: homegrid-design-system-2.45
-from gui.tray import _force_quit_app, _LINUX_TRAY_MODES, _MAC_TRAY_MODES, TRAY_MODE_HINTS
-
+from gui.tray import (
+    _LINUX_TRAY_MODES,
+    _MAC_TRAY_MODES,
+    TRAY_MODE_HINTS,
+    _force_quit_app,
+)
 
 _OP_ARCHIVE_RE = re.compile(r"^homegrid_backup_(DAILY|WEEKLY|MONTHLY|YEARLY|KEEP)_(.+)$", re.IGNORECASE)
 
@@ -824,6 +836,7 @@ class DialogsMixin:
                 return tr(text, st.get("lang", "en"))
 
             from tkinter import messagebox
+
             from core.cloud import delete_rclone_remote, list_rclone_remotes
             try:
                 remote_exists = remote in list_rclone_remotes()
@@ -1067,6 +1080,7 @@ class DialogsMixin:
 
         def _test_cloud_remote():
             import threading
+
             from core.cloud import check_rclone_remote
 
             remote = v_cloud_remote.get().strip()
@@ -1105,6 +1119,7 @@ class DialogsMixin:
         def _remove_cloud_remote():
             import threading
             from tkinter import messagebox
+
             from core.cloud import delete_rclone_remote
 
             remote = v_cloud_remote.get().strip()
@@ -1336,7 +1351,9 @@ class DialogsMixin:
         tk.Radiobutton(sr_m, text=tr("У фоні (з іконкою в треї)", st.get("lang", "en")), variable=v_smode, value="--hidden", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], activebackground=p["card"], activeforeground=p["text"], font=(self._ui_fam(), fs)).pack(side="left", padx=(0, 16))
         tk.Radiobutton(sr_m, text=tr("З вікном консолі", st.get("lang", "en")), variable=v_smode, value="--silent", bg=p["card"], fg=p["text"], selectcolor=p["inp_bg"], activebackground=p["card"], activeforeground=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
 
-        from core.config import IS_WINDOWS as _IS_WIN_S, IS_WSL as _IS_WSL_S, IS_MAC as _IS_MAC_S
+        from core.config import IS_MAC as _IS_MAC_S
+        from core.config import IS_WINDOWS as _IS_WIN_S
+        from core.config import IS_WSL as _IS_WSL_S
         if _IS_WIN_S:
             tk.Frame(f_sch, height=1, bg=p["border"]).pack(fill="x", pady=6)
             sr2 = tk.Frame(f_sch, bg=p["card"])
@@ -2373,6 +2390,7 @@ class DialogsMixin:
 
     def open_about(self):
         import webbrowser
+
         from core.config import BUILD_DATE
         fs = self.metrics["font_sz"]
         k = self.metrics["k"]

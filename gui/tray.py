@@ -8,13 +8,12 @@
 # [ФАЙЛ: gui/tray.py (v2.10 | 24.11.2026 09:25)
 # patch-id: macos-quit-and-buttons-2.17
 # ==============================================================================
-import os
-import time
 import ctypes
-import threading
-
-
+import os
 import queue as _queue_mod
+import threading
+import time
+
 _TRAY_UI_QUEUE = _queue_mod.SimpleQueue()
 
 def _enqueue_tray_ui(fn):
@@ -451,8 +450,8 @@ def _start_tray_thread(engine):
         _force_quit_app(engine)
 
     def _on_open_folder(icon, item):
-        from core.files import open_folder_native
         from core.config import DEFAULT_BACKUP_DIR
+        from core.files import open_folder_native
         open_folder_native(engine.state.get("backup_dir") or DEFAULT_BACKUP_DIR)
 
     def _on_open_dialog(method_name):
@@ -658,10 +657,12 @@ Gtk.main()
 """
 
 def _start_wayland_sni_bridge(engine):
-    import subprocess, json
-    from core.files import get_app_icon_path, open_folder_native
-    from core.config import DEFAULT_BACKUP_DIR
+    import json
+    import subprocess
+
     from core.backup import run_backup_task
+    from core.config import DEFAULT_BACKUP_DIR
+    from core.files import get_app_icon_path, open_folder_native
     from core.i18n import tr
 
     sys_py = "/usr/bin/python3" if os.path.exists("/usr/bin/python3") else None
@@ -762,7 +763,10 @@ def _start_show_window_listener(engine, event_name=r"Global\HomeGridBackup_ShowW
     if os.name != "nt":
         def _posix_wait_loop():
             try:
-                import sys, hashlib, socket, tempfile
+                import hashlib
+                import socket
+                import sys
+                import tempfile
                 _inst_id = hashlib.md5(os.path.realpath(sys.argv[0]).encode("utf-8", errors="ignore")).hexdigest()[:10]
                 _port_p = os.path.join(tempfile.gettempdir(), f"hgb_inst_{_inst_id}.port")
                 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

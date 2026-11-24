@@ -5,7 +5,8 @@
 import os
 import re
 from datetime import datetime
-from core.files import parse_backup_dt, format_backup_dt, remove_backup_file
+
+from core.files import format_backup_dt, parse_backup_dt, remove_backup_file
 
 _GFS_PLAN_CACHE = {}
 

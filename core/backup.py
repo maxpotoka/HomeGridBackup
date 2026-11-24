@@ -8,22 +8,38 @@
 # patch-id: single-pass-verify-speed-2.75
 # [ФАЙЛ: core/backup.py (v2.16 | 24.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 # ==============================================================================
+import hashlib
+import http.cookiejar
+import json
 import os
 import re
-import json
-import time
-import zlib
 import shutil
-import hashlib
-import zipfile
+import time
 import urllib.request
-import http.cookiejar
-from urllib.parse import urlparse
+import zipfile
+import zlib
 from datetime import datetime
+from urllib.parse import urlparse
+
 # patch-id: pcloud-speed-progress-gradient-2.33
-from core.config import DEFAULT_TOK, SILENT_MODE, NO_CLEAN, commit_state, SCRIPT_VER, get_fast_sysinfo
-from core.files import pretty_phase, format_duration, format_backup_dt
-from core.network import BROWSER_UA, _seed_cookie, invoke_http, normalize_server_url, verify_host_and_hgm, scan_lan_servers
+from core.config import (
+    DEFAULT_TOK,
+    NO_CLEAN,
+    SCRIPT_VER,
+    SILENT_MODE,
+    commit_state,
+    get_fast_sysinfo,
+)
+from core.files import format_backup_dt, format_duration, pretty_phase
+from core.network import (
+    BROWSER_UA,
+    _seed_cookie,
+    invoke_http,
+    normalize_server_url,
+    scan_lan_servers,
+    verify_host_and_hgm,
+)
+
 
 def _record_cloud_event(engine, operation_id, event, **details):
     try:
@@ -87,7 +103,8 @@ def _sync_cloud_backups(engine, prune=False, progress_cb=None):
         return False
 
 def _desktop_notify(title, text):
-    import sys, subprocess
+    import subprocess
+    import sys
     try:
         if sys.platform.startswith("linux"):
             if (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and shutil.which("notify-send"):
@@ -264,6 +281,16 @@ class _HashingReader:
 
     def tell(self):
         return self._f.tell()
+
+    def seekable(self):
+        return self._f.seekable()
+
+    def readable(self):
+        return True
+
+    @property
+    def closed(self):
+        return getattr(self._f, "closed", False)
 
     def finalize_tail(self, buf_size=1048576):
         self._f.seek(self.hashed_pos)
@@ -732,7 +759,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             commit_state(engine.state)
             engine.log("Налаштування та ключі захищено збережено.", "ok")
 
-        from core.gfs import compute_gfs_plan, apply_gfs_cleanup
+        from core.gfs import apply_gfs_cleanup, compute_gfs_plan
         engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
         gfs_started = time.time()
         _record_cloud_event(engine, operation_id, "stage_started", stage="gfs_rotation", archive=out_file)

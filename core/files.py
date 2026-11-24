@@ -51,8 +51,8 @@ def remove_backup_file(filepath, delete_mode="trash"):
     return send_to_recycle_bin(abs_path)
 
 def _open_path_os(target_path):
-    import sys
     import subprocess
+    import sys
     if os.name == "nt":
         os.startfile(target_path)
     elif sys.platform == "darwin":
@@ -84,7 +84,9 @@ def open_file_native(file_path):
         return False
 
 def choose_folder_native(initial_dir, lang="en"):
-    import sys, subprocess
+    import subprocess
+    import sys
+
     from core.i18n import tr
     dlg_t = tr("Оберіть папку", lang)
     if sys.platform.startswith("linux"):

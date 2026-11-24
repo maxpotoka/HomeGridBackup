@@ -3,8 +3,8 @@
 # patch-id: homegrid-design-system-2.45
 # [ФАЙЛ: gui/styles.py (v2.02 | 22.11.2026 09:10) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 # ==============================================================================
-import os
 import ctypes
+import os
 import tkinter as tk
 
 if os.name == "nt":

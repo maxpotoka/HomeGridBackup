@@ -1,13 +1,15 @@
+import json
 import os
-import sys
+
 # ==============================================================================
 # patch-id: lan-scan-2.19
 # [ФАЙЛ: core/network.py (v2.02 | 22.11.2026 08:40) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 # ==============================================================================
 import re
-import json
-import time
 import socket
+import sys
+import time
+
 _ORIG_CREATE_CONN = socket.create_connection
 def _fast_conn(addr, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kw):
     s = _ORIG_CREATE_CONN(addr, timeout=timeout, source_address=source_address, **kw)
@@ -18,13 +20,14 @@ def _fast_conn(addr, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
     except Exception: pass
     return s
 socket.create_connection = _fast_conn
+import http.cookiejar
 import ipaddress
 import subprocess
-import urllib.request
 import urllib.error
-import http.cookiejar
-from urllib.parse import urlparse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
+
 from core.config import DEFAULT_TOK, SILENT_MODE, commit_state
 
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"

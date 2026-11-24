@@ -1,5 +1,3 @@
-import time
-from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
@@ -26,19 +24,38 @@ from core.i18n import tr, apply_widget_i18n
 # ==============================================================================
 import os
 import threading
+import time
 import tkinter as tk
+
+from core.backup import run_backup_task
+from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
+
 # patch-id: center-storage-notepad-2.40
 # patch-id: dashboard-redesign-2.34
-from core.config import SCRIPT_VER, BUILD_DATE, DEFAULT_BACKUP_DIR, commit_state, NO_TRAY, get_logs_dir
-from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-from core.files import open_folder_native, choose_folder_native, get_app_icon_path
+from core.config import (
+    BUILD_DATE,
+    DEFAULT_BACKUP_DIR,
+    NO_TRAY,
+    SCRIPT_VER,
+    commit_state,
+    get_logs_dir,
+)
+from core.files import choose_folder_native, get_app_icon_path, open_folder_native
+from core.i18n import apply_widget_i18n, tr
 from core.network import normalize_server_url, run_connect_task, run_scan_task
-from core.backup import run_backup_task
-from gui.styles import UI_SCALE_LABELS, THEMES, _calc_screen_metrics, ToolTip, fix_mac_buttons
-# patch-id: homegrid-design-system-2.45
-from gui.widgets import StyledProgressBar, HomeGridToggle
-from gui.tray import HAS_TRAY, _start_tray_thread, drain_tray_ui_queue
 from gui.dialogs import DialogsMixin
+from gui.styles import (
+    THEMES,
+    UI_SCALE_LABELS,
+    ToolTip,
+    _calc_screen_metrics,
+    fix_mac_buttons,
+)
+from gui.tray import HAS_TRAY, _start_tray_thread, drain_tray_ui_queue
+
+# patch-id: homegrid-design-system-2.45
+from gui.widgets import HomeGridToggle, StyledProgressBar
+
 
 class HomeGridApp(DialogsMixin):
     def __init__(self, root, engine):
@@ -532,7 +549,8 @@ class HomeGridApp(DialogsMixin):
             ToolTip(w_tip, t_tip)
 
     def open_raw_log_file(self):
-        import sys, subprocess
+        import subprocess
+        import sys
         bdir = get_logs_dir(self.engine.state)
         os.makedirs(bdir, exist_ok=True)
         lp = os.path.join(bdir, "backup.log")

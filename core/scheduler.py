@@ -3,11 +3,13 @@
 # ==============================================================================
 import os
 import re
+import subprocess
 import sys
 import tempfile
-import subprocess
 from datetime import datetime
+
 from core.config import SCHED_TASK_NAME
+
 
 def is_compiled_app():
     if getattr(sys, "frozen", False) or ("__compiled__" in globals()):
@@ -218,7 +220,7 @@ def _manage_wsl_scheduler(action, time_str="03:00", mode_flag="--silent"):
     return (True, f"Завдання Windows '{SCHED_TASK_NAME}' створено на {int(hh):02d}:{int(mm):02d} (WSL {eff_flag}).") if res.returncode == 0 else (False, f"Помилка schtasks.exe: {(res.stderr or res.stdout or '').strip()}")
 
 def _manage_windows_scheduler(action, time_str="03:00", mode_flag="--hidden", start_missed=True, wake_pc=False, prio=6):
-    from core.config import IS_WSL, IS_MAC, IS_WINDOWS
+    from core.config import IS_MAC, IS_WINDOWS, IS_WSL
     if IS_WSL:
         return _manage_wsl_scheduler(action, time_str, mode_flag)
     if IS_MAC:
