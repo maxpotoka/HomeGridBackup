@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_VERSION: "2.76"
+  APP_FILE_VERSION: "2.76.0.0"
+
 jobs:
   build-win7-folder:
     runs-on: windows-latest
@@ -22,17 +26,25 @@ jobs:
           python-version: "3.8.10"
           architecture: "x86"
 
-      - name: Install pinned Python build dependencies
+      - name: Install build dependencies
+        shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
           pip install "nuitka<2.6" "pillow<11.0" pystray keyring send2trash
+          if ($LASTEXITCODE -ne 0) { throw "dependency install failed" }
+          python -c "import sys; assert sys.version_info[:2] == (3, 8), sys.version"
 
       - name: Enable Windows 7 cloud sync preview
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           Set-Content -Path core\build_variant.py -Value "WINDOWS7_CLOUD_SYNC_PREVIEW = True" -Encoding ascii
+          $content = Get-Content core\build_variant.py -Raw
+          if ($content -notmatch "WINDOWS7_CLOUD_SYNC_PREVIEW = True") { throw "build_variant.py was not updated" }
 
-      - name: Build max-optimized Windows 7 standalone folder with Nuitka
+      - name: Build Windows 7 standalone folder with Nuitka
         shell: cmd
         run: |
           set "ICON_FLAG="
@@ -54,8 +66,8 @@ jobs:
             --company-name="HomeGrid" ^
             --product-name="HomeGrid Backup" ^
             --include-data-files=icon.ico=icon.ico ^
-            --file-version="1.0.55.0" ^
-            --product-version="1.0.55.0" ^
+            --file-version="%APP_FILE_VERSION%" ^
+            --product-version="%APP_FILE_VERSION%" ^
             --file-description="HomeGrid Backup Utility (Windows 7 x86)" ^
             %ICON_FLAG% ^
             --include-package=core ^
@@ -71,10 +83,28 @@ jobs:
             --output-dir=dist_win7 ^
             --output-filename=HomeGridBackup.exe ^
             main.py
+          if errorlevel 1 (
+            echo Nuitka failed with exit code %errorlevel%
+            exit /b 1
+          )
+
+      - name: Verify Nuitka output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $appDir = "dist_win7\main.dist"
+          if (-not (Test-Path "$appDir\HomeGridBackup.exe")) {
+            Get-ChildItem dist_win7 -Recurse -Depth 2 | Select-Object FullName | Out-String | Write-Host
+            throw "HomeGridBackup.exe not found in $appDir"
+          }
+          $count = (Get-ChildItem $appDir -Recurse -File | Measure-Object).Count
+          Write-Host "Nuitka output: $count files in $appDir"
+          if ($count -lt 10) { throw "Nuitka output looks incomplete: $count files" }
 
       - name: Bundle Windows 7-compatible rclone
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $version = "1.62.2"
           $archiveName = "rclone-v$version-windows-386.zip"
           $archivePath = Join-Path $env:RUNNER_TEMP $archiveName
@@ -96,7 +126,7 @@ jobs:
           }
 
           $appDir = "dist_win7\main.dist"
-          Copy-Item -LiteralPath $rcloneSource.FullName -Destination (Join-Path $appDir "rclone.exe")
+          Copy-Item -LiteralPath $rcloneSource.FullName -Destination (Join-Path $appDir "rclone.exe") -Force
           Invoke-WebRequest `
             -Uri "https://raw.githubusercontent.com/rclone/rclone/v$version/COPYING" `
             -OutFile (Join-Path $appDir "rclone-COPYING.txt")
@@ -106,51 +136,81 @@ jobs:
             throw "Bundled rclone failed to start."
           }
 
-      - name: Prepare batch scripts and ultra-compress archive
-        shell: cmd
+      - name: Prepare folder, batch scripts and archive
+        shell: pwsh
         run: |
-          ren "dist_win7\main.dist" "HomeGridBackup"
-          (
-            echo @echo off
-            echo chcp 65001 ^>nul
-            echo "%%~dp0HomeGridBackup.exe" --silent
-          ) > "dist_win7\HomeGridBackup\backup_silent.bat"
-          (
-            echo @echo off
-            echo start "" "%%~dp0HomeGridBackup.exe" --hidden
-          ) > "dist_win7\HomeGridBackup\backup_hidden.bat"
-          cd /d "dist_win7"
-          7z a -t7z -mx=9 -mfb=273 -md=64m "HomeGridBackup_Win7_x86.7z" "HomeGridBackup"
+          $ErrorActionPreference = "Stop"
+          $src = "dist_win7\main.dist"
+          $dst = "dist_win7\HomeGridBackup"
+
+          if (-not (Test-Path "$src\HomeGridBackup.exe")) { throw "Source not found: $src" }
+
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          robocopy $src $dst /E /NFL /NDL /NJH /NJS /NP | Out-Null
+          if ($LASTEXITCODE -ge 8) { throw "robocopy failed with code $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
+
+          $silentBat = "@echo off`r`nchcp 65001 >nul`r`n`"%~dp0HomeGridBackup.exe`" --silent`r`n"
+          $hiddenBat = "@echo off`r`nstart `"`" `"%~dp0HomeGridBackup.exe`" --hidden`r`n"
+          [System.IO.File]::WriteAllText((Join-Path (Resolve-Path $dst) "backup_silent.bat"), $silentBat, [System.Text.Encoding]::ASCII)
+          [System.IO.File]::WriteAllText((Join-Path (Resolve-Path $dst) "backup_hidden.bat"), $hiddenBat, [System.Text.Encoding]::ASCII)
+
+          if (-not (Test-Path "$dst\HomeGridBackup.exe")) { throw "HomeGridBackup.exe missing after copy" }
+          if (-not (Test-Path "$dst\rclone.exe")) { throw "rclone.exe missing after copy" }
+
+          Push-Location dist_win7
+          try {
+            7z a -t7z -mx=9 -mfb=273 -md=64m "HomeGridBackup_Win7_x86.7z" "HomeGridBackup"
+            if ($LASTEXITCODE -ne 0) { throw "7z failed with code $LASTEXITCODE" }
+            if (-not (Test-Path "HomeGridBackup_Win7_x86.7z")) { throw "Archive not created" }
+            $size = (Get-Item "HomeGridBackup_Win7_x86.7z").Length
+            if ($size -lt 1MB) { throw "Archive is suspiciously small: $size bytes" }
+            Write-Host "Archive size: $([math]::Round($size / 1MB, 1)) MB"
+          } finally {
+            Pop-Location
+          }
 
       - name: Build per-user Windows 7 installer
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           choco install innosetup -y --no-progress
-          New-Item -ItemType Directory -Force -Path "packaging\installer_payload" | Out-Null
-          Copy-Item -Path "dist_win7\HomeGridBackup\*" -Destination "packaging\installer_payload" -Recurse -Force
+          if ($LASTEXITCODE -ne 0) { throw "innosetup install failed" }
+
+          $payload = "packaging\installer_payload"
+          if (Test-Path $payload) { Remove-Item $payload -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $payload | Out-Null
+          Copy-Item -Path "dist_win7\HomeGridBackup\*" -Destination $payload -Recurse -Force
+          if (-not (Test-Path "$payload\HomeGridBackup.exe")) { throw "Installer payload is incomplete" }
+
           $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
-          & $compiler /DAppVersion=2.25 /DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup packaging\windows_user_setup.iss
+          & $compiler "/DAppVersion=$env:APP_VERSION" "/DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup" packaging\windows_user_setup.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed: $LASTEXITCODE" }
+          if (-not (Test-Path "packaging\installer_output\HomeGridBackup_Win7_x86_Setup.exe")) {
+            throw "Installer was not created"
+          }
 
       - name: Set build completion timestamp
         id: build_time
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $utcNow = [DateTime]::UtcNow
           $buildTime = $utcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")
           $buildDate = $utcNow.ToString("yyyy.MM.dd")
-          echo "value=$buildTime" >> $env:GITHUB_OUTPUT
-          echo "date=$buildDate" >> $env:GITHUB_OUTPUT
+          "value=$buildTime" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "date=$buildDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Generate version tag
         id: tag
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $date = "${{ steps.build_time.outputs.date }}"
           $runNumber = "${{ github.run_number }}"
           $tag = "win7-x86-v$date.$runNumber"
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Delete old Windows 7 releases
         shell: pwsh
@@ -181,33 +241,4 @@ jobs:
               }
             }
           }
-          Write-Host "Cleanup completed successfully."
-
-      - name: Publish clean .7z to GitHub Releases
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: HomeGrid Backup — Windows 7/10/11 (x86 Folder) — ${{ steps.build_time.outputs.value }}
-          body: |
-            ## HomeGrid Backup для Windows 7 (x86)
-            
-            **Версія:** ${{ steps.tag.outputs.tag }}  
-            **Дата збірки:** ${{ steps.build_time.outputs.value }}
-            
-            Установщик **HomeGridBackup_Win7_x86_Setup.exe** устанавливает приложение для текущего пользователя в `%LOCALAPPDATA%\Programs\HomeGridBackup` и добавляет ярлык в меню «Пуск». Права администратора не нужны.
-            Архив **HomeGridBackup_Win7_x86.7z** сохранён для портативной установки: внутри папка `HomeGridBackup` с `HomeGridBackup.exe` и rclone 1.62.2 (32-bit).
-            Настройка облаков находится в разделе «Настройки» приложения.
-            
-            ### Режимы запуска:
-            - `HomeGridBackup.exe` - звичайний запуск
-            - `backup_silent.bat` - тихий режим
-            - `backup_hidden.bat` - прихований режим
-            
-            ### Системні вимоги:
-            - Windows 7/8/10/11 (32-bit або 64-bit)
-            - .NET Framework не потрібен
-          files: |
-            dist_win7/HomeGridBackup_Win7_x86.7z
-            packaging/installer_output/HomeGridBackup_Win7_x86_Setup.exe
-          fail_on_unmatched_files: true
-          make_latest: false
+          Write-Host "Cleanup completed
