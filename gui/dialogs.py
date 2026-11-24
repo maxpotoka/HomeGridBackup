@@ -1,3 +1,4 @@
+from gui.widgets import *
 import os
 import re
 import time
@@ -678,6 +679,9 @@ class DialogsMixin:
         j_row = tk.Frame(f_logs, bg=p["card"])
         j_row.pack(fill="x", pady=(4, 2))
         tk.Label(j_row, text=tr("Протоколи для рейтингу швидкості (між ОС):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        lng_j = st.get("lang", "en")
+        j_map = {tr("Авто (pCloud → Мережа при наявності)", lng_j): "auto", tr("Тільки мережева папка", lng_j): "network", "pCloud": "pcloud", tr("pCloud та мережева папка", lng_j): "both"}
+        rev_j = {v: k for k, v in j_map.items()}
         cb_journal_target = ttk.Combobox(j_row, values=list(j_map.keys()), state="readonly", width=32, font=(self._ui_fam(), fs))
         cb_journal_target.set(rev_j.get(v_journal_target.get(), tr("Авто (pCloud → Мережа при наявності)", lng_j)))
         cb_journal_target.pack(side="right")
@@ -902,14 +906,14 @@ class DialogsMixin:
             cloud_path = v_cloud_path.get().strip()
             if v_cloud_enabled.get():
                 if not v_cloud_save_archives.get() and not v_cloud_save_logs.get():
-                    cloud_msg.configure(text=tr("Оберіть хоча б один пункт: зберігати архів або журнал.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
+                    lbl_sch_msg.configure(text=tr("Оберіть хоча б один пункт: зберігати архів або журнал.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
                     _select_pill_tab(2)
                     return
                 try:
                     from core.cloud import validate_cloud_settings
                     cloud_path = validate_cloud_settings(cloud_remote, cloud_path)
                 except ValueError as exc:
-                    cloud_msg.configure(text=tr(str(exc), lang_map.get(cb_lang.get(), "en")), fg=p["red"])
+                    lbl_sch_msg.configure(text=tr(str(exc), lang_map.get(cb_lang.get(), "en")), fg=p["red"])
                     _select_pill_tab(2)
                     return
             else:
@@ -946,7 +950,7 @@ class DialogsMixin:
             st["cloud_fit_free_space"] = bool(v_cloud_fit_free.get())
             j_val = j_map.get(cb_journal_target.get(), "auto")
             if j_val in ("network", "both") and not (st.get("net_dir") or "").strip():
-                cloud_msg.configure(text=tr("Для обміну через мережеву папку вкажіть шлях у рядку «Мережа» головного вікна.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
+                lbl_sch_msg.configure(text=tr("Для обміну через мережеву папку вкажіть шлях у рядку «Мережа» головного вікна.", lang_map.get(cb_lang.get(), "en")), fg=p["red"])
                 _select_pill_tab(2); return
             st["journal_sync_target"] = j_val
             old_sc = st.get("ui_scale", "auto")
