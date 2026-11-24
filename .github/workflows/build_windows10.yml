@@ -6,9 +6,10 @@ on:
 concurrency:
   group: build-win10-${{ github.ref }}
   cancel-in-progress: false
-
+  
 permissions:
-  contents: read
+  contents: write
+
 
 jobs:
   build-win10:
@@ -99,3 +100,9 @@ jobs:
           path: output/
           if-no-files-found: error
           retention-days: 30
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.99-win10-x64-${{ github.run_number }}
+          name: HomeGrid Backup 2.99 (Windows 10/11 x64)
+          files: release/HomeGridBackup_Win10_x64_Setup.exe
