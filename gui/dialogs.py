@@ -33,7 +33,6 @@ import tkinter as tk
 from tkinter import ttk
 
 from core.backup import verify_all_archives
-from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
 
 # patch-id: pcloud-speed-progress-gradient-2.33
 # patch-id: cloud-speed-stats-2.31

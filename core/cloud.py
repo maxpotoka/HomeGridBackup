@@ -1,3 +1,4 @@
+import shutil
 import csv
 import json
 import os
@@ -256,9 +257,19 @@ def fetch_cloud_speed_stats(engine, refresh=True):
     state = engine.state
     net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
     local_reports = os.path.join(get_logs_dir(state), "reports")
+    net_cache = os.path.join(local_reports, "net_cache")
+    net_src = os.path.join(net_dir, ".HomeGridBackup-sources") if net_dir else ""
+    if net_src and os.path.isdir(net_src):
+        try:
+            os.makedirs(net_cache, exist_ok=True)
+            for fn in os.listdir(net_src):
+                if fn.endswith(".jsonl"):
+                    shutil.copy2(os.path.join(net_src, fn), os.path.join(net_cache, fn))
+        except Exception:
+            pass
     scan_dirs = [local_reports]
-    if net_dir and os.path.isdir(os.path.join(net_dir, ".HomeGridBackup-sources")):
-        scan_dirs.append(os.path.join(net_dir, ".HomeGridBackup-sources"))
+    if net_src and os.path.isdir(net_src):
+        scan_dirs.append(net_src)
     recs = _collect_report_records(tuple(scan_dirs))
     grouped = {}
     for r in _ordered_report_records(recs):
