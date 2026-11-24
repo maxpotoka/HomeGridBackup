@@ -1,3 +1,4 @@
+# patch-id: startup-version-log-2.80
 # patch-id: i18n-ping-and-retry-en-2.79
 # patch-id: fix-net-drive-status-and-build-retry-2.78
 # ==============================================================================
@@ -22,7 +23,7 @@
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: remove-mirror-ui-2.71-p1
 # patch-id: force-tall-pbar-and-grid-2.74
-# [ФАЙЛ: gui/window.py (v2.30 | 24.11.2026 02:15) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
+# [ФАЙЛ: gui/window.py (v2.31 | 24.11.2026 02:15) — ГЛАВНОЕ ОКНО HOMEGRIDAPP И ФОНОВЫЙ ЦИКЛ UI]
 # ==============================================================================
 import os
 import threading
@@ -131,6 +132,7 @@ class HomeGridApp(DialogsMixin):
         self.root.minsize(620, 420)
         self.root.update_idletasks()
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
+        self.engine.log(f"Версія програми: v{SCRIPT_VER} (від {BUILD_DATE})", "info")
         self.root.after(60, self._apply_window_icon)
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
