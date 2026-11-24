@@ -140,6 +140,7 @@ SCHED_TASK_NAME = "HomeGridBackup"
 VALID_PBAR_STYLES = ("v8",)
 VALID_THEMES = ("dark", "light")
 VALID_SCALES = ("auto", "800x600", "1024x600", "1024x768", "1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440")
+VALID_TRAY_BACKENDS = ("auto", "appindicator", "sni-bridge", "gtk", "xorg", "none", "pystray")
 
 def _get_ram_summary():
     try:
@@ -275,25 +276,6 @@ def get_fast_sysinfo():
     _SYSINFO_CACHE["time"] = now
     return result
 
-def _detect_low_end_or_win7():
-    if os.name != "nt":
-        return False, ""
-    try:
-        v = sys.getwindowsversion()
-        if v.major == 6 and v.minor <= 1:
-            return True, "Windows 7 або старіша ОС"
-        cpu_str = " ".join([
-            platform.processor() or "",
-            os.environ.get("PROCESSOR_IDENTIFIER", ""),
-        ]).lower()
-        if any(k in cpu_str for k in ("atom", "celeron", "pentium", "geode", "via ")):
-            return True, "енергоефективний процесор (Intel Atom / Celeron)"
-        if (os.cpu_count() or 4) <= 2:
-            return True, "2 або менше потоків процесора"
-    except Exception:
-        pass
-    return False, ""
-
 def _ensure_secure_dir():
     os.makedirs(SECURE_DIR, exist_ok=True)
 
@@ -412,7 +394,7 @@ def load_state():
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
         "weekly_count": 4, "monthly_count": 12, "yearly_count": 3, "delete_mode": "trash",
-        "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True, "tray_enabled": True,
+        "lang": "en", "theme": "dark", "ui_scale": "auto", "ui_font": 0, "minimize_to_tray": True, "tray_enabled": True, "tray_backend": "auto",
         "lite_mode": False, "hw_checked": False, "hw_auto_notice": "",
         "progress_style": "v8", "silent_sec_digits": True, "silent_cleanup": False,
         "sched_time": "03:00", "sched_mode": "--hidden", "sched_missed": True,
@@ -474,6 +456,8 @@ def load_state():
                 state["progress_style"] = data["progress_style"]
             if data.get("delete_mode") in ("trash", "direct", "permanent"):
                 state["delete_mode"] = data["delete_mode"]
+            if data.get("tray_backend") in VALID_TRAY_BACKENDS:
+                state["tray_backend"] = data["tray_backend"]
             for bk in ("lite_mode", "hw_checked", "silent_sec_digits", "silent_cleanup", "sched_missed", "sched_wake", "tray_enabled", "cloud_save_archives", "cloud_save_logs", "cloud_fit_free_space"):
                 if isinstance(data.get(bk), bool):
                     state[bk] = data[bk]
@@ -558,7 +542,7 @@ def commit_state(state):
         "net_dir", "net_enabled", "journal_sync_target",
         "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
-        "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled",
+        "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled", "tray_backend",
         "lite_mode", "hw_checked", "progress_style", "silent_sec_digits", "silent_cleanup",
         "sched_time", "sched_mode", "sched_missed", "sched_wake", "sched_prio"
     )

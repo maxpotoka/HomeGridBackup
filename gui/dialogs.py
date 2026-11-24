@@ -40,7 +40,7 @@ from core.scheduler import _build_run_cmd, _sync_scheduler_from_windows, _manage
 from gui.styles import UI_SCALE_LABELS, UI_FONT_LABELS, THEMES, fix_mac_buttons
 # patch-id: settings-all-tabs-homegrid-2.46
 # patch-id: homegrid-design-system-2.45
-from gui.tray import _force_quit_app
+from gui.tray import _force_quit_app, _LINUX_TRAY_MODES, _MAC_TRAY_MODES, TRAY_MODE_HINTS
 
 
 _OP_ARCHIVE_RE = re.compile(r"^homegrid_backup_(DAILY|WEEKLY|MONTHLY|YEARLY|KEEP)_(.+)$", re.IGNORECASE)
@@ -508,6 +508,7 @@ class DialogsMixin:
         v_font = tk.IntVar(value=int(st.get("ui_font", 0)))
         v_lang = tk.StringVar(value=st.get("lang", "en"))
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
+        v_tray_backend = tk.StringVar(value=str(st.get("tray_backend", "auto")))
         v_logs_dir = tk.StringVar(value=st.get("logs_dir", ""))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
@@ -1492,6 +1493,34 @@ class DialogsMixin:
         tr_row.pack(fill="x", pady=(0, 6))
         tk.Label(tr_row, text=tr("Згортати у трей при закритті", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         HomeGridToggle(tr_row, variable=v_tray_min, compact=True, palette=p, font_sz=fs).pack(side="right")
+        import sys as _sys_tray
+        _lng_tray = st.get("lang", "en")
+        _modes_t = _MAC_TRAY_MODES if _sys_tray.platform == "darwin" else _LINUX_TRAY_MODES
+        _tray_labels = {
+            "auto": tr("Авто (рекомендовано)", _lng_tray),
+            "appindicator": "AppIndicator (Ubuntu, GNOME, XFCE)",
+            "sni-bridge": "StatusNotifier bridge (Wayland)",
+            "gtk": "X11 Tkinter-меню (запасний)",
+            "xorg": "XEmbed (класичний X11 трей)",
+            "none": tr("Вимкнено", _lng_tray),
+            "pystray": "pystray (верхнє меню macOS)",
+        }
+        _tray_rev = {v: k for k, v in _tray_labels.items()}
+        tr_mode_row = tk.Frame(f_sec, bg=p["card"])
+        tr_mode_row.pack(fill="x", pady=(0, 4))
+        tk.Label(tr_mode_row, text=tr("Режим трею (для тесту)", _lng_tray), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        cb_tray_mode = ttk.Combobox(tr_mode_row, values=[_tray_labels[m] for m in _modes_t], state="readonly", width=34, font=(self._ui_fam(), fs))
+        cb_tray_mode.set(_tray_labels.get(v_tray_backend.get(), _tray_labels["auto"]))
+        cb_tray_mode.pack(side="right")
+        lbl_tray_hint = tk.Label(f_sec, text="", justify="left", wraplength=520, anchor="w", bg=p["card"], fg=p["amber"], font=(self._ui_fam(), max(8, fs - 1)))
+        lbl_tray_hint.pack(fill="x", pady=(0, 6))
+        def _refresh_tray_hint(_e=None):
+            key = _tray_rev.get(cb_tray_mode.get(), "auto")
+            hint = TRAY_MODE_HINTS.get(key, "")
+            note = tr("Після зміни режиму перезапустіть застосунок. Результат дивіться в журналі: рядок [TRAY MODE] і «Значок системного трею активовано».", _lng_tray)
+            lbl_tray_hint.configure(text=(hint + "\n" if hint else "") + note)
+        cb_tray_mode.bind("<<ComboboxSelected>>", _refresh_tray_hint)
+        _refresh_tray_hint()
         tk.Frame(f_sec, height=1, bg=p["border"]).pack(fill="x", pady=6)
         sec_r = tk.Frame(f_sec, bg=p["card"])
         sec_r.pack(fill="x")
@@ -1531,6 +1560,7 @@ class DialogsMixin:
             st["theme"] = thm_map.get(cb_theme.get(), "dark")
             st["delete_mode"] = "trash" if v_trash.get() else "direct"
             st["minimize_to_tray"] = bool(v_tray_min.get())
+            st["tray_backend"] = _tray_rev.get(cb_tray_mode.get(), "auto")
             st["silent_cleanup"] = bool(v_sclean.get())
             st["cloud_enabled"] = bool(v_cloud_enabled.get())
             st["cloud_remote"] = "pcloud"
