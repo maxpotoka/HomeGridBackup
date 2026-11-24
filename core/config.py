@@ -397,7 +397,7 @@ def load_state():
     state = {
         "server": "", "server_history": [], "favorite_servers": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR, "logs_dir": "",
-        "local_enabled": True, "download_buf_kb": 64, "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "net_max_archives": 0, "net_max_size_gb": 0.0, "net_fit_free_space": True, "journal_sync_target": "auto",
+        "local_enabled": True, "download_buf_kb": 0, "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "net_max_archives": 0, "net_max_size_gb": 0.0, "net_fit_free_space": True, "journal_sync_target": "auto",
         "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
@@ -436,7 +436,7 @@ def load_state():
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
             if data.get("net_dir"):
                 state["net_dir"] = os.path.expanduser(str(data["net_dir"]).strip())
-            if "download_buf_kb" in data and int(data["download_buf_kb"] or 64) in (16, 32, 64, 128, 256, 512, 1024): state["download_buf_kb"] = int(data["download_buf_kb"])
+            if "download_buf_kb" in data and data["download_buf_kb"] is not None and int(data["download_buf_kb"]) in (0, 16, 32, 64, 128, 256, 512, 1024): state["download_buf_kb"] = int(data["download_buf_kb"])
             if isinstance(data.get("local_enabled"), bool): state["local_enabled"] = data["local_enabled"]
             if "net_max_archives" in data: state["net_max_archives"] = max(0, int(data["net_max_archives"] or 0))
             if "net_max_size_gb" in data: state["net_max_size_gb"] = max(0.0, float(data["net_max_size_gb"] or 0.0))

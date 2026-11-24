@@ -11,14 +11,25 @@ import sys
 import time
 
 _ORIG_CREATE_CONN = socket.create_connection
+_SOCK_BUF_BYTES = 0  # 0 = авто: буферы сокетов не трогаем
+
+def set_socket_buffer_kb(kb):
+    global _SOCK_BUF_BYTES
+    try:
+        _SOCK_BUF_BYTES = max(0, int(kb or 0)) * 1024
+    except (TypeError, ValueError):
+        _SOCK_BUF_BYTES = 0
+
 def _fast_conn(addr, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kw):
     s = _ORIG_CREATE_CONN(addr, timeout=timeout, source_address=source_address, **kw)
     try:
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2097152)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2097152)
+        if _SOCK_BUF_BYTES > 0:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, _SOCK_BUF_BYTES)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, _SOCK_BUF_BYTES)
     except Exception: pass
     return s
+
 socket.create_connection = _fast_conn
 import http.cookiejar
 import ipaddress

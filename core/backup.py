@@ -679,6 +679,8 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
     dt_tok = st.get("download_token") or cli_tok
     du = f"{srv}{st['download_url']}" if st.get("download_url") else f"{srv}/api/migration/export?_t={int(time.time()*1000)}&job_id={job_id}&_download_token={dt_tok}"
 
+    from core.network import set_socket_buffer_kb
+    set_socket_buffer_kb(engine.state.get("download_buf_kb", 0))
     engine.log(f"Завантаження ZIP-архіву з {srv_label}...", "info")
     download_started = time.time()
     _record_cloud_event(engine, operation_id, "stage_started", stage="archive_download")
