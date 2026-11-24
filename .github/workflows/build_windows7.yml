@@ -1,67 +1,101 @@
-@echo off
-setlocal
-cd /d "%~dp0"
+name: Build HomeGrid Backup Windows 7 (folder + installer)
 
-echo [0/4] Checking Python 3.8 x86...
-python -c "import sys,struct; assert sys.version_info[:2]==(3,8) and struct.calcsize('P')*8==32" 2>nul
-if errorlevel 1 (
-  echo ERROR: Python 3.8 32-bit is required.
-  goto :fail
-)
+on:
+  workflow_dispatch:
 
-echo [1/4] Enabling Windows 7 build flag...
-python -c "open('core/build_variant.py','w',encoding='ascii').write('WINDOWS7_CLOUD_SYNC_PREVIEW = True\n')"
-if errorlevel 1 goto :fail
+concurrency:
+  group: build-win7-${{ github.ref }}
+  cancel-in-progress: false
 
-echo [2/4] Cleaning old output...
-if exist dist_win7 rmdir /s /q dist_win7
+permissions:
+  contents: read
 
-echo [3/4] Building with Nuitka...
-python -m nuitka ^
-  --standalone ^
-  --lto=yes ^
-  --mingw64 ^
-  --jobs=4 ^
-  --python-flag=no_site ^
-  --python-flag=no_asserts ^
-  --python-flag=no_docstrings ^
-  --enable-plugin=tk-inter ^
-  --windows-console-mode=attach ^
-  --assume-yes-for-downloads ^
-  --company-name=HomeGrid ^
-  --product-name="HomeGrid Backup" ^
-  --file-version=2.76.0.0 ^
-  --product-version=2.76.0.0 ^
-  --include-data-files=icon.ico=icon.ico ^
-  --windows-icon-from-ico=icon.ico ^
-  --include-package=core ^
-  --include-package=console ^
-  --include-package=gui ^
-  --include-package=pystray ^
-  --include-module=pystray._win32 ^
-  --include-package=PIL ^
-  --include-package=keyring ^
-  --include-module=keyring.backends.Windows ^
-  --include-package=send2trash ^
-  --nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo ^
-  --output-dir=dist_win7 ^
-  --output-filename=HomeGridBackup.exe ^
-  main.py
-if errorlevel 1 goto :fail
+jobs:
+  build-win7:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
 
-echo [4/4] Verifying output...
-if not exist "dist_win7\main.dist\HomeGridBackup.exe" (
-  echo ERROR: HomeGridBackup.exe was not created.
-  goto :fail
-)
+      - name: Set up 32-bit Python 3.8 (Windows 7 compatible)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8.10"
+          architecture: "x86"
 
-echo.
-echo SUCCESS: dist_win7\main.dist\HomeGridBackup.exe
-pause
-exit /b 0
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install --upgrade pip
+          pip install "nuitka<2.6" "pillow<11.0" pystray keyring send2trash
+          python -c "import sys,struct; assert sys.version_info[:2]==(3,8) and struct.calcsize('P')*8==32"
 
-:fail
-echo.
-echo BUILD FAILED.
-pause
-exit /b 1
+      - name: Set build variant (Windows 7 cloud sync preview)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Content -Path core\build_variant.py -Value 'WINDOWS7_CLOUD_SYNC_PREVIEW = True' -Encoding ascii
+
+      - name: Build folder with Nuitka (MinGW64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $nuitkaArgs = @(
+            '--standalone', '--lto=yes', '--mingw64', '--jobs=4',
+            '--python-flag=no_site', '--python-flag=no_asserts', '--python-flag=no_docstrings',
+            '--enable-plugin=tk-inter', '--windows-console-mode=attach', '--assume-yes-for-downloads',
+            '--company-name=HomeGrid', '--product-name=HomeGrid Backup',
+            '--file-version=2.76.0.0', '--product-version=2.76.0.0',
+            '--file-description=HomeGrid Backup Utility (Windows 7 x86)',
+            '--include-data-files=icon.ico=icon.ico', '--windows-icon-from-ico=icon.ico',
+            '--include-package=core', '--include-package=console', '--include-package=gui',
+            '--include-package=pystray', '--include-module=pystray._win32',
+            '--include-package=PIL', '--include-package=keyring',
+            '--include-module=keyring.backends.Windows', '--include-package=send2trash',
+            '--nofollow-import-to=mobile,kivy,unittest,pydoc,test,lib2to3,ensurepip,distutils,setuptools,pip,curses,sqlite3,xmlrpc,ftplib,imaplib,poplib,smtplib,telnetlib,turtle,turtledemo',
+            '--output-dir=dist_win7', '--output-filename=HomeGridBackup.exe', 'main.py'
+          )
+          python -m nuitka @nuitkaArgs
+          if ($LASTEXITCODE -ne 0) { throw "Nuitka failed: $LASTEXITCODE" }
+          if (-not (Test-Path 'dist_win7\main.dist\HomeGridBackup.exe')) {
+            throw 'HomeGridBackup.exe was not created'
+          }
+
+      - name: Prepare installer payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'packaging\installer_payload' | Out-Null
+          robocopy 'dist_win7\main.dist' 'packaging\installer_payload' /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+          if ($LASTEXITCODE -ge 8) { throw "robocopy failed: $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install innosetup -y --no-progress
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "Inno Setup not found: $iscc" }
+          New-Item -ItemType Directory -Force -Path 'release' | Out-Null
+          & $iscc '/DAppVersion=2.25' '/DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup' '/Orelease' 'packaging\windows_user_setup.iss'
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+          if (-not (Test-Path 'release\HomeGridBackup_Win7_x86_Setup.exe')) { throw 'Installer was not created' }
+
+      - name: Collect output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'output' | Out-Null
+          Copy-Item 'dist_win7\main.dist' 'output\HomeGridBackup_win7_folder' -Recurse -Force
+          Copy-Item 'release\HomeGridBackup_Win7_x86_Setup.exe' 'output\'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeGridBackup_win7_${{ github.run_number }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 30
