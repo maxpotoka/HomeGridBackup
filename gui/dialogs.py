@@ -567,7 +567,7 @@ class DialogsMixin:
         tab_cloud = tk.Frame(content_area, bg=p["panel"])
         tab_ui = tk.Frame(content_area, bg=p["panel"])
         tab_sys = tk.Frame(content_area, bg=p["panel"])
-        _pages = [tab_bkp, tab_sched, tab_cloud, tab_ui, tab_sys]
+        _pages = [tab_bkp, tab_sched, tab_ui, tab_sys]
         _nav_items = []
         _grp_lbls = []
 
@@ -575,12 +575,11 @@ class DialogsMixin:
         _nav_specs = [
             ("ПРОГРАМА ТА КОПІЇ", "shield", "🛡", "Зберігання та GFS", False),
             (None, "hist", "🕒", "Розклад та запуск", True),
-            ("СИСТЕМА ТА ХМАРА", "cloud", "☁", "Хмара pCloud", False),
-            (None, "gear", "⚙", "Інтерфейс", False),
+            ("СИСТЕМА ТА ХМАРА", "gear", "⚙", "Інтерфейс", False),
             (None, "shield", "🔒", "Трей та безпека", False),
         ]
-        _init_map = {0: 0, 1: 3, 2: 2}
-        _start_idx = _init_map.get(int(initial_tab), int(initial_tab)) if int(initial_tab) in (0, 1, 2, 3, 4) else 0
+        _init_map = {0: 0, 1: 2, 2: 0}
+        _start_idx = _init_map.get(int(initial_tab), int(initial_tab)) if int(initial_tab) in (0, 1, 2, 3) else 0
         _cur_tab = {"idx": _start_idx}
 
         def _select_pill_tab(idx):
@@ -686,37 +685,6 @@ class DialogsMixin:
 
         cloud_credentials_frame = tk.Frame(f_cloud, bg=p["card"])
         cloud_credentials_hint = None
-        if False:
-            username_row = tk.Frame(cloud_credentials_frame, bg=p["card"])
-            username_row.pack(fill="x", pady=2)
-            tk.Label(
-                username_row, text=tr("Email / ім'я користувача:", st.get("lang", "en")),
-                width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-            ).pack(side="left")
-            tk.Entry(
-                username_row, textvariable=v_cloud_username, bg=p["inp_bg"],
-                fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
-            ).pack(side="left", fill="x", expand=True)
-            password_row = tk.Frame(cloud_credentials_frame, bg=p["card"])
-            password_row.pack(fill="x", pady=2)
-            tk.Label(
-                password_row, text=tr("Пароль:", st.get("lang", "en")),
-                width=24, anchor="w", bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-            ).pack(side="left")
-            tk.Entry(
-                password_row, textvariable=v_cloud_password, show="*", bg=p["inp_bg"],
-                fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs)
-            ).pack(side="left", fill="x", expand=True)
-            cloud_credentials_hint = tk.Label(
-                cloud_credentials_frame, text="", bg=p["card"], fg=p["muted"],
-                justify="left", wraplength=780, font=("Segoe UI", max(8, fs - 1)),
-            )
-            cloud_credentials_hint.pack(anchor="w", pady=(2, 0))
-            cloud_credentials_hint.configure(text=tr(
-                "Для MEGA використовується email і пароль аккаунта.",
-                st.get("lang", "en"),
-            ))
-
         cloud_actions = tk.Frame(f_cloud, bg=p["card"])
         cloud_actions.pack(fill="x", pady=(4, 2))
         cloud_msg = tk.Label(f_cloud, text="", bg=p["card"], fg=p["muted"], font=("Segoe UI", fs - 1))
@@ -811,272 +779,6 @@ class DialogsMixin:
                     pass
 
             threading.Thread(target=_worker, daemon=True).start()
-
-        def _select_cloud_provider(_event=None):
-            provider = v_cloud_provider.get()
-            v_cloud_new_remote.set(cloud_default_remote_by_name.get(provider, "cloud"))
-            if WINDOWS7_CLOUD_SYNC_PREVIEW:
-                cloud_credentials_hint.configure(text=tr(
-                    "Для MEGA використовується email і пароль аккаунта."
-                    if cloud_provider_by_name.get(provider) == "mega"
-                    else "Для Koofr потрібен пароль додатка, створений в налаштуваннях Koofr.",
-                    st.get("lang", "en"),
-                ))
-
-        def _open_cloud_setup():
-            import queue
-            import threading
-
-            remote = v_cloud_new_remote.get().strip()
-            backend = cloud_provider_by_name.get(v_cloud_provider.get())
-            if not backend:
-                cloud_msg.configure(text=tr("Оберіть хмарний сервіс.", st.get("lang", "en")), fg=p["red"])
-                return
-            def _t(text):
-                return tr(text, st.get("lang", "en"))
-
-            from tkinter import messagebox
-
-            from core.cloud import delete_rclone_remote, list_rclone_remotes
-            try:
-                remote_exists = remote in list_rclone_remotes()
-            except Exception as exc:
-                cloud_msg.configure(text=str(exc), fg=p["red"])
-                return
-            if remote_exists:
-                if not messagebox.askyesno(
-                    _t("Замінити підключення?"),
-                    _t("Підключення з таким ім'ям уже існує. Замінити його? Файли у хмарі залишаться."),
-                    parent=self.root,
-                ):
-                    return
-                try:
-                    delete_rclone_remote(remote)
-                except Exception as exc:
-                    cloud_msg.configure(text=str(exc), fg=p["red"])
-                    return
-            if WINDOWS7_CLOUD_SYNC_PREVIEW:
-                username = v_cloud_username.get().strip()
-                password = v_cloud_password.get()
-                if not username or not password:
-                    cloud_msg.configure(
-                        text=tr("Введіть ім'я користувача та пароль.", st.get("lang", "en")),
-                        fg=p["red"],
-                    )
-                    return
-                v_cloud_password.set("")
-                cloud_msg.configure(
-                    text=tr("Створення підключення...", st.get("lang", "en")), fg=p["muted"]
-                )
-                cloud_setup_button.configure(state="disabled")
-
-                def _create_remote():
-                    try:
-                        from core.cloud import create_rclone_remote
-                        create_rclone_remote(remote, backend, username, password)
-                        error = ""
-                    except Exception as exc:
-                        error = str(exc)
-
-                    def _update():
-                        if not dlg.winfo_exists():
-                            return
-                        cloud_setup_button.configure(state="normal")
-                        if error:
-                            cloud_msg.configure(text=error, fg=p["red"])
-                        else:
-                            v_cloud_remote.set(remote)
-                            cloud_msg.configure(
-                                text=tr("Підключення створено.", st.get("lang", "en")),
-                                fg=p["green"],
-                            )
-                            _refresh_cloud_remotes()
-
-                    self.root.after(0, _update)
-
-                threading.Thread(target=_create_remote, daemon=True).start()
-                return
-
-            from core.cloud import start_rclone_remote_setup
-            try:
-                process = start_rclone_remote_setup(remote, backend)
-            except Exception as exc:
-                cloud_msg.configure(text=str(exc), fg=p["red"])
-                return
-
-            wizard = tk.Toplevel(self.root)
-            wizard.title(_t("Підключення до хмарного сервісу"))
-            wizard.geometry("480x190")
-            wizard.transient(self.root)
-            wizard.configure(bg=p["panel"])
-            wizard.resizable(False, False)
-
-            token_re = re.compile(r'("(?:access_token|refresh_token)"\s*:\s*")[^"]+')
-            link_re = re.compile(r"http://127\.0\.0\.1:\d+/auth\?\S+")
-            wz = {"text": "", "link": "", "details": False}
-
-            tk.Label(
-                wizard, text=v_cloud_provider.get(), bg=p["panel"], fg=p["cyan"],
-                font=("Segoe UI", fs + 1, "bold")
-            ).pack(anchor="w", padx=14, pady=(12, 2))
-            wizard_status = tk.StringVar(value=_t("Запуск rclone..."))
-            tk.Label(
-                wizard, textvariable=wizard_status, bg=p["panel"], fg=p["text"],
-                font=("Segoe UI", fs), wraplength=450, justify="left", anchor="w"
-            ).pack(fill="x", padx=14, pady=(0, 8))
-            progress = ttk.Progressbar(wizard, mode="indeterminate", length=450)
-            progress.pack(padx=14)
-            progress.start(12)
-
-            buttons_row = tk.Frame(wizard, bg=p["panel"])
-            buttons_row.pack(fill="x", padx=14, pady=10)
-
-            details_frame = tk.Frame(wizard, bg=p["panel"])
-            output = tk.Text(
-                details_frame, wrap="word", state="disabled", height=10,
-                bg=p["log_bg"], fg=p["text"], font=("Consolas", max(8, fs - 1))
-            )
-            output.pack(fill="both", expand=True, pady=(0, 6))
-            input_row = tk.Frame(details_frame, bg=p["panel"])
-            input_row.pack(fill="x")
-            hide_input = tk.BooleanVar(value=True)
-            response = tk.Entry(input_row, show="*", font=("Segoe UI", fs))
-            response.pack(side="left", fill="x", expand=True)
-            tk.Checkbutton(
-                input_row, text=_t("Приховати введення"), variable=hide_input,
-                command=lambda: response.configure(show="*" if hide_input.get() else ""),
-                bg=p["panel"], fg=p["text"], selectcolor=p["inp_bg"], font=("Segoe UI", fs - 1)
-            ).pack(side="left", padx=6)
-
-            output_queue = queue.Queue()
-            reader_done = threading.Event()
-
-            def _read_rclone_output():
-                try:
-                    while True:
-                        chunk = process.stdout.read(1)
-                        if not chunk:
-                            break
-                        output_queue.put(chunk)
-                except Exception as exc:
-                    output_queue.put(f"\n{exc}\n")
-                finally:
-                    reader_done.set()
-
-            def _send_rclone_response(_event=None):
-                answer = response.get()
-                response.delete(0, "end")
-                try:
-                    process.stdin.write(answer + "\n")
-                    process.stdin.flush()
-                except (OSError, ValueError) as exc:
-                    wizard_status.set(str(exc))
-                return "break"
-
-            def _show_details(show):
-                wz["details"] = show
-                if show:
-                    wizard.geometry("640x450")
-                    details_frame.pack(fill="both", expand=True, padx=14, pady=(0, 12))
-                else:
-                    details_frame.pack_forget()
-                    wizard.geometry("480x190")
-
-            def _copy_link():
-                if wz["link"]:
-                    wizard.clipboard_clear()
-                    wizard.clipboard_append(wz["link"])
-                    wizard_status.set(_t("Посилання скопійовано. Відкрийте його в браузері."))
-
-            def _close_rclone_wizard():
-                if process.poll() is None:
-                    import subprocess
-                    try:
-                        process.terminate()
-                        process.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=2)
-                    except OSError:
-                        pass
-                try:
-                    process.stdin.close()
-                except (OSError, ValueError):
-                    pass
-                wizard.destroy()
-
-            cancel_button = tk.Button(
-                buttons_row, text=_t("Скасувати"), command=_close_rclone_wizard,
-                bg=p["card"], fg=p["text"], font=("Segoe UI", fs), padx=10, cursor="hand2"
-            )
-            cancel_button.pack(side="left")
-            link_button = tk.Button(
-                buttons_row, text=_t("Копіювати посилання"), command=_copy_link, state="disabled",
-                bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=10, cursor="hand2"
-            )
-            link_button.pack(side="left", padx=6)
-            tk.Button(
-                buttons_row, text=_t("Деталі"), command=lambda: _show_details(not wz["details"]),
-                bg=p["card"], fg=p["muted"], font=("Segoe UI", fs), padx=10, cursor="hand2"
-            ).pack(side="right")
-            send_button = tk.Button(
-                input_row, text=_t("Надіслати"), command=_send_rclone_response,
-                bg=p["card"], fg=p["cyan"], font=("Segoe UI", fs), padx=10, cursor="hand2"
-            )
-            send_button.pack(side="right", padx=(6, 0))
-            response.bind("<Return>", _send_rclone_response)
-            wizard.protocol("WM_DELETE_WINDOW", _close_rclone_wizard)
-
-            def _poll_rclone_output():
-                if not wizard.winfo_exists():
-                    return
-                chunks = []
-                while True:
-                    try:
-                        chunks.append(output_queue.get_nowait())
-                    except queue.Empty:
-                        break
-                if chunks:
-                    wz["text"] += "".join(chunks)
-                    full = wz["text"]
-                    if not wz["link"]:
-                        found = link_re.search(full)
-                        if found:
-                            wz["link"] = found.group(0)
-                            link_button.configure(state="normal")
-                    if "Got code" in full:
-                        wizard_status.set(_t("Доступ отримано, зберігаю підключення..."))
-                    elif "Waiting for code" in full:
-                        wizard_status.set(_t("Увійдіть у браузері та натисніть «Дозволити»."))
-                    if full.endswith("> ") or full.endswith(">"):
-                        wizard_status.set(_t("rclone очікує вашу відповідь. Введіть її у розділі «Деталі»."))
-                        if not wz["details"]:
-                            _show_details(True)
-                        response.focus_set()
-                    output.configure(state="normal")
-                    output.delete("1.0", "end")
-                    output.insert("end", token_re.sub(r"\1***", full))
-                    output.see("end")
-                    output.configure(state="disabled")
-                if reader_done.is_set() and process.poll() is not None:
-                    progress.stop()
-                    send_button.configure(state="disabled")
-                    if process.returncode == 0:
-                        progress.configure(mode="determinate", value=100)
-                        wizard_status.set(_t("Готово ✔"))
-                        v_cloud_remote.set(remote)
-                        cloud_msg.configure(text=_t("Підключення створено."), fg=p["green"])
-                        _refresh_cloud_remotes()
-                        wizard.after(1200, lambda: wizard.winfo_exists() and wizard.destroy())
-                    else:
-                        wizard_status.set(_t("Помилка підключення. Подробиці у розділі «Деталі»."))
-                        cloud_msg.configure(text=_t("Майстер rclone завершився з помилкою."), fg=p["red"])
-                        _show_details(True)
-                    return
-                wizard.after(80, _poll_rclone_output)
-
-            threading.Thread(target=_read_rclone_output, daemon=True).start()
-            wizard.after(80, _poll_rclone_output)
 
         def _test_cloud_remote():
             import threading
@@ -1228,7 +930,6 @@ class DialogsMixin:
             _refresh_cloud_queue()
             dlg.after(30000, _schedule_cloud_queue_refresh)
 
-        cb_cloud_provider.bind("<<ComboboxSelected>>", _select_cloud_provider)
         v_cloud_provider.set("pCloud")
         v_cloud_new_remote.set("pcloud")
         v_cloud_remote.set("pcloud")
@@ -1237,7 +938,7 @@ class DialogsMixin:
         cloud_actions.columnconfigure(2, weight=1)
         cloud_setup_button = tk.Button(
             cloud_actions, text=tr("Авторизація pCloud", st.get("lang", "en")),
-            command=lambda: (v_cloud_provider.set("pCloud"), v_cloud_new_remote.set("pcloud"), _open_cloud_setup()),
+            command=lambda: None,
             bg=p["blue"], fg="#ffffff", bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=10, pady=5, cursor="hand2"
         )
         cloud_setup_button.grid(row=0, column=0, sticky="ew", padx=(0, 5), pady=3)
@@ -1614,7 +1315,7 @@ class DialogsMixin:
             lng = st.get("lang", "en")
             for _gl, _gk in _grp_lbls:
                 _gl.configure(text=tr(_gk, lng))
-            for _ib, _tc in enumerate(("Зберігання та GFS", "Розклад та запуск", "Хмара pCloud", "Інтерфейс", "Трей та безпека")):
+            for _ib, _tc in enumerate(("Зберігання та GFS", "Розклад та запуск", "Інтерфейс", "Трей та безпека")):
                 _nav_items[_ib].set_active(_ib == _cur_tab["idx"], text_override=tr(_tc, lng))
             apply_widget_i18n(dlg, lng)
         _i18n_settings()
@@ -2142,7 +1843,6 @@ class DialogsMixin:
             ("size", "Розмір" if lang == "uk" else "Size", 78, 60, "e"),
             ("dur", "Час" if lang == "uk" else "Duration", 88, 70, "center"),
             ("sha", "SHA", 56, 48, "center"),
-            ("cloud", "Хмара" if lang == "uk" else "Cloud", 74, 58, "center"),
         ]
         for cid, title_h, w_col, min_w_col, anc in heads:
             tree.heading(cid, text=title_h)
@@ -2274,7 +1974,6 @@ class DialogsMixin:
                     "duration": dur_txt,
                     "sha": sha_mark,
                     "sha_tooltip": sha_tooltip,
-                    "cloud": cloud_mark,
                     "cloud_tooltip": cloud_tooltip,
                     "interval": _operation_interval_text(item),
                 }
