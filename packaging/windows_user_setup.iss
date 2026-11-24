@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "2.25"
+  #define AppVersion "2.99"
 #endif
 
 #ifndef OutputBaseFilename
@@ -11,7 +11,7 @@
 #endif
 
 #ifndef AppIdGuid
-  #define AppIdGuid "{849CA065-D972-41A1-BA97-1B3858B1CA4B}"
+  #define AppIdGuid "{{849CA065-D972-41A1-BA97-1B3858B1CA4B}"
 #endif
 
 [Setup]
