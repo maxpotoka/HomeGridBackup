@@ -1,3 +1,5 @@
+# patch-id: fix-net-drive-status-and-build-retry-2.78
+import atexit
 import getpass
 
 # ==============================================================================
@@ -110,11 +112,12 @@ class BackupEngine:
         self.pill_text = f"v{SCRIPT_VER} | {BUILD_DATE}"
         self.pill_type = "idle"
         self.op_history = list(self.state.get("op_history") or [])
-        if not self.op_history:
-            self._seed_op_history_from_disk()
         self.diag_net = "Не перевірено"
         self.diag_ping = "— мс"
         self.logs = []
+        self._file_log_buf = []
+        self._file_log_last_flush = time.monotonic()
+        atexit.register(self.flush_logs)
         self.modal = None
         self.modal_event = threading.Event()
         self.modal_result = None
@@ -156,10 +159,38 @@ class BackupEngine:
             if os.path.abspath(self.state["backup_dir"]).startswith("/mnt/"):
                 self.log("Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.", "warn")
 
+    def flush_logs(self):
+        with self.lock:
+            if not self._file_log_buf:
+                return
+            lines = list(self._file_log_buf)
+            self._file_log_buf.clear()
+            self._file_log_last_flush = time.monotonic()
+        try:
+            ldir = get_logs_dir(self.state)
+            for item in lines:
+                write_file_log(item, ldir)
+        except Exception:
+            pass
+
     def log(self, msg, level="info"):
         msg = tr(msg, self.state.get("lang", "en"))
         ts = datetime.now().strftime("%H:%M:%S")
-        write_file_log(f"[{level.upper()}] {msg}", get_logs_dir(self.state))
+        line = f"[{level.upper()}] {msg}"
+        urgent = level in ("err", "ok")
+        to_write = None
+        with self.lock:
+            self._file_log_buf.append(line)
+            now_m = time.monotonic()
+            if urgent or len(self._file_log_buf) >= 20 or (now_m - self._file_log_last_flush) >= 4.0:
+                to_write = chr(10).join(self._file_log_buf)
+                self._file_log_buf.clear()
+                self._file_log_last_flush = now_m
+        if to_write:
+            try:
+                write_file_log(to_write, get_logs_dir(self.state))
+            except Exception:
+                pass
         if CLI_MODE or (SILENT_MODE and not HIDDEN_MODE):
             from console.terminal import _finish_cli_inline, _safe_con_write
             _finish_cli_inline(self)
@@ -239,20 +270,31 @@ class BackupEngine:
         else:
             self._dest_stats_event.set()
 
-    def _scan_dir_brief(self, raw_path):
+    def _scan_dir_brief(self, raw_path, prev_res=None):
         p = os.path.expanduser((raw_path or "").strip())
-        if not p or not os.path.isdir(p):
+        if not p:
             return {"ok": False}
-        cnt, total_b = 0, 0
         try:
+            if not os.path.isdir(p):
+                if isinstance(prev_res, dict) and prev_res.get("ok"):
+                    return dict(prev_res, stale=True)
+                return {"ok": False}
+            cnt, total_b = 0, 0
             with os.scandir(p) as it:
                 for entry in it:
                     if not entry.name.startswith(".") and entry.name.lower().endswith(".zip") and entry.is_file(follow_symlinks=False):
                         cnt += 1
                         total_b += entry.stat(follow_symlinks=False).st_size
-            _, _, free_b = shutil.disk_usage(p)
-            free_gb = round(free_b / 1073741824.0, 1)
+            free_gb = -1.0
+            try:
+                _, _, free_b = shutil.disk_usage(p)
+                free_gb = round(free_b / 1073741824.0, 1)
+            except Exception:
+                if isinstance(prev_res, dict) and prev_res.get("free_gb", -1) >= 0:
+                    free_gb = prev_res["free_gb"]
         except Exception:
+            if isinstance(prev_res, dict) and prev_res.get("ok"):
+                return dict(prev_res, stale=True)
             return {"ok": False}
         return {"ok": True, "count": cnt, "mb": round(total_b / 1048576.0, 1), "free_gb": free_gb}
 
@@ -260,8 +302,10 @@ class BackupEngine:
         while True:
             self._dest_stats_event.clear()
             st = self.state
-            mir_res = self._scan_dir_brief(st.get("mirror_dir")) if (st.get("mirror_enabled") and (st.get("mirror_dir") or "").strip()) else None
-            net_res = self._scan_dir_brief(st.get("net_dir")) if (st.get("net_enabled") and (st.get("net_dir") or "").strip()) else None
+            with self.lock:
+                prev_snap = dict(getattr(self, "_dest_stats", {}) or {})
+            mir_res = self._scan_dir_brief(st.get("mirror_dir"), prev_snap.get("mirror")) if (st.get("mirror_enabled") and (st.get("mirror_dir") or "").strip()) else None
+            net_res = self._scan_dir_brief(st.get("net_dir"), prev_snap.get("network")) if (st.get("net_enabled") and (st.get("net_dir") or "").strip()) else None
             cld_res = None
             if st.get("cloud_enabled"):
                 try:

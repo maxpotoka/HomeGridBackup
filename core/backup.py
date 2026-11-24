@@ -1,3 +1,4 @@
+# patch-id: fix-net-drive-status-and-build-retry-2.78
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
@@ -138,8 +139,61 @@ def _desktop_notify(title, text):
     except Exception:
         pass
 
+def _is_slow_or_cloud_path(path_str):
+    if not path_str:
+        return False
+    norm = os.path.normpath(os.path.expanduser(str(path_str)))
+    low = norm.lower().replace(chr(92), "/")
+    if norm.startswith(chr(92) * 2) or low.startswith("//"):
+        return True
+    markers = (
+        "/library/cloudstorage/",
+        "/library/mobile documents/",
+        "googledrive",
+        "google-drive",
+        "/run/user/",
+        "google drive",
+        "onedrive",
+        "dropbox",
+        "icloud",
+        "pcloud",
+        "nextcloud",
+        "owncloud",
+        "yandexdisk",
+        "/gvfs/",
+        "/volumes/",
+        "/mnt/",
+        "/media/",
+    )
+    if any(m in low for m in markers):
+        return True
+    if os.name == "nt":
+        try:
+            import ctypes
+            drive = os.path.splitdrive(norm)
+            if drive:
+                root_p = drive + chr(92)
+                if ctypes.windll.kernel32.GetDriveTypeW(root_p) == 4:
+                    return True
+                fs_buf = ctypes.create_unicode_buffer(64)
+                vol_buf = ctypes.create_unicode_buffer(256)
+                if ctypes.windll.kernel32.GetVolumeInformationW(root_p, vol_buf, 256, None, None, None, fs_buf, 64):
+                    fs_low = fs_buf.value.lower()
+                    vol_low = vol_buf.value.lower()
+                    if any(k in fs_low or k in vol_low for k in ("dokan", "winfsp", "fuse", "pcloud", "google", "mega", "raidrive", "webdav")):
+                        return True
+        except Exception:
+            pass
+    return False
+
+
 def _backup_stage1_prepare(engine, raw_url, force_skip):
-    bdir = engine.state["backup_dir"]
+    local_on = bool(engine.state.get("local_enabled", True))
+    net_dir = os.path.expanduser((engine.state.get("net_dir") or "").strip())
+    net_on = bool(engine.state.get("net_enabled", False)) and bool(net_dir)
+    if not local_on and not net_on:
+        raise RuntimeError("Увімкніть хоча б одне сховище (Локально або Мережа).")
+    bdir = engine.state["backup_dir"] if local_on else net_dir
     os.makedirs(bdir, exist_ok=True)
     srv, has_bang = normalize_server_url(raw_url if raw_url is not None else engine.state["server"])
     skip_check = force_skip or has_bang
@@ -445,21 +499,39 @@ def _copy_to_mirror(engine, out_file, sha_file):
         engine.log(f"Попередження: не вдалося скопіювати у дзеркальну папку ({mirror_dir}): {e}", "warn")
 
 def _copy_to_network(engine, out_file, sha_file):
-    if not bool(engine.state.get("net_enabled", False)):
-        return
+    if not bool(engine.state.get("net_enabled", False)): return
     net_dir = (engine.state.get("net_dir") or "").strip()
-    if not net_dir or net_dir in (".", "./", ".\\", "/", "\\"):
-        return
+    if not net_dir or net_dir in (".", "./", ".\\", "/", "\\"): return
     try:
+        from operator import itemgetter
         src_real = os.path.normcase(os.path.realpath(os.path.dirname(out_file)))
         dst_real = os.path.normcase(os.path.realpath(os.path.expanduser(net_dir)))
-        if src_real == dst_real:
-            return
+        if src_real == dst_real: return
         os.makedirs(dst_real, exist_ok=True)
-        shutil.copy2(out_file, os.path.join(dst_real, os.path.basename(out_file)))
-        if os.path.exists(sha_file):
-            shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
-        engine.log(f"Мережеву копію збережено у: {dst_real}", "ok")
+        fname = os.path.basename(out_file)
+        f_mb = os.path.getsize(out_file) / 1048576.0
+        engine.set_progress(96, f"Копіювання у мережу ({f_mb:.1f} МБ)...")
+        engine.log(f"Копіювання архіву у мережеву папку: {dst_real}...", "info")
+        st_n = engine.state
+        need_b = os.path.getsize(out_file) + (64 * 1024 * 1024)
+        max_c = max(0, int(st_n.get("net_max_archives", 0) or 0))
+        max_b = int(max(0.0, float(st_n.get("net_max_size_gb", 0.0) or 0.0)) * (1024 ** 3))
+        fit_f = bool(st_n.get("net_fit_free_space", True))
+        arcs = [(os.path.join(dst_real, f), os.path.getsize(os.path.join(dst_real, f)), os.path.getmtime(os.path.join(dst_real, f))) for f in os.listdir(dst_real) if f.lower().endswith(".zip") and "_KEEP_" not in f.upper()]
+        arcs.sort(key=itemgetter(2))
+        del_n = 0
+        while arcs and ((fit_f and shutil.disk_usage(dst_real).free < need_b) or (max_c > 0 and len(arcs) + 1 > max_c) or (max_b > 0 and sum(sz for _, sz, _ in arcs) + os.path.getsize(out_file) > max_b)):
+            old_p, _, _ = arcs.pop(0)
+            for rem_p in (old_p, old_p + ".sha256"):
+                if os.path.exists(rem_p): os.remove(rem_p)
+            del_n += 1
+        if del_n: engine.log(f"Ротація мережі: видалено {del_n} старих архівів.", "info")
+        t_cp = time.time()
+        shutil.copy2(out_file, os.path.join(dst_real, fname))
+        if os.path.exists(sha_file): shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
+        cp_sec = round(max(0.1, time.time() - t_cp), 1)
+        cp_spd = round(f_mb / cp_sec, 1)
+        engine.log(f"Мережеву копію збережено у: {dst_real} ({cp_sec} с, {cp_spd} МБ/с)", "ok")
     except Exception as e:
         engine.log(f"Попередження: не вдалося скопіювати у мережеву папку ({net_dir}): {e}", "warn")
 
@@ -477,9 +549,12 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
         _, sr_code, sr_body, _, sr_err, _ = invoke_http(f"{srv}/api/migration/export/status?job_id={job_id}", engine.state, timeout=45.0)
         if not sr_body or not sr_body.strip():
             bad_json_cnt += 1
+            if bad_json_cnt in (1, 5, 15, 30):
+                engine.log(f"Втрачено зв'язок із {srv_label} під час збірки (HTTP {sr_code}: {sr_err}). Повтор {bad_json_cnt}/45...", "warn")
+            engine.set_progress(None, f"[{srv_label}] Очікування мережі ({bad_json_cnt}/45)...")
             if bad_json_cnt >= 45:
                 raise RuntimeError(f"Сервер {srv_label} перестав відповідати під час збірки (HTTP {sr_code}): {sr_err}")
-            time.sleep(1.5)
+            time.sleep(2.5)
             continue
         try:
             st = json.loads(sr_body)
@@ -549,10 +624,12 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
         else:
             sz_txt = ""
 
+        _lng_p = engine.state.get("lang", "en")
+        _el_s = f"{elapsed_ph:.1f} {'с' if _lng_p == 'uk' else 's'}" if elapsed_ph < 60 else format_duration(elapsed_ph, _lng_p).partition(" (").__getitem__(0)
         if ph == "checking":
-            engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({elapsed_ph:.1f} с)...")
+            engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({_el_s})...")
         elif ph != "ready" and st.get("ready") is not True:
-            pct_part = f": {pct}%" if pct > 0 else f" ({elapsed_ph:.1f} с)"
+            pct_part = f": {pct}%" if pct > 0 else f" ({_el_s})"
             engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)}{pct_part}{sz_txt}")
 
         if ph == "ready" or st.get("ready") is True:
@@ -577,7 +654,26 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
     while os.path.exists(out_file):
         out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}_{collision_id}.zip")
         collision_id += 1
-    part_file = out_file + ".part"
+    import tempfile
+    use_ssd_stage = False
+    stage_dir = bdir
+    net_only = (not bool(engine.state.get("local_enabled", True))) and bool(engine.state.get("net_enabled")) and bool((engine.state.get("net_dir") or "").strip())
+    if _is_slow_or_cloud_path(bdir) or net_only:
+        tmp_root = tempfile.gettempdir()
+        try:
+            free_tmp = shutil.disk_usage(tmp_root).free
+        except OSError:
+            free_tmp = 0
+        need_bytes = int(tot_b * 1.25) + 104857600 if tot_b > 0 else 536870912
+        if not _is_slow_or_cloud_path(tmp_root) and free_tmp >= need_bytes:
+            stage_dir = os.path.join(tmp_root, "HomeGridBackup_stage")
+            os.makedirs(stage_dir, exist_ok=True)
+            use_ssd_stage = True
+            engine.log("Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.", "warn")
+            reason_txt = "??????? ?????? ???????? ?????" if net_only else "????? ??????????? ? ???????? / ?????????? ???????"
+            engine.log(f"???? ({reason_txt}): ?????? ????????? ?? ???????? ? ????????? ????? ?? SSD, ? ????? ???????? ? ????? ???????????.", "warn")
+    stage_out_file = os.path.join(stage_dir, os.path.basename(out_file)) if use_ssd_stage else out_file
+    part_file = stage_out_file + ".part"
     cli_tok = engine.state["client_token"] or DEFAULT_TOK
     ses_tok = engine.state["session_token"]
     dt_tok = st.get("download_token") or cli_tok
@@ -614,8 +710,9 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                     last_speed_t = d0
                     last_speed_bytes = 0
                     smooth_speed = None
+                    dl_chunk_sz = max(16384, int(engine.state.get("download_buf_kb", 64) or 64) * 1024)
                     while True:
-                        chunk = resp.read(1048576)
+                        chunk = resp.read(dl_chunk_sz)
                         if not chunk:
                             break
                         out_f.write(chunk)
@@ -653,7 +750,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
             if os.path.exists(part_file):
                 os.remove(part_file)
         if dl_ok and size_valid:
-            os.replace(part_file, out_file)
+            os.replace(part_file, stage_out_file)
             download_duration = max(0.05, time.time() - d0)
             if hasattr(engine, "_last_srv_timings"):
                 engine._last_srv_timings["dl_t0"] = d0
@@ -664,7 +761,7 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
                 size_bytes=actual_sz, duration_sec=download_duration,
                 speed_mbps=(actual_sz / 1048576.0) / max(download_duration, 0.001)
             )
-            return out_file, net_sha_hex
+            return stage_out_file, out_file, net_sha_hex
         if dl_ok and not size_valid:
             dl_err = f"завантажено лише {actual_sz/1048576.0:.1f} із {tot_b/1048576.0:.1f} МБ (обрив потоку)"
             if os.path.exists(part_file):
@@ -699,9 +796,12 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         net_on = bool(engine.state.get("net_enabled", False)) and bool((engine.state.get("net_dir") or "").strip())
         if not loc_on and not net_on:
             raise RuntimeError("No storage enabled (Local and Network are both OFF).")
-        bdir = engine.state["backup_dir"] if loc_on else __import__("tempfile").gettempdir()
+        local_on = bool(engine.state.get("local_enabled", True))
+        bdir = engine.state["backup_dir"] if local_on else os.path.expanduser((engine.state.get("net_dir") or "").strip()) if loc_on else __import__("tempfile").gettempdir()
         tgts = ([f"Local: {bdir}"] if loc_on else []) + ([f"Network: {engine.state.get('net_dir')}"] if net_on else [])
         engine.log("Targets: " + " | ".join(tgts), "info")
+        if loc_on and net_on:
+            engine.log("Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.", "info")
         t_prep0 = time.time()
         _record_cloud_event(engine, operation_id, "stage_started", stage="server_connection_and_preparation")
         srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
@@ -711,7 +811,8 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         )
         t_dl0 = time.time()
         _record_cloud_event(engine, operation_id, "milestone", stage="server_job_ready")
-        out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id)
+        stage_file, final_out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id)
+        out_file = stage_file
         t_ver0 = time.time()
 
         total_bytes = os.path.getsize(out_file)
@@ -764,7 +865,17 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         zip_hash = disk_sha_low.upper()
         sha_file = out_file + ".sha256"
         with open(sha_file, "w", encoding="utf-8") as f_sha:
-            f_sha.write(f"{zip_hash.lower()}  {os.path.basename(out_file)}\n")
+            f_sha.write(f"{zip_hash.lower()}  {os.path.basename(final_out_file)}\n")
+        if os.path.normcase(os.path.realpath(out_file)) != os.path.normcase(os.path.realpath(final_out_file)):
+            engine.set_progress(97, "?????????? ???????????? ?????? ? ????? ???????????...")
+            os.makedirs(os.path.dirname(final_out_file), exist_ok=True)
+            final_sha_file = final_out_file + ".sha256"
+            shutil.move(out_file, final_out_file)
+            if os.path.exists(sha_file):
+                shutil.move(sha_file, final_sha_file)
+            out_file = final_out_file
+            sha_file = final_sha_file
+            engine.log(f"???? ?? .sha256 ?????????? ? ????? ???????????: {os.path.dirname(out_file)}", "ok")
         engine.log(f"Цілісність перевірено в 1 прохід ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
         _record_cloud_event(
             engine, operation_id, "stage_completed", stage="archive_sha256_verification",
@@ -785,7 +896,11 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
                 archive=out_file, duration_sec=mir_duration
             )
 
-        _copy_to_network(engine, out_file, sha_file)
+        net_active = bool(engine.state.get("net_enabled", False)) and bool((engine.state.get("net_dir") or "").strip())
+        t_net0 = time.time()
+        if bool(engine.state.get("local_enabled", True)):
+            _copy_to_network(engine, out_file, sha_file)
+        net_sec = round(max(0.1, time.time() - t_net0), 1) if net_active else 0.0
         with engine.lock:
             if hasattr(engine, "_dest_stats"):
                 engine._dest_stats["network"] = None
@@ -842,7 +957,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         final_name = os.path.basename(out_file)
         engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
         engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
-        tot_fmt = format_duration(total_sec, engine.state.get("lang", "en"))
+        tot_fmt = format_duration(total_sec, engine.state.get("lang", "en")).partition(" (").__getitem__(0)
         engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
         system_info = get_fast_sysinfo()
         summary = f"v{SCRIPT_VER} | {system_info} | download {spd_mbs} MB/s ({dl_sec} s) | server {srv_sec} s | total {total_sec} s | files {cnt}"
@@ -882,7 +997,7 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         _sync_cloud_reports(engine)
         if not SILENT_MODE and not auto_quiet:
             z_cnt, z_mb, free_gb = engine.get_storage_stats()
-            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_proc_sec": srv_proc_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
+            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_proc_sec": srv_proc_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "buf_kb": int(engine.state.get("download_buf_kb", 64) or 64), "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "net_active": net_active, "net_sec": net_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
             engine.ask_modal("backup_report", "Звіт про резервне копіювання", json.dumps(rep, ensure_ascii=False))
     except Exception as exc:
         engine.exit_code = 1
@@ -906,6 +1021,15 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         if not SILENT_MODE:
             engine.ask_modal("alert", "Помилка резервного копіювання", str(exc))
     finally:
+        if hasattr(engine, "flush_logs"):
+            engine.flush_logs()
+        try:
+            import tempfile
+            st_d = os.path.join(tempfile.gettempdir(), "HomeGridBackup_stage")
+            if os.path.isdir(st_d):
+                shutil.rmtree(st_d, ignore_errors=True)
+        except Exception:
+            pass
         with engine.lock:
             engine.is_running = False
             engine.indeterminate = False

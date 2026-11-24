@@ -544,6 +544,7 @@ def _start_tray_thread(engine):
         last_sig, last_menu_sig, last_title = None, None, ""
         last_menu_ts = 0.0
         is_macos = (os.sys.platform == "darwin")
+        is_win = (os.name == "nt")
         while not _TRAY_STOP.is_set():
             _TRAY_STOP.wait(1.0)
             if _TRAY_STOP.is_set():
@@ -556,9 +557,10 @@ def _start_tray_thread(engine):
                 if not getattr(engine.tray_icon, "visible", True):
                     continue
                 cur_pct = int(engine.progress) if engine.is_running else 0
+                icon_pct = (cur_pct // 10) * 10 if (is_win and engine.is_running) else cur_pct
                 lng_s = engine.state.get("lang", "en")
-                sig = (cur_pct, engine.is_running, engine.pill_type)
-                menu_sig = (cur_pct if engine.is_running else 0, engine.is_running, lng_s, engine.app_ref is not None)
+                sig = (icon_pct, engine.is_running, engine.pill_type)
+                menu_sig = (0 if is_win else (cur_pct if engine.is_running else 0), engine.is_running, lng_s, engine.app_ref is not None)
                 elapsed_sec = _elapsed_seconds()
                 new_title = (
                     f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
@@ -566,11 +568,11 @@ def _start_tray_thread(engine):
                 )
                 upd_icon = None
                 if sig != last_sig:
-                    upd_icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
+                    upd_icon = _get_tray_img_safe(icon_pct, engine.is_running, engine.pill_type, 0)
                     last_sig = sig
                 upd_menu = None
                 now_m = time.monotonic()
-                menu_due = (now_m - last_menu_ts) >= 3.0
+                menu_due = (not is_win) and ((now_m - last_menu_ts) >= 3.0)
                 if menu_sig != last_menu_sig or (engine.is_running and menu_due):
                     upd_menu = _build_tray_menu()
                     last_menu_sig = menu_sig

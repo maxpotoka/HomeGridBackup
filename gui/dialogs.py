@@ -48,12 +48,6 @@ from gui.styles import UI_FONT_LABELS, UI_SCALE_LABELS, fix_mac_buttons
 
 # patch-id: settings-all-tabs-homegrid-2.46
 # patch-id: homegrid-design-system-2.45
-from gui.tray import (
-    _LINUX_TRAY_MODES,
-    _MAC_TRAY_MODES,
-    TRAY_MODE_HINTS,
-    _force_quit_app,
-)
 
 _OP_ARCHIVE_RE = re.compile(r"^homegrid_backup_(DAILY|WEEKLY|MONTHLY|YEARLY|KEEP)_(.+)$", re.IGNORECASE)
 
@@ -292,6 +286,7 @@ class DialogsMixin:
                 dlg.destroy()
             except Exception:
                 pass
+            from gui.tray import _force_quit_app
             _force_quit_app(self.engine)
         def _cancel_exit(_e=None):
             self._exit_confirm_open = False
@@ -322,7 +317,7 @@ class DialogsMixin:
                 self.engine.submit_modal(True)
             dlg.protocol("WM_DELETE_WINDOW", _close_rep)
             tot_s = max(0.1, float(d.get("total_sec", 0.1)))
-            tot_disp = format_duration(tot_s, lang)
+            tot_disp = format_duration(tot_s, lang).partition(" (").__getitem__(0)
             fn_s = d.get("file", "backup.zip")
             sz_s = d.get("size_mb", 0.0)
             fc_s = d.get("files_cnt", 0)
@@ -366,7 +361,7 @@ class DialogsMixin:
             for idx_r, (lbl_st, val_s, col_st) in enumerate(stages):
                 pct_v = min(100, int(round((float(val_s) / tot_s) * 100)))
                 tk.Label(mid_c, text=lbl_st, bg=p["card"], fg=col_st, font=(fam, fs), anchor="w").grid(row=idx_r, column=0, sticky="w", pady=4)
-                tk.Label(mid_c, text=f"{format_duration(val_s, lang)}  ({pct_v}%)", bg=p["card"], fg=col_st, font=(fam, fs, "bold"), anchor="e").grid(row=idx_r, column=1, sticky="e", padx=(12, 0), pady=4)
+                tk.Label(mid_c, text=f"{format_duration(val_s, lang).partition(' (').__getitem__(0)}  ({pct_v}%)", bg=p["card"], fg=col_st, font=(fam, fs, "bold"), anchor="e").grid(row=idx_r, column=1, sticky="e", padx=(12, 0), pady=4)
             bot_c = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=14, pady=8)
             bot_c.pack(fill="x", padx=16, pady=(0, 8))
             tk.Label(bot_c, text=(f"Сховище:  {d.get('z_cnt', 0)} архівів ({d.get('z_mb', 0)} МБ)   •   Вільно:  {d.get('free_gb', 0)} ГБ   •   Застарілих GFS:  {d.get('old_cnt', 0)} шт." if lang == "uk" else f"Storage:  {d.get('z_cnt', 0)} archives ({d.get('z_mb', 0)} MB)   •   Free:  {d.get('free_gb', 0)} GB   •   Outdated GFS:  {d.get('old_cnt', 0)}"), bg=p["card"], fg=p["muted"], font=(fam, fs), anchor="w").pack(fill="x")
@@ -525,6 +520,7 @@ class DialogsMixin:
         v_net_cnt = tk.IntVar(value=int(st.get("net_max_archives", 0) or 0))
         v_net_gb = tk.DoubleVar(value=float(st.get("net_max_size_gb", 0.0) or 0.0))
         v_net_free = tk.BooleanVar(value=bool(st.get("net_fit_free_space", True)))
+        v_dl_buf = tk.StringVar(value=f"{int(st.get('download_buf_kb', 64) or 64)} КБ")
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
         v_cloud_provider = tk.StringVar(value="pCloud")
@@ -625,390 +621,6 @@ class DialogsMixin:
         _select_pill_tab(_cur_tab["idx"])
 
 
-        f_cloud = tk.Frame(tab_cloud, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
-        f_cloud.pack(fill="x", padx=14, pady=10)
-        tk.Label(f_cloud, text=tr("Налаштування pCloud", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
-        from gui.widgets import HomeGridToggle
-        def _sync_pcloud_now():
-            import threading
-            if not st.get("cloud_enabled"):
-                cloud_msg.configure(text="Спочатку увімкніть pCloud і натисніть «Застосувати»." if st.get("lang", "en") == "uk" else "Enable pCloud and click Apply first.", fg=p["amber"])
-                return
-            cloud_msg.configure(text="Синхронізація з pCloud..." if st.get("lang", "en") == "uk" else "Syncing with pCloud...", fg=p["cyan"])
-            def _w():
-                try:
-                    from core.cloud import sync_cloud_backups, sync_cloud_reports
-                    sync_cloud_backups(self.engine, prune=False)
-                    sync_cloud_reports(self.engine)
-                    msg_r, col_r = ("Синхронізацію завершено ✔" if st.get("lang", "en") == "uk" else "Sync completed ✔"), p["green"]
-                except Exception as ex:
-                    msg_r, col_r = str(ex), p["red"]
-                self.root.after(0, lambda: dlg.winfo_exists() and cloud_msg.configure(text=msg_r, fg=col_r))
-            threading.Thread(target=_w, daemon=True).start()
-
-        from gui.styles import ToolTip
-        _c_en_row = tk.Frame(f_cloud, bg=p["card"])
-        _c_en_row.pack(fill="x", pady=(2, 6))
-        tk.Label(_c_en_row, text=tr("Увімкнути синхронізацію з pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold")).pack(side="left")
-        btn_sync_ico = tk.Button(_c_en_row, text="↻", command=_sync_pcloud_now, bg=p["inp_bg"], fg=p["cyan"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs + 1, "bold"), width=3, pady=1, cursor="hand2")
-        btn_sync_ico.pack(side="right", padx=(8, 0))
-        ToolTip(btn_sync_ico, "Синхронізувати з pCloud зараз" if st.get("lang", "en") == "uk" else "Sync with pCloud now")
-        tog_cloud_main = HomeGridToggle(_c_en_row, variable=v_cloud_enabled, compact=True, palette=p, font_sz=fs)
-        tog_cloud_main.pack(side="right")
-        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=4)
-        _c_opt1 = tk.Frame(f_cloud, bg=p["card"])
-        _c_opt1.pack(fill="x", pady=4)
-        lbl_c_arc = tk.Label(_c_opt1, text=tr("Зберігати архів у pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
-        lbl_c_arc.pack(side="left")
-        tog_c_arc = HomeGridToggle(_c_opt1, variable=v_cloud_save_archives, compact=True, palette=p, font_sz=fs)
-        tog_c_arc.pack(side="right")
-        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=4)
-        _c_opt2 = tk.Frame(f_cloud, bg=p["card"])
-        _c_opt2.pack(fill="x", pady=(4, 8))
-        lbl_c_log = tk.Label(_c_opt2, text=tr("Зберігати журнал у pCloud", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
-        lbl_c_log.pack(side="left")
-        tog_c_log = HomeGridToggle(_c_opt2, variable=v_cloud_save_logs, compact=True, palette=p, font_sz=fs)
-        tog_c_log.pack(side="right")
-
-        cloud_remote_row = tk.Frame(f_cloud, bg=p["card"])
-        tk.Label(
-            cloud_remote_row, text="Вибір хмарного сховища:", width=24, anchor="w",
-            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-        ).pack(side="left")
-        cb_cloud_remote = ttk.Combobox(
-            cloud_remote_row, textvariable=v_cloud_remote, state="readonly",
-            font=("Segoe UI", fs)
-        )
-        cb_cloud_remote.pack(side="left", fill="x", expand=True, padx=(0, 8))
-
-        provider_row = tk.Frame(f_cloud, bg=p["card"])
-        tk.Label(
-            provider_row, text=tr("Сервіс:", st.get("lang", "en")), width=24, anchor="w",
-            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-        ).pack(side="left")
-        cb_cloud_provider = ttk.Combobox(
-            provider_row, textvariable=v_cloud_provider, values=["pCloud"],
-            state="readonly", font=("Segoe UI", fs), width=20
-        )
-        cb_cloud_provider.pack(side="left", padx=(0, 8))
-        tk.Label(
-            provider_row, text=tr("Ім'я підключення:", st.get("lang", "en")), anchor="w",
-            bg=p["card"], fg=p["text"], font=("Segoe UI", fs)
-        ).pack(side="left")
-        tk.Entry(
-            provider_row, textvariable=v_cloud_new_remote, bg=p["inp_bg"],
-            fg=p["text"], insertbackground=p["text"], font=("Segoe UI", fs), width=16
-        ).pack(side="left", fill="x", expand=True, padx=(8, 0))
-
-        cloud_credentials_frame = tk.Frame(f_cloud, bg=p["card"])
-        cloud_credentials_hint = None
-        cloud_actions = tk.Frame(f_cloud, bg=p["card"])
-        cloud_actions.pack(fill="x", pady=(4, 2))
-        cloud_msg = tk.Label(f_cloud, text="", bg=p["card"], fg=p["muted"], font=("Segoe UI", fs - 1))
-        cloud_msg.pack(anchor="w", pady=(2, 4))
-        cloud_queue_label = None
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            cloud_queue_label = tk.Label(
-                f_cloud, text="", bg=p["card"], fg=p["muted"],
-                font=("Segoe UI", fs - 1),
-            )
-            cloud_queue_label.pack(anchor="w", pady=(0, 4))
-
-        tk.Frame(f_cloud, height=1, bg=p["border"]).pack(fill="x", pady=6)
-        c_ret0 = tk.Frame(f_cloud, bg=p["card"])
-        c_ret0.pack(fill="x", pady=4)
-        lbl_ret0 = tk.Label(c_ret0, text=tr("Контроль вільного місця у хмарі (автоочищення):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
-        lbl_ret0.pack(side="left")
-        tog_c_free = HomeGridToggle(c_ret0, variable=v_cloud_fit_free, compact=True, palette=p, font_sz=fs)
-        tog_c_free.pack(side="right")
-        c_ret1 = tk.Frame(f_cloud, bg=p["card"])
-        c_ret1.pack(fill="x", pady=4)
-        lbl_ret1 = tk.Label(c_ret1, text=tr("Зберігати останніх архівів у хмарі (0 = без обмеження):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
-        lbl_ret1.pack(side="left")
-        sp_c_cnt = tk.Spinbox(c_ret1, from_=0, to=200, textvariable=v_cloud_max_cnt, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold"))
-        sp_c_cnt.pack(side="right")
-
-        c_ret2 = tk.Frame(f_cloud, bg=p["card"])
-        c_ret2.pack(fill="x", pady=(4, 8))
-        lbl_ret2 = tk.Label(c_ret2, text=tr("Максимальний розмір папки у хмарі, ГБ (0 = без обмеження):", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs))
-        lbl_ret2.pack(side="left")
-        sp_c_gb = tk.Spinbox(c_ret2, from_=0.0, to=500.0, increment=0.5, format="%.1f", textvariable=v_cloud_max_gb, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold"))
-        sp_c_gb.pack(side="right")
-        cloud_path_row = tk.Frame(f_cloud, bg=p["card"])
-        cloud_path_row.pack(fill="x", pady=4)
-        lbl_cpath = tk.Label(
-            cloud_path_row, text=tr("Папка у хмарі:", st.get("lang", "en")), width=18, anchor="w",
-            bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)
-        )
-        lbl_cpath.pack(side="left")
-        ent_c_path = tk.Entry(
-            cloud_path_row, textvariable=v_cloud_path, bg=p["inp_bg"],
-            fg=p["text"], insertbackground=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs)
-        )
-        ent_c_path.pack(side="left", fill="x", expand=True, ipady=4)
-        lng_j = st.get("lang", "en")
-        j_map = {
-            tr("Авто (pCloud → Мережа при наявності)", lng_j): "auto",
-            tr("Тільки pCloud", lng_j): "pcloud",
-            tr("Тільки мережева папка (Мережа)", lng_j): "network",
-            tr("Обидва (pCloud + Мережа)", lng_j): "both",
-        }
-        rev_j = {v: k for k, v in j_map.items()}
-        tk.Label(
-            f_cloud, text="Архіви та журнал зберігаються у вказаній папці pCloud." if st.get("lang", "en") == "uk" else "Archives and log are stored in the specified pCloud folder.",
-            bg=p["card"], fg=p["muted"], justify="left",
-            font=("Segoe UI", max(8, fs - 1))
-        ).pack(anchor="w", pady=(6, 4))
-
-        def _refresh_cloud_remotes():
-            import threading
-            cloud_msg.configure(text=tr("Завантаження списку rclone remotes...", st.get("lang", "en")), fg=p["muted"])
-
-            def _worker():
-                try:
-                    from core.cloud import list_rclone_remotes
-                    remotes = list_rclone_remotes()
-                    error = ""
-                except Exception as exc:
-                    remotes = []
-                    error = str(exc)
-
-                def _update():
-                    if not dlg.winfo_exists():
-                        return
-                    current = v_cloud_remote.get()
-                    values = list(remotes)
-                    if current and current not in values:
-                        values.append(current)
-                    cb_cloud_remote.configure(values=values)
-                    if current:
-                        v_cloud_remote.set(current)
-                    if error:
-                        cloud_msg.configure(text=error, fg=p["red"])
-                    elif remotes:
-                        cloud_msg.configure(text=tr("rclone remotes завантажено.", st.get("lang", "en")), fg=p["green"])
-                    else:
-                        cloud_msg.configure(text=tr("Налаштованих rclone remotes не знайдено.", st.get("lang", "en")), fg=p["amber"])
-
-                try:
-                    self.root.after(0, _update)
-                except Exception:
-                    pass
-
-            threading.Thread(target=_worker, daemon=True).start()
-
-        def _test_cloud_remote():
-            import threading
-
-            from core.cloud import check_rclone_remote
-
-            remote = v_cloud_remote.get().strip()
-            if not remote:
-                cloud_msg.configure(text=tr("Спочатку виберіть підключення.", st.get("lang", "en")), fg=p["amber"])
-                return
-            cloud_msg.configure(text=tr("Перевірка підключення...", st.get("lang", "en")), fg=p["muted"])
-
-            def _worker():
-                try:
-                    usage = check_rclone_remote(remote)
-                    result = tr("Підключення працює.", st.get("lang", "en"))
-                    color = p["green"]
-                    free, total = usage.get("free"), usage.get("total")
-                    if free is not None:
-                        gib = 1024 ** 3
-                        result += " " + tr("Вільно:", st.get("lang", "en")) + f" {free / gib:.1f}"
-                        if total:
-                            result += f" / {total / gib:.1f}"
-                        result += " " + tr("ГБ", st.get("lang", "en"))
-                        if free < gib:
-                            result += ". " + tr("Мало місця!", st.get("lang", "en"))
-                            color = p["amber"]
-                except Exception as exc:
-                    result = str(exc)
-                    color = p["red"]
-
-                def _update():
-                    if dlg.winfo_exists():
-                        cloud_msg.configure(text=result, fg=color)
-
-                self.root.after(0, _update)
-
-            threading.Thread(target=_worker, daemon=True).start()
-
-        def _remove_cloud_remote():
-            import threading
-            from tkinter import messagebox
-
-            from core.cloud import delete_rclone_remote
-
-            remote = v_cloud_remote.get().strip()
-            if not remote:
-                cloud_msg.configure(text=tr("Спочатку виберіть підключення.", st.get("lang", "en")), fg=p["amber"])
-                return
-            if not messagebox.askyesno(
-                tr("Видалити підключення?", st.get("lang", "en")),
-                tr("Буде видалено лише конфігурацію. Файли у хмарі залишаться.", st.get("lang", "en")),
-                parent=self.root
-            ):
-                return
-            cloud_msg.configure(text=tr("Видалення підключення...", st.get("lang", "en")), fg=p["muted"])
-
-            def _worker():
-                try:
-                    delete_rclone_remote(remote)
-                    error = ""
-                except Exception as exc:
-                    error = str(exc)
-
-                def _update():
-                    if not dlg.winfo_exists():
-                        return
-                    if error:
-                        cloud_msg.configure(text=error, fg=p["red"])
-                        return
-                    if st.get("cloud_remote") == remote:
-                        st["cloud_enabled"] = False
-                        st["cloud_remote"] = ""
-                        v_cloud_enabled.set(False)
-                        commit_state(st)
-                    if v_cloud_remote.get() == remote:
-                        v_cloud_remote.set("")
-                    cloud_msg.configure(text=tr("Підключення видалено.", st.get("lang", "en")), fg=p["green"])
-                    _refresh_cloud_remotes()
-
-                self.root.after(0, _update)
-
-            threading.Thread(target=_worker, daemon=True).start()
-
-        def _refresh_cloud_queue():
-            if cloud_queue_label is None:
-                return
-            try:
-                from core.cloud import cloud_sync_queue_state
-                queue_state = cloud_sync_queue_state(self.engine)
-                message = tr(
-                    "Черга синхронізації: архіви {archives}, звіти {reports}",
-                    st.get("lang", "en"),
-                ).format(**queue_state)
-                color = p["amber"] if queue_state["total"] else p["green"]
-            except Exception as exc:
-                message = str(exc)
-                color = p["red"]
-            cloud_queue_label.configure(text=message, fg=color)
-
-        def _retry_cloud_sync():
-            if not v_cloud_enabled.get():
-                cloud_msg.configure(
-                    text=tr("Увімкніть хмарне сховище, щоб повторити синхронізацію.", st.get("lang", "en")),
-                    fg=p["amber"],
-                )
-                return
-            if not st.get("cloud_enabled"):
-                cloud_msg.configure(
-                    text=tr("Спочатку збережіть налаштування хмарного сховища.", st.get("lang", "en")),
-                    fg=p["amber"],
-                )
-                return
-            from core.cloud import cloud_sync_error_text, start_cloud_sync_worker
-            retry_cloud_button.configure(state="disabled")
-            cloud_msg.configure(text=tr("Синхронізацію запущено...", st.get("lang", "en")), fg=p["muted"])
-
-            def _completed(error):
-                def _update():
-                    if not dlg.winfo_exists():
-                        return
-                    retry_cloud_button.configure(state="normal")
-                    _refresh_cloud_queue()
-                    if error:
-                        cloud_msg.configure(
-                            text=cloud_sync_error_text(error, st.get("lang", "en")),
-                            fg=p["red"],
-                        )
-                    else:
-                        cloud_msg.configure(
-                            text=tr("Синхронізацію завершено.", st.get("lang", "en")),
-                            fg=p["green"],
-                        )
-                try:
-                    self.root.after(0, _update)
-                except tk.TclError:
-                    pass
-
-            if not start_cloud_sync_worker(self.engine, force=True, on_complete=_completed):
-                retry_cloud_button.configure(state="normal")
-                cloud_msg.configure(
-                    text=tr("Синхронізація вже виконується.", st.get("lang", "en")),
-                    fg=p["amber"],
-                )
-
-        def _schedule_cloud_queue_refresh():
-            if cloud_queue_label is None or not dlg.winfo_exists():
-                return
-            _refresh_cloud_queue()
-            dlg.after(30000, _schedule_cloud_queue_refresh)
-
-        v_cloud_provider.set("pCloud")
-        v_cloud_new_remote.set("pcloud")
-        v_cloud_remote.set("pcloud")
-        cloud_actions.columnconfigure(0, weight=1)
-        cloud_actions.columnconfigure(1, weight=1)
-        cloud_actions.columnconfigure(2, weight=1)
-        cloud_setup_button = tk.Button(
-            cloud_actions, text=tr("Авторизація pCloud", st.get("lang", "en")),
-            command=lambda: None,
-            bg=p["blue"], fg="#ffffff", bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=10, pady=5, cursor="hand2"
-        )
-        cloud_setup_button.grid(row=0, column=0, sticky="ew", padx=(0, 5), pady=3)
-        btn_cloud_free = tk.Button(
-            cloud_actions, text=tr("Перевірити вільне місце", st.get("lang", "en")),
-            command=lambda: (v_cloud_remote.set("pcloud"), _test_cloud_remote()),
-            bg=p["inp_bg"], fg=p["green"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs, "bold"), padx=10, pady=5, cursor="hand2"
-        )
-        btn_cloud_free.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
-        tk.Button(
-            cloud_actions, text="Відкрити pCloud" if st.get("lang", "en") == "uk" else "Open pCloud",
-            command=lambda: __import__("webbrowser").open("https://pcloud.com"),
-            bg=p["inp_bg"], fg=p["muted"], bd=0, highlightthickness=0, font=(self._ui_fam(), fs), padx=10, pady=5, cursor="hand2"
-        ).grid(row=0, column=2, sticky="ew", padx=(5, 0), pady=3)
-        retry_cloud_button = None
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            retry_cloud_button = tk.Button(
-                cloud_actions, text=tr("Повторити синхронізацію", st.get("lang", "en")),
-                command=_retry_cloud_sync, bg=p["card"], fg=p["amber"],
-                font=("Segoe UI", fs), padx=10, cursor="hand2",
-            )
-            retry_cloud_button.pack(side="left", padx=6)
-        tk.Button(
-            cloud_remote_row, text="Оновити список",
-            command=_refresh_cloud_remotes, bg=p["card"], fg=p["cyan"],
-            font=("Segoe UI", fs), padx=10, pady=4, cursor="hand2"
-        ).pack(side="right")
-        def _sync_pcloud_widgets_state():
-            on_c = bool(v_cloud_enabled.get())
-            st_w = "normal" if on_c else "disabled"
-            fg_lbl = p["text"] if on_c else p["muted"]
-            btn_sync_ico.configure(state=st_w, fg=p["cyan"] if on_c else p["muted"], cursor="hand2" if on_c else "")
-            tog_c_arc.apply_style(palette=p, state=st_w, font_sz=fs)
-            tog_c_log.apply_style(palette=p, state=st_w, font_sz=fs)
-            tog_c_free.apply_style(palette=p, state=st_w, font_sz=fs)
-            lbl_c_arc.configure(fg=fg_lbl)
-            lbl_c_log.configure(fg=fg_lbl)
-            lbl_ret0.configure(fg=fg_lbl)
-            cloud_setup_button.configure(state=st_w, bg=p["blue"] if on_c else p["inp_bg"], fg="#ffffff" if on_c else p["muted"], cursor="hand2" if on_c else "")
-            btn_cloud_free.configure(state=st_w, fg=p["green"] if on_c else p["muted"], cursor="hand2" if on_c else "")
-            lbl_ret1.configure(fg=fg_lbl)
-            lbl_ret2.configure(fg=fg_lbl)
-            lbl_cpath.configure(fg=fg_lbl)
-            sp_c_cnt.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
-            sp_c_gb.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
-            ent_c_path.configure(state=st_w, disabledbackground=p["panel"], disabledforeground=p["muted"])
-
-        tog_cloud_main.cmd = _sync_pcloud_widgets_state
-        _sync_pcloud_widgets_state()
-        _refresh_cloud_remotes()
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            dlg.after(0, _schedule_cloud_queue_refresh)
-
         f_gfs = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
         f_gfs.pack(fill="x", padx=12, pady=(8, 8))
         tk.Label(f_gfs, text=tr("Кільцева стратегія (останні N архівів)", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 8))
@@ -1039,6 +651,12 @@ class DialogsMixin:
         nr2 = tk.Frame(f_netr, bg=p["card"]); nr2.pack(fill="x", pady=3)
         tk.Label(nr2, text="Макс. розмір папки у мережі, ГБ (0 = без ліміту):" if st.get("lang", "en") == "uk" else "Max network folder size, GB (0 = unlimited):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         tk.Spinbox(nr2, from_=0.0, to=2000.0, increment=0.5, format="%.1f", textvariable=v_net_gb, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold")).pack(side="right")
+
+        f_buf = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_buf.pack(fill="x", padx=12, pady=(0, 8))
+        br1 = tk.Frame(f_buf, bg=p["card"]); br1.pack(fill="x", pady=2)
+        tk.Label(br1, text="Розмір буфера завантаження (КБ):" if st.get("lang", "en") == "uk" else "Download buffer size (KB):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold")).pack(side="left")
+        ttk.Combobox(br1, textvariable=v_dl_buf, values=["16 КБ", "32 КБ", "64 КБ", "128 КБ", "256 КБ", "512 КБ", "1024 КБ"], width=10, state="readonly", font=(self._ui_fam(), fs)).pack(side="right")
 
         f_logs = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
         f_logs.pack(fill="x", padx=12, pady=(0, 8))
@@ -1243,6 +861,7 @@ class DialogsMixin:
         HomeGridToggle(tr_row, variable=v_tray_min, compact=True, palette=p, font_sz=fs).pack(side="right")
         import sys as _sys_tray
         _lng_tray = st.get("lang", "en")
+        from gui.tray import _LINUX_TRAY_MODES, _MAC_TRAY_MODES, TRAY_MODE_HINTS
         _modes_t = _MAC_TRAY_MODES if _sys_tray.platform == "darwin" else _LINUX_TRAY_MODES
         _tray_labels = {
             "auto": tr("Авто (рекомендовано)", _lng_tray),
@@ -1302,6 +921,7 @@ class DialogsMixin:
             st["net_max_archives"] = max(0, int(v_net_cnt.get() or 0))
             st["net_max_size_gb"] = max(0.0, round(float(v_net_gb.get() or 0.0), 2))
             st["net_fit_free_space"] = bool(v_net_free.get())
+            st["download_buf_kb"] = int(v_dl_buf.get().split()[0])
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))
             st["weekly_count"] = max(0, int(v_week.get()))
@@ -1597,8 +1217,8 @@ class DialogsMixin:
         except Exception: pass
         st_tv.configure("HGBC.Treeview", background=p["log_bg"], foreground=p["text"], fieldbackground=p["log_bg"], rowheight=max(24, int((fs + 14) * k)), font=(fam, max(8, fs - 1)))
         st_tv.configure("HGBC.Treeview.Heading", background=p["card"], foreground=p["cyan"], font=(fam, max(8, fs - 1), "bold"))
-        tree = ttk.Treeview(wrap, columns=("ts", "dev", "arc", "mb", "dur", "spd"), show="headings", style="HGBC.Treeview")
-        for cid, h_t, wc, anc in (("ts", "Дата та час" if lang == "uk" else "Date & Time", 145, "center"), ("dev", "ОС / Система" if lang == "uk" else "OS / System", 118, "w"), ("arc", "Архів" if lang == "uk" else "Archive", 260, "w"), ("mb", "Розмір" if lang == "uk" else "Size", 80, "e"), ("dur", "Час (хв / с)" if lang == "uk" else "Duration", 90, "center"), ("spd", "МБ/с" if lang == "uk" else "MB/s", 75, "e")):
+        tree = ttk.Treeview(wrap, columns=("ts", "dev", "arc", "mb", "dur", "spd", "nspd"), show="headings", style="HGBC.Treeview")
+        for cid, h_t, wc, anc in (("ts", "Дата та час" if lang == "uk" else "Date & Time", 145, "center"), ("dev", "ОС / Система" if lang == "uk" else "OS / System", 118, "w"), ("arc", "Архів" if lang == "uk" else "Archive", 260, "w"), ("mb", "Розмір" if lang == "uk" else "Size", 80, "e"), ("dur", "Час (хв / с)" if lang == "uk" else "Duration", 90, "center"), ("spd", "Лок. МБ/с" if lang == "uk" else "Loc MB/s", 76, "e"), ("nspd", "Мер. МБ/с" if lang == "uk" else "Net MB/s", 76, "e")):
             tree.heading(cid, text=h_t); tree.column(cid, width=int(wc * k), minwidth=50, anchor=anc, stretch=(cid == "arc"))
         vsb = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview); tree.configure(yscrollcommand=vsb.set); vsb.pack(side="right", fill="y"); tree.pack(side="left", fill="both", expand=True)
         state_box = {"ops": [], "devs": [], "rows": {}}
@@ -1633,7 +1253,8 @@ class DialogsMixin:
                 cv.create_line(x1 + 1, y1 + 1, x2 - 1, y1 + 1, fill="#e0f2fe")
                 dur_s = format_duration(d["avg_dur"], lang)
                 unit = "МБ/с" if lang == "uk" else "MB/s"
-                cv.create_text(cx + dx // 2, y1 - dy - int(11 * k), text=f"{d['avg_spd']} {unit} • {dur_s}", fill=p["text"], font=(fam, max(8, fs - 1), "bold"))
+                net_part = f" | Net: {d['avg_net_spd']}" if d.get("avg_net_spd", 0) > 0 else ""
+                cv.create_text(cx + dx // 2, y1 - dy - int(11 * k), text=f"{d['avg_spd']} {unit}{net_part} • {dur_s.partition(' (').__getitem__(0)}", fill=p["text"], font=(fam, max(8, fs - 1), "bold"))
                 lbl_d = d["label"] if len(d["label"]) <= 24 else d["label"][:21] + "..."
                 cv.create_text(cx, bot_y + int(16 * k), text=lbl_d, fill=p["green"] if i == 0 else p["muted"], font=(fam, max(8, fs - 1), "bold" if i == 0 else "normal"))
 
@@ -1656,7 +1277,7 @@ class DialogsMixin:
             for idx, o in enumerate(ops[:100]):
                 ts_s = str(o.get("timestamp") or "")[:19].replace("T", " ")
                 iid = f"c_{idx}"; state_box["rows"][iid] = o
-                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang).partition(" (").__getitem__(0), f"{o['spd_f']}"))
+                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang).partition(" (").__getitem__(0), f"{o['spd_f']}", f"{o['net_spd_f']}" if o.get("net_spd_f", 0) > 0 else "—"))
             _draw_bars()
 
         def _on_dbl(_e=None):
@@ -1666,8 +1287,8 @@ class DialogsMixin:
             if sid not in state_box["rows"]: return
             o = state_box["rows"][sid]
             lines = [f"{o['dev_label']}  •  {o.get('archive', '')}", f"{'Загальний час' if lang=='uk' else 'Total time'}: {format_duration(o['dur_f'], lang)}  •  {'Швидкість' if lang=='uk' else 'Speed'}: {o['spd_f']} {'МБ/с' if lang=='uk' else 'MB/s'}"]
-            for k_s, n_s in (("server_duration_sec", "Server"), ("download_duration_sec", "Download"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("mirror_duration_sec", "Mirror")):
-                if float(o.get(k_s) or 0) > 0: lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang)}")
+            for k_s, n_s in (("server_duration_sec", "Server"), ("download_duration_sec", "Download"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("net_duration_sec", "Network" if lang != "uk" else "Мережа"), ("mirror_duration_sec", "Mirror")):
+                if float(o.get(k_s) or 0) > 0: lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang).partition(" (").__getitem__(0)}")
             self._show_engine_modal({"type": "alert", "title": "Деталі швидкості" if lang=="uk" else "Speed Details", "text": chr(10).join(lines)})
 
         def _load(refresh=True):

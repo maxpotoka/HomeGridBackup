@@ -23,6 +23,8 @@ socket.create_connection = _fast_conn
 import http.cookiejar
 import ipaddress
 import subprocess
+
+_WIN_NO_WINDOW = {"creationflags": 0x08000000} if os.name == "nt" else {}
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -143,14 +145,14 @@ def ping_host(host, timeout_ms=2000):
         if os.name == "nt":
             cmd = ["ping", "-n", "1", "-w", str(timeout_ms), host]
             res = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, capture_output=True, encoding="cp866", errors="replace", timeout=4, creationflags=0x08000000
+                cmd, stdin=subprocess.DEVNULL, capture_output=True, encoding="cp866", **_WIN_NO_WINDOW, errors="replace", timeout=4, creationflags=0x08000000
             )
         else:
             sec = max(1, int(round(timeout_ms / 1000.0)))
             w_flag = "-t" if sys.platform == "darwin" else "-W"
             cmd = ["ping", "-c", "1", w_flag, str(sec), host]
             res = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=4
+                cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", **_WIN_NO_WINDOW, timeout=4
             )
         if res.returncode == 0:
             m = re.search(r"time[=<]\s*([\d.,]+)\s*ms", res.stdout or "", re.IGNORECASE)
@@ -187,7 +189,7 @@ def _os_gateway_and_arp():
     if sys.platform.startswith("linux"):
         return _linux_proc_net_hints()
     gw_ips, arp_ips = [], []
-    kw = dict(stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=3)
+    kw = dict(stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", **_WIN_NO_WINDOW, timeout=3)
     if os.name == "nt":
         kw["creationflags"] = 0x08000000
     try:
@@ -359,7 +361,7 @@ def get_main_subnets(state=None):
             ps_out = subprocess.check_output(
                 ["powershell.exe", "-NoProfile", "-Command",
                  "(Get-NetIPConfiguration | Where-Object {$_.IPv4DefaultGateway -ne $null}).IPv4Address.IPAddress"],
-                stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.5
+                stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.5, **_WIN_NO_WINDOW
             ).decode("utf-8", errors="ignore")
             for m_ip in re.findall(r"\b(\d+\.\d+\.\d+)\.\d+\b", ps_out):
                 if not m_ip.startswith("172."):

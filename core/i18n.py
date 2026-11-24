@@ -1,3 +1,4 @@
+# patch-id: i18n-ping-and-retry-en-2.79
 # patch-id: opt-log-i18n-ui-2.20
 # patch-id: stage-window-2.21
 # patch-id: android-storage-fallback-2.13
@@ -91,7 +92,6 @@ EN_EXACT = {
     "Сервер підключено": "Server Connected",
     "Резервне копіювання...": "Backing up...",
     "Архівація": "Backup",
-    "Виберіть коректний rclone remote.": "Select a valid rclone remote.",
     "Вкажіть окрему папку у хмарі; корінь сховища не допускається.": "Enter a separate cloud folder; the storage root is not allowed.",
     "Папка у хмарі має бути відносним шляхом без сегментів '.' або '..'.": "Cloud folder must be a relative path without '.' or '..' segments.",
     "Хмарний сервіс обмежив частоту запитів. Файли залишено в черзі; повторна синхронізація буде автоматичною. Для Google Drive рекомендується власний OAuth Client ID та Secret.": "The cloud provider rate-limited the requests. Files remain queued and sync will retry automatically. For Google Drive, use your own OAuth Client ID and Secret.",
@@ -106,7 +106,6 @@ EN_EXACT = {
     "Введіть обидва значення: OAuth Client ID та Client Secret.": "Enter both the OAuth Client ID and Client Secret.",
     "Google OAuth Client ID:": "Google OAuth Client ID:",
     "Google OAuth Client Secret:": "Google OAuth Client Secret:",
-    "Для Google Drive рекомендуються власні OAuth Client ID і Secret. Залиште обидва поля порожніми, щоб ввести їх у майстрі rclone.": "For Google Drive, use your own OAuth Client ID and Secret. Leave both blank to enter them in the rclone wizard.",
     "Підключення...": "Connecting...",
     "Пошук в LAN...": "Scanning LAN...",
     "Помилка бекапу": "Backup error",
@@ -119,7 +118,6 @@ EN_EXACT = {
     "Налаштування експортовано у JSON": "Settings exported to JSON",
     "Збережені PIN-коди очищено": "Saved PIN codes cleared",
     "Увімкнути хмарне дзеркало та звіт": "Enable cloud mirror and report",
-    "Для Google Drive рекомендується власний OAuth Client ID та Secret, щоб уникнути спільного ліміту rclone.": "For Google Drive, use your own OAuth Client ID and Secret to avoid the shared rclone quota.",
     "Адреса сервера (напр. 192.168.1.246)": "Server address (e.g. 192.168.1.246)",
     "Пошук по LAN": "Search LAN",
     "Сховище: завантаження...": "Storage: loading...",
@@ -131,7 +129,6 @@ EN_EXACT = {
     "Відкрити налаштування хмарного сховища": "Open cloud storage settings",
     "Вибір хмарного сховища:": "Select cloud storage:",
     "5. Налаштування хмарного сховища": "5. Cloud storage settings",
-    "Виберіть налаштоване хмарне сховище зі списку. Нові сховища додаються командою: rclone config": "Select a configured cloud storage from the list. Add new storage with: rclone config",
     "Сервіс:": "Service:",
     "Email / ім'я користувача:": "Email / username:",
     "Пароль:": "Password:",
@@ -141,26 +138,21 @@ EN_EXACT = {
     "Створення підключення...": "Creating connection...",
     "Ім'я підключення:": "Connection name:",
     "Приховати введення": "Hide input",
-    "Відповідайте на запити rclone. Для OAuth може відкритися браузер.": "Answer the rclone prompts. OAuth may open a browser.",
-    "Для MEGA введіть email і пароль свого облікового запису у відповідь на запити rclone.": "For MEGA, enter the email and password for your MEGA account when rclone prompts.",
     "Архіви всіх пристроїв зберігаються у вибраній папці хмари в backups/; назви містять ID пристрою. Спільний текстовий журнал у корені: HomeGridBackup.log. На всіх пристроях виберіть той самий обліковий запис і папку.": "Archives from all devices are stored in the selected cloud folder under backups/; filenames include the device ID. The shared plain-text log in the root is HomeGridBackup.log. Select the same cloud account and folder on every device.",
     "Архіви зберігаються у вибраній папці хмари в backups/<ID пристрою>/. Журнал пристрою: operations/<ID пристрою>/<дата>.jsonl.": "Archives are stored in the selected cloud folder under backups/<device ID>/. The device log is operations/<device ID>/<date>.jsonl.",
     "Підключення створено.": "Connection created.",
     "Замінити підключення?": "Replace connection?",
     "Підключення з таким ім'ям уже існує. Замінити його? Файли у хмарі залишаться.": "A connection with this name already exists. Replace it? Files in the cloud will stay.",
-    "Запуск rclone...": "Starting rclone...",
     "Копіювати посилання": "Copy link",
     "Деталі": "Details",
     "Готово ✔": "Done ✔",
     "Увійдіть у браузері та натисніть «Дозволити».": "Sign in in your browser and click Allow.",
     "Доступ отримано, зберігаю підключення...": "Access granted, saving the connection...",
     "Посилання скопійовано. Відкрийте його в браузері.": "Link copied. Open it in your browser.",
-    "rclone очікує вашу відповідь. Введіть її у розділі «Деталі».": "rclone is waiting for your answer. Enter it under Details.",
     "Помилка підключення. Подробиці у розділі «Деталі».": "Connection failed. See Details.",
     "Вільно:": "Free:",
     "ГБ": "GB",
     "Мало місця!": "Low space!",
-    "Майстер rclone завершився з помилкою.": "The rclone wizard exited with an error.",
     "Спочатку виберіть підключення.": "Select a connection first.",
     "Підключення працює.": "Connection is working.",
     "Видалити підключення?": "Delete connection?",
@@ -174,7 +166,6 @@ EN_EXACT = {
     "Перевірка підключення...": "Testing connection...",
     "Оберіть хмарний сервіс.": "Choose a cloud provider.",
     "Підключення з таким ім'ям уже існує.": "A connection with this name already exists.",
-    "Оберіть сервіс і додайте підключення тут. Майстер rclone відкриється в цьому вікні; OAuth-підтвердження може перейти в браузер.": "Choose a service and add a connection here. The rclone wizard opens in this window; OAuth confirmation may continue in a browser.",
     "Журнал зберігається локально у папці reports поруч з архівами та окремо синхронізується в хмару. Дані розділяються за ID пристрою та містять етапи, кількість файлів і системні версії.": "Reports are stored locally in the reports folder beside the archives and separately synced to the cloud. Data is separated by device ID and includes stage timings, file counts, and system versions.",
     "Не вказано адресу": "No address entered",
     "Не перевірено": "Not checked",
@@ -386,11 +377,7 @@ EN_EXACT = {
     "Папка у хмарі:": "Cloud folder:",
     "Архіви та журнали розділяються за випадковим ID пристрою. Хмарні ZIP-копії повторюють GFS після очищення; журнали мають секундні часові мітки.": "Archives and reports are separated by a random device ID. Cloud ZIP copies follow GFS after cleanup; reports use second-level timestamps.",
     "ID пристрою:": "Device ID:",
-    "Завантаження списку rclone remotes...": "Loading rclone remotes...",
-    "rclone remotes завантажено.": "rclone remotes loaded.",
-    "Налаштованих rclone remotes не знайдено.": "No configured rclone remotes found.",
     "Оновити список": "Refresh list",
-    "Спочатку встановіть rclone та налаштуйте провайдера командою: rclone config": "Install rclone and configure a provider first with: rclone config",
     "Адресу не вказано. Запуск автопошуку в LAN...": "No address entered. Starting LAN auto-scan...",
     "Активні мережеві адаптери LAN не знайдено!": "No active LAN network adapters found!",
     "Автоматичне налаштування теми": "Automatic theme setup",
@@ -416,6 +403,8 @@ EN_EXACT = {
     "5. Налаштування pCloud": "5. pCloud Settings",
     # patch-id: settings-grouped-sidebar-clean-2.48
     "ПРОГРАМА ТА КОПІЇ": "APP & BACKUPS",
+    "Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.": "Downloading and verifying in temporary local folder first, then moving to destination.",
+    "Сховища:": "Storages:",
     "СИСТЕМА ТА ХМАРА": "SYSTEM & CLOUD",
     "Зберігання та GFS": "Retention & GFS",
     "Розклад та запуск": "Schedule & Startup",
@@ -463,7 +452,6 @@ EN_EXACT = {
     "Локально": "Local Stats",
     "Журнал": "Journal",
     "Перевірка SHA": "Verify SHA",
-    "немає rclone": "rclone missing",
     "не підключено": "not connected",
     "в черзі": "queued",
     "Обрані:": "Favorites:",
@@ -502,7 +490,15 @@ EN_EXACT = {
 }
 
 
-EN_SUBSTR = sorted([
+EN_SUBSTR = (
+    ("Очікування мережі (", "Waiting for network ("),
+    ("Втрачено зв'язок із ", "Lost connection to "),
+    (" під час збірки (HTTP ", " during build (HTTP "),
+        ("Увага (активна тільки мережева папка): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.", "Warning (network folder only): downloading and verifying in local SSD temp folder first, then moving to destination."),
+    ("Увага (папка призначення в хмарному / мережевому сховищі): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.", "Warning (destination is in cloud / network storage): downloading and verifying in local SSD temp folder first, then moving to destination."),
+    ("Перенесення перевіреного архіву у папку призначення...", "Moving verified archive to destination folder..."),
+    ("Архів та .sha256 перенесено у місце призначення:", "Archive and .sha256 moved to destination:"),
+    ("Активовано системний трей", "System tray activated"),
     ("ID пристрою:", "Device ID:"),
     ("Оновлено:", "Updated:"),
     ("Архівів:", "Archives:"),
@@ -684,20 +680,36 @@ EN_SUBSTR = sorted([
     ("але файл .sha256 відсутній", "but .sha256 file is missing"),
     ("Робота в WSL (дистрибутив:", "Running in WSL (distro:"),
     (", режим: ", ", mode: "),
-], key=lambda x: len(x), reverse=True)
+)
 
 UK_EXACT = {v: k for k, v in EN_EXACT.items()}
-UK_EXACT["Черга синхронізації: архіви {archives}, звіти {reports}"] = (
-    "Черга синхронізації: архіви {archives}, звіти {reports}"
-)
+UK_EXACT["Черга синхронізації: архіви {archives}, звіти {reports}"] = "Черга синхронізації: архіви {archives}, звіти {reports}"
+
+_SUBSTR_CACHE = {}
+
+
+def _get_substr_engine(lang):
+    eng = _SUBSTR_CACHE.get(lang)
+    if eng is not None:
+        return eng
+    if lang == "uk":
+        pairs = sorted(((en, uk) for uk, en in EN_SUBSTR if len(en) >= 3), key=lambda x: len(x[0]), reverse=True)
+    else:
+        pairs = sorted(EN_SUBSTR, key=lambda x: len(x[0]), reverse=True)
+    mapping = dict(pairs)
+    pattern = re.compile("|".join(re.escape(k) for k, _ in pairs)) if pairs else None
+    eng = (pattern, mapping)
+    _SUBSTR_CACHE[lang] = eng
+    return eng
+
 
 def _clean_linux_emoji(txt):
     import sys
+
     if not sys.platform.startswith("linux"):
         return txt
     return re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]+\s*", "", txt)
 
-UK_SUBSTR = [(uk, en) for uk, en in sorted(EN_SUBSTR, key=lambda x: len(next(iter(reversed(x)))), reverse=True) if len(en) >= 3]
 
 @lru_cache(maxsize=2048)
 def _tr_cached(raw_s, lang):
@@ -705,39 +717,26 @@ def _tr_cached(raw_s, lang):
     if lang == "uk":
         if s in UK_EXACT:
             return UK_EXACT[s]
-        for uk, en in UK_SUBSTR:
-            if en in s:
-                s = s.replace(en, uk)
-        return s
+        pat, mp = _get_substr_engine("uk")
+        return pat.sub(lambda m: mp[m.group(0)], s) if pat else s
     if s in EN_EXACT:
         return EN_EXACT[s]
-    for uk, en in EN_SUBSTR:
-        if uk in s:
-            s = s.replace(uk, en)
-    s = re.sub(r"(\d+)\s*хв\s*([\d.]+)\s*с", r"\1m \2s", s)
-    s = re.sub(r"(?<=\d)\s*с(?=\b|\)|\.)", " s", s)
-    s = re.sub(r"\bза\s+(?=\d)", "in ", s)
-    s = re.sub(r"\bіз\s+(?=\d)", "of ", s)
-    s = re.sub(r"\bо\s+(?=\d{2}:\d{2})", "at ", s)
+    pat, mp = _get_substr_engine("en")
+    if pat:
+        s = pat.sub(lambda m: mp[m.group(0)], s)
+    s = re.sub(r"(\d+)\s*\u0445\u0432\s*([\d.]+)\s*\u0441", r"\1m \2s", s)
+    s = re.sub(r"(?<=\d)\s*\u0441(?=\b|\)|\.)", " s", s)
+    s = re.sub(r"\b\u0437\u0430\s+(?=\d)", "in ", s)
+    s = re.sub(r"\b\u0456\u0437\s+(?=\d)", "of ", s)
+    s = re.sub(r"\b\u043e\s+(?=\d{2}:\d{2})", "at ", s)
     return s
+
 
 def tr(text, lang="en"):
     if not text:
         return text
     return _tr_cached(str(text), lang)
 
-def _tr_unused_tail(s, lang):
-    if s in EN_EXACT:
-        return EN_EXACT[s]
-    for uk, en in EN_SUBSTR:
-        if uk in s:
-            s = s.replace(uk, en)
-    s = re.sub(r"(\d+)\s*хв\s*([\d.]+)\s*с", r"\1m \2s", s)
-    s = re.sub(r"(?<=\d)\s*с(?=\b|\)|\.)", " s", s)
-    s = re.sub(r"\bза\s+(?=\d)", "in ", s)
-    s = re.sub(r"\bіз\s+(?=\d)", "of ", s)
-    s = re.sub(r"\bо\s+(?=\d{2}:\d{2})", "at ", s)
-    return s
 
 def apply_widget_i18n(widget, lang="en"):
     try:

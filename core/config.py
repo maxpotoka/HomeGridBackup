@@ -1,3 +1,5 @@
+# patch-id: i18n-ping-and-retry-en-2.79
+# patch-id: fix-net-drive-status-and-build-retry-2.78
 # ==============================================================================
 #  patch-id: io-pause-buf128-2.18
 # patch-id: idle-ui-cache-2.19
@@ -106,8 +108,8 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.77"
-BUILD_DATE = "24.11.2026 15:30"
+SCRIPT_VER = "2.79"
+BUILD_DATE = "24.11.2026 21:25"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -346,18 +348,18 @@ def write_file_log(text, target_dir=None):
             log_path = os.path.join(d, "backup.log")
             cnt = _LOG_WRITE_CNT.get(log_path, 0)
             _LOG_WRITE_CNT[log_path] = cnt + 1
-            if cnt % 50 == 0 and os.path.exists(log_path) and os.path.getsize(log_path) > 2 * 1024 * 1024:
+            if cnt % 50 == 0 and os.path.exists(log_path) and os.path.getsize(log_path) > 51512 * 1024:
                 if log_path in _LOG_HANDLES:
                     _LOG_HANDLES.pop(log_path).close()
                 try:
                     with open(log_path, "rb") as f_old:
-                        f_old.seek(-512 * 1024, os.SEEK_END)
+                        f_old.seek(-150 * 1024, os.SEEK_END)
                         tail = f_old.read().decode("utf-8", errors="replace")
                     cut = tail.find("\n")
                     if cut != -1:
                         tail = tail[cut + 1:]
                     with open(log_path, "w", encoding="utf-8") as f_new:
-                        f_new.write("[Лог автоматично скорочено при перевищенні 2 МБ]\n" + tail)
+                        f_new.write("[Лог автоматично скорочено при перевищенні 512 МБ]\n" + tail)
                 except Exception:
                     pass
             handle = _LOG_HANDLES.get(log_path)
@@ -393,7 +395,7 @@ def load_state():
     state = {
         "server": "", "server_history": [], "favorite_servers": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR, "logs_dir": "",
-        "local_enabled": True, "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "net_max_archives": 0, "net_max_size_gb": 0.0, "net_fit_free_space": True, "journal_sync_target": "auto",
+        "local_enabled": True, "download_buf_kb": 64, "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "net_max_archives": 0, "net_max_size_gb": 0.0, "net_fit_free_space": True, "journal_sync_target": "auto",
         "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
@@ -432,6 +434,7 @@ def load_state():
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
             if data.get("net_dir"):
                 state["net_dir"] = os.path.expanduser(str(data["net_dir"]).strip())
+            if "download_buf_kb" in data and int(data["download_buf_kb"] or 64) in (16, 32, 64, 128, 256, 512, 1024): state["download_buf_kb"] = int(data["download_buf_kb"])
             if isinstance(data.get("local_enabled"), bool): state["local_enabled"] = data["local_enabled"]
             if "net_max_archives" in data: state["net_max_archives"] = max(0, int(data["net_max_archives"] or 0))
             if "net_max_size_gb" in data: state["net_max_size_gb"] = max(0.0, float(data["net_max_size_gb"] or 0.0))
@@ -546,7 +549,7 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "favorite_servers", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "local_enabled", "logs_dir", "mirror_dir", "mirror_enabled",
+        "server", "server_history", "favorite_servers", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "local_enabled", "download_buf_kb", "logs_dir", "mirror_dir", "mirror_enabled",
         "net_dir", "net_enabled", "net_max_archives", "net_max_size_gb", "net_fit_free_space", "journal_sync_target",
         "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",

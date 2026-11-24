@@ -1,3 +1,5 @@
+# patch-id: i18n-ping-and-retry-en-2.79
+# patch-id: fix-net-drive-status-and-build-retry-2.78
 # ==============================================================================
 # patch-id: idle-ui-cache-2.19
 # patch-id: opt-log-i18n-ui-2.20
@@ -51,7 +53,6 @@ from gui.styles import (
     _calc_screen_metrics,
     fix_mac_buttons,
 )
-from gui.tray import HAS_TRAY, _start_tray_thread, drain_tray_ui_queue
 
 # patch-id: homegrid-design-system-2.45
 from gui.widgets import HomeGridToggle, StyledProgressBar
@@ -77,7 +78,6 @@ class HomeGridApp(DialogsMixin):
         self._ignore_resize_until = time.time() + 1.0
 
         self.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})")
-        self._apply_window_icon()
         m = self.metrics
         self.root.geometry(f"{m['win_w']}x{m['win_h']}+{m['pos_x']}+{m['pos_y']}")
         self.root.minsize(min(620, m['win_w']), min(420, m['win_h']))
@@ -131,10 +131,11 @@ class HomeGridApp(DialogsMixin):
         self.root.minsize(620, 420)
         self.root.update_idletasks()
         self._last_live_wh = (self.root.winfo_width(), self.root.winfo_height())
+        self.root.after(60, self._apply_window_icon)
         self.root.after(250, self._watch_size)
         self.root.after(300, self._poll_ui)
         if hasattr(self.engine, 'start_dest_stats_worker'):
-            self.engine.start_dest_stats_worker()
+            self.root.after(150, self.engine.start_dest_stats_worker)
         if WINDOWS7_CLOUD_SYNC_PREVIEW and self.engine.state.get("cloud_enabled"):
             self.root.after(5000, self._retry_pending_cloud_sync)
 
@@ -275,6 +276,10 @@ class HomeGridApp(DialogsMixin):
             self.engine.log("Вікно згорнуто в панель задач (трей вимкнено).", "info")
             return
         keep_tray = bool(self.engine.state.get("minimize_to_tray", True))
+        if keep_tray:
+            from gui.tray import HAS_TRAY, _start_tray_thread
+        else:
+            HAS_TRAY = False
         if keep_tray and HAS_TRAY:
             try:
                 if self.engine.tray_icon is None:
@@ -869,20 +874,38 @@ class HomeGridApp(DialogsMixin):
             tg.apply_style(palette=p, state="disabled" if run else "normal", font_sz=max(8, fs - 1))
         self.l_dir.configure(bg=p["panel"], fg=p["text"] if lo else p["muted"], font=sf)
         self.l_net.configure(bg=p["panel"], fg=p["text"] if no else p["muted"], font=sf)
-        for en, ew, bw, sv, sl, ps in ((lo, self.ent_dir, self.btn_dir, self.var_loc_st, self.lbl_loc_st, ld), (no, self.ent_net, self.btn_net, self.var_net_st, self.lbl_net_st, nd)):
+        with self.engine.lock:
+            _net_info = dict((getattr(self.engine, "_dest_stats", {}) or {}).get("network") or {}) if (getattr(self.engine, "_dest_stats", {}) or {}).get("network") is not None else None
+        for kind, en, ew, bw, sv, sl, ps in (("loc", lo, self.ent_dir, self.btn_dir, self.var_loc_st, self.lbl_loc_st, ld), ("net", no, self.ent_net, self.btn_net, self.var_net_st, self.lbl_net_st, nd)):
             st = "disabled" if (run or not en) else "normal"
             ew.configure(state=st, bg=p["inp_bg"], fg=p["text"], disabledbackground=p["panel"], disabledforeground=p["muted"])
             bw.configure(state=st)
             if not en or not ps:
                 sv.set("—")
                 sl.configure(bg=p["panel"], fg=p["muted"], font=sf)
-            elif os.path.isdir(ps):
-                gb = round(_sh.disk_usage(ps).free / (1024 ** 3), 1)
-                sv.set(f"● {gb} " + ("ГБ" if lang == "uk" else "GB"))
-                sl.configure(bg=p["panel"], fg=p["green"], font=sf)
+            elif kind == "net":
+                if _net_info is None:
+                    sv.set("● ...")
+                    sl.configure(bg=p["panel"], fg=p["muted"], font=sf)
+                elif _net_info.get("ok"):
+                    gb = _net_info.get("free_gb", -1)
+                    sv.set((f"● {gb} " + ("ГБ" if lang == "uk" else "GB")) if gb >= 0 else "● Online")
+                    sl.configure(bg=p["panel"], fg=p["amber"] if _net_info.get("stale") else p["green"], font=sf)
+                else:
+                    sv.set(tr("● офлайн", lang))
+                    sl.configure(bg=p["panel"], fg=p["red"], font=sf)
             else:
-                sv.set(tr("● офлайн", lang))
-                sl.configure(bg=p["panel"], fg=p["red"], font=sf)
+                try:
+                    if os.path.isdir(ps):
+                        gb = round(_sh.disk_usage(ps).free / (1024 ** 3), 1)
+                        sv.set(f"● {gb} " + ("ГБ" if lang == "uk" else "GB"))
+                        sl.configure(bg=p["panel"], fg=p["green"], font=sf)
+                    else:
+                        sv.set(tr("● офлайн", lang))
+                        sl.configure(bg=p["panel"], fg=p["red"], font=sf)
+                except Exception:
+                    sv.set(tr("● офлайн", lang))
+                    sl.configure(bg=p["panel"], fg=p["red"], font=sf)
         if hasattr(self.engine, "request_dest_stats_refresh"):
             self.engine.request_dest_stats_refresh()
     def open_backup_folder(self):
@@ -1094,15 +1117,15 @@ class HomeGridApp(DialogsMixin):
                     cpu_p = max(0, min(100, int(round(100.0 * (1.0 - (cur[0] - prv[0]) / (cur[1] - prv[1]))))))
                 with open("/proc/meminfo", "r", encoding="utf-8") as f:
                     mi = dict(ln.split(":", 1) for ln in f if ":" in ln)
-                tot = int(mi["MemTotal"].split())
+                tot = int(mi["MemTotal"].split()[0])
                 if "MemAvailable" in mi:
-                    avl = int(mi["MemAvailable"].split())
+                    avl = int(mi["MemAvailable"].split()[0])
                 else:
-                    avl = int(mi.get("MemFree", "0").split()) + int(mi.get("Buffers", "0").split()) + int(mi.get("Cached", "0").split())
+                    avl = int(mi.get("MemFree", "0").split()[0]) + int(mi.get("Buffers", "0").split()[0]) + int(mi.get("Cached", "0").split()[0])
                 ram_p = max(0, min(100, int(round(100.0 * (tot - avl) / max(1, tot)))))
             else:
                 if hasattr(os, "getloadavg"):
-                    cpu_p = max(0, min(100, int(round((os.getloadavg() / max(1, os.cpu_count() or 1)) * 100))))
+                    cpu_p = max(0, min(100, int(round((os.getloadavg()[0] / max(1, os.cpu_count() or 1)) * 100))))
                 import sys as _s
                 if _s.platform == "darwin":
                     import subprocess as _sp, re as _re
@@ -1135,7 +1158,9 @@ class HomeGridApp(DialogsMixin):
 
     def _poll_ui(self):
         try:
-            drain_tray_ui_queue()
+            if getattr(self.engine, "tray_icon", None) is not None:
+                from gui.tray import drain_tray_ui_queue
+                drain_tray_ui_queue()
             if self.root.state() in ("iconic", "withdrawn"):
                 if self.engine.modal and self.engine.modal.get("id") != self.last_modal_id:
                     self.last_modal_id = self.engine.modal["id"]
@@ -1208,7 +1233,7 @@ class HomeGridApp(DialogsMixin):
                     self._last_srv_b_sig = _s_sig
                     p_c = self._get_palette()
                     if "ОНЛАЙН" in dn:
-                        self.var_srv_badge.set(f"● {dp}" if dp else "● Online")
+                        self.var_srv_badge.set(tr(f"● {dp}", cur_lang) if dp else "● Online")
                         self.lbl_srv_badge.configure(bg=p_c["panel"], fg=p_c["green"])
                     elif "ОФЛАЙН" in dn:
                         self.var_srv_badge.set("● Offline")
