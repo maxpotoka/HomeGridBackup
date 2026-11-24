@@ -7,6 +7,8 @@
 # кэш Python (включая /core/__pycache__/) не должен попадать в репозиторий
 __pycache__/
 */__pycache__/
+*.pyc
+*.pyo
 *.py[cod]
 *$py.class
 
@@ -33,6 +35,8 @@ __pycache__/
 !/mergefiles.py
 !/sfx.bat
 !/wlsGUI.bat
+!/packaging/install_hints_before.txt
+!/packaging/install_hints_after.txt
 !/wlsconsol.bat
 !/icon.png
 
