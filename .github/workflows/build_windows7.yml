@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.76"
+  APP_VERSION: "2.80"
 
 jobs:
   build-win7-folder:
@@ -125,15 +125,7 @@ jobs:
           }
 
           $appDir = 'dist_win7\main.dist'
-          Copy-Item -LiteralPath $rcloneSource.FullName -Destination (Join-Path $appDir 'rclone.exe') -Force
-          Invoke-WebRequest `
-            -Uri "https://raw.githubusercontent.com/rclone/rclone/v$version/COPYING" `
-            -OutFile (Join-Path $appDir 'rclone-COPYING.txt')
-
-          & (Join-Path $appDir 'rclone.exe') version
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Bundled rclone failed to start.'
-          }
+         
 
       - name: Prepare folder, batch scripts and archive
         shell: pwsh
