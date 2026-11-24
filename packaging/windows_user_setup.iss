@@ -6,13 +6,21 @@
   #define OutputBaseFilename "HomeGridBackup_Setup"
 #endif
 
+#ifndef AppDirName
+  #define AppDirName "HomeGridBackup"
+#endif
+
+#ifndef AppIdGuid
+  #define AppIdGuid "{849CA065-D972-41A1-BA97-1B3858B1CA4B}"
+#endif
+
 [Setup]
-AppId={{849CA065-D972-41A1-BA97-1B3858B1CA4B}
+AppId={#AppIdGuid}
 AppName=HomeGrid Backup
 AppVersion={#AppVersion}
 AppPublisher=HomeGrid
-DefaultDirName={localappdata}\Programs\HomeGridBackup
-DisableDirPage=yes
+DefaultDirName={localappdata}\Programs\{#AppDirName}
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=6.1
