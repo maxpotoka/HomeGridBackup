@@ -106,8 +106,8 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.76"
-BUILD_DATE = "24.11.2026 09:25"
+SCRIPT_VER = "2.77"
+BUILD_DATE = "24.11.2026 15:30"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
@@ -393,7 +393,7 @@ def load_state():
     state = {
         "server": "", "server_history": [], "favorite_servers": [], "op_history": [], "all_time_cnt": 0, "all_time_mb": 0.0, "client_token": "", "session_token": "",
         "login_pin": "", "editor_pin": "", "backup_dir": DEFAULT_BACKUP_DIR, "logs_dir": "",
-        "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "journal_sync_target": "auto",
+        "local_enabled": True, "mirror_dir": "", "mirror_enabled": False, "net_dir": "", "net_enabled": False, "net_max_archives": 0, "net_max_size_gb": 0.0, "net_fit_free_space": True, "journal_sync_target": "auto",
         "cloud_enabled": False, "cloud_remote": "pcloud", "cloud_save_archives": True, "cloud_save_logs": True, "cloud_max_archives": 0, "cloud_max_size_gb": 0.0, "cloud_fit_free_space": True,
         "cloud_path": "HomeGridBackup", "device_id": uuid.uuid4().hex,
         "keep_last_count": 5, "daily_days": 7, "today_max": 2,
@@ -432,6 +432,10 @@ def load_state():
                 state["mirror_enabled"] = data["mirror_enabled"] and bool(state["mirror_dir"])
             if data.get("net_dir"):
                 state["net_dir"] = os.path.expanduser(str(data["net_dir"]).strip())
+            if isinstance(data.get("local_enabled"), bool): state["local_enabled"] = data["local_enabled"]
+            if "net_max_archives" in data: state["net_max_archives"] = max(0, int(data["net_max_archives"] or 0))
+            if "net_max_size_gb" in data: state["net_max_size_gb"] = max(0.0, float(data["net_max_size_gb"] or 0.0))
+            if isinstance(data.get("net_fit_free_space"), bool): state["net_fit_free_space"] = data["net_fit_free_space"]
             if isinstance(data.get("net_enabled"), bool):
                 state["net_enabled"] = data["net_enabled"] and bool(state["net_dir"])
             if data.get("journal_sync_target") in ("auto", "pcloud", "network", "both"):
@@ -542,8 +546,8 @@ def commit_state(state):
     if state.get("server"):
         record_server_history(state, state["server"])
     pub_keys = (
-        "server", "server_history", "favorite_servers", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "logs_dir", "mirror_dir", "mirror_enabled",
-        "net_dir", "net_enabled", "journal_sync_target",
+        "server", "server_history", "favorite_servers", "op_history", "all_time_cnt", "all_time_mb", "backup_dir", "local_enabled", "logs_dir", "mirror_dir", "mirror_enabled",
+        "net_dir", "net_enabled", "net_max_archives", "net_max_size_gb", "net_fit_free_space", "journal_sync_target",
         "cloud_enabled", "cloud_remote", "cloud_save_archives", "cloud_save_logs", "cloud_max_archives", "cloud_max_size_gb", "cloud_fit_free_space", "cloud_path", "device_id",
         "keep_last_count", "daily_days", "today_max", "weekly_count", "monthly_count", "yearly_count",
         "delete_mode", "lang", "theme", "ui_scale", "ui_font", "minimize_to_tray", "tray_enabled", "tray_backend",

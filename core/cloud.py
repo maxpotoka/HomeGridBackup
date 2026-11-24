@@ -928,7 +928,7 @@ def fetch_cloud_speed_stats(engine, refresh=True):
     state = engine.state
     net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
     has_net_src = bool(net_dir and os.path.isdir(os.path.join(net_dir, ".HomeGridBackup-sources")))
-    if not state.get("cloud_enabled") and not has_net_src:
+    if not state.get("cloud_enabled") and not (net_dir and os.path.isdir(net_dir)):
         raise RuntimeError("Увімкніть синхронізацію з pCloud або вкажіть доступну мережеву папку у Налаштуваннях.")
     remote = str(state.get("cloud_remote") or "pcloud").strip()
     cloud_path = validate_cloud_settings(remote, state.get("cloud_path", "HomeGridBackup"))
@@ -968,10 +968,17 @@ def fetch_cloud_speed_stats(engine, refresh=True):
             spd = round(mb / dl_d, 2)
         if spd <= 0.0:
             spd = float(op.get("speed_mbps") or (round(mb / dur, 2) if mb > 0.0 else 0.0))
-        os_n = " ".join(str(op.get(k) or "").strip() for k in ("platform", "platform_version") if op.get(k)).strip() or "OS"
+        _op = str(op.get("platform") or "").strip()
+        _ov = str(op.get("platform_version") or "").strip().partition("-").__getitem__(0)
+        if _op == "Linux" and "." in _ov:
+            _a, _, _b = _ov.partition(".")
+            _ov = f"{_a}.{_b.partition('.').__getitem__(0)}"
+        elif _op == "Darwin":
+            _op = "macOS"
+            _ov = _ov.partition(".").__getitem__(0)
+        os_n = f"{_op} {_ov}".strip() or "OS"
         did = op["device_id"]
-        tag = f"#{did[:4]}" if len(did) >= 4 else ""
-        op["dev_label"] = (f"★ {os_n} ({tag})" if did == own_id else f"{os_n} ({tag})").strip()
+        op["dev_label"] = (f"★ {os_n}" if did == own_id else os_n).strip()
         op["dur_f"], op["mb_f"], op["spd_f"] = round(dur, 1), round(mb, 1), round(spd, 2)
         ops.append(op)
     ops.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)

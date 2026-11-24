@@ -522,6 +522,9 @@ class DialogsMixin:
         v_tray_min = tk.BooleanVar(value=bool(st.get("minimize_to_tray", True)))
         v_tray_backend = tk.StringVar(value=str(st.get("tray_backend", "auto")))
         v_logs_dir = tk.StringVar(value=st.get("logs_dir", ""))
+        v_net_cnt = tk.IntVar(value=int(st.get("net_max_archives", 0) or 0))
+        v_net_gb = tk.DoubleVar(value=float(st.get("net_max_size_gb", 0.0) or 0.0))
+        v_net_free = tk.BooleanVar(value=bool(st.get("net_fit_free_space", True)))
         v_pstyle = tk.StringVar(value=st.get("progress_style", "v8"))
         v_cloud_enabled = tk.BooleanVar(value=bool(st.get("cloud_enabled", False)))
         v_cloud_provider = tk.StringVar(value="pCloud")
@@ -1024,6 +1027,19 @@ class DialogsMixin:
         tk.Label(g_r3, text=tr("Автоочищення у фоні (GFS)", st.get("lang", "en")), bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
         HomeGridToggle(g_r3, variable=v_sclean, compact=True, palette=p, font_sz=fs).pack(side="right")
 
+        f_netr = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
+        f_netr.pack(fill="x", padx=12, pady=(0, 8))
+        tk.Label(f_netr, text="Авторотація мережевої папки (від старих до нових)" if st.get("lang", "en") == "uk" else "Network Folder Auto-Rotation (oldest first)", bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 6))
+        nr0 = tk.Frame(f_netr, bg=p["card"]); nr0.pack(fill="x", pady=3)
+        tk.Label(nr0, text="Контроль вільного місця на мережевому диску:" if st.get("lang", "en") == "uk" else "Auto-free space on network drive:", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        HomeGridToggle(nr0, variable=v_net_free, compact=True, palette=p, font_sz=fs).pack(side="right")
+        nr1 = tk.Frame(f_netr, bg=p["card"]); nr1.pack(fill="x", pady=3)
+        tk.Label(nr1, text="Зберігати останніх архівів у мережі (0 = без ліміту):" if st.get("lang", "en") == "uk" else "Keep last archives in network (0 = unlimited):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        tk.Spinbox(nr1, from_=0, to=500, textvariable=v_net_cnt, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold")).pack(side="right")
+        nr2 = tk.Frame(f_netr, bg=p["card"]); nr2.pack(fill="x", pady=3)
+        tk.Label(nr2, text="Макс. розмір папки у мережі, ГБ (0 = без ліміту):" if st.get("lang", "en") == "uk" else "Max network folder size, GB (0 = unlimited):", bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs)).pack(side="left")
+        tk.Spinbox(nr2, from_=0.0, to=2000.0, increment=0.5, format="%.1f", textvariable=v_net_gb, width=6, bg=p["inp_bg"], fg=p["text"], bd=0, highlightthickness=1, highlightbackground=p["border"], font=(self._ui_fam(), fs, "bold")).pack(side="right")
+
         f_logs = tk.Frame(tab_bkp, bg=p["card"], bd=0, highlightthickness=1, highlightbackground=p["border"], padx=16, pady=12)
         f_logs.pack(fill="x", padx=12, pady=(0, 8))
         tk.Label(f_logs, text=tr("Папка файлів протоколів (backup.log та звіти)", st.get("lang", "en")), bg=p["card"], fg=p["cyan"], font=(self._ui_fam(), fs + 1, "bold")).pack(anchor="w", pady=(0, 6))
@@ -1283,6 +1299,9 @@ class DialogsMixin:
             if st["logs_dir"]:
                 os.makedirs(st["logs_dir"], exist_ok=True)
             st["keep_last_count"] = max(1, int(v_keep_n.get()))
+            st["net_max_archives"] = max(0, int(v_net_cnt.get() or 0))
+            st["net_max_size_gb"] = max(0.0, round(float(v_net_gb.get() or 0.0), 2))
+            st["net_fit_free_space"] = bool(v_net_free.get())
             st["daily_days"] = max(1, int(v_daily.get()))
             st["today_max"] = max(1, int(v_today.get()))
             st["weekly_count"] = max(0, int(v_week.get()))
@@ -1553,129 +1572,119 @@ class DialogsMixin:
     def open_cloud_stats_modal(self):
         import threading
         fs, k, lang, fam = self.metrics["font_sz"], self.metrics["k"], self.engine.state.get("lang", "en"), self._ui_fam()
-        dlg, p, _ = self._make_dialog("☁ Хмарна статистика швидкості (pCloud)" if lang == "uk" else "☁ Cloud Speed Statistics (pCloud)", 960, 620)
-        bf = tk.Frame(dlg, bg=p["panel"])
-        bf.pack(side="bottom", fill="x", padx=14, pady=(4, 10))
-        tk.Button(bf, text=tr("Закрити", lang), command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs, "bold"), padx=18, pady=5, cursor="hand2").pack(side="right")
-
-        top_bar = tk.Frame(dlg, bg=p["panel"])
-        top_bar.pack(fill="x", padx=14, pady=(8, 4))
-        v_dev = tk.StringVar(value="Усі комп'ютери" if lang == "uk" else "All computers")
-        cb_dev = ttk.Combobox(top_bar, textvariable=v_dev, state="readonly", width=28, font=(fam, fs))
-        cb_dev.pack(side="left", padx=(0, 8))
-        lbl_st = tk.Label(top_bar, text="", bg=p["panel"], fg=p["muted"], font=(fam, max(8, fs - 1)))
-        lbl_st.pack(side="right")
-
-        cards_f = tk.Frame(dlg, bg=p["panel"])
-        cards_f.pack(fill="x", padx=14, pady=4)
+        dlg, p, _ = self._make_dialog("🌐 Статистика швидкості мережі" if lang == "uk" else "🌐 Network Speed Statistics", 960, 620)
+        bf = tk.Frame(dlg, bg=p["panel"]); bf.pack(side="bottom", fill="x", padx=14, pady=(4, 10))
+        tk.Button(bf, text="Закрити" if lang == "uk" else "Close", command=dlg.destroy, bg=p["card"], fg=p["text"], font=(fam, fs, "bold"), padx=18, pady=5, cursor="hand2").pack(side="right")
+        top_bar = tk.Frame(dlg, bg=p["panel"]); top_bar.pack(fill="x", padx=14, pady=(8, 4))
+        v_dev = tk.StringVar(value="Усі системи" if lang == "uk" else "All systems")
+        cb_dev = ttk.Combobox(top_bar, textvariable=v_dev, state="readonly", width=28, font=(fam, fs)); cb_dev.pack(side="left", padx=(0, 8))
+        lbl_st = tk.Label(top_bar, text="", bg=p["panel"], fg=p["muted"], font=(fam, max(8, fs - 1))); lbl_st.pack(side="right")
+        cards_f = tk.Frame(dlg, bg=p["panel"]); cards_f.pack(fill="x", padx=14, pady=4)
         for ci in range(4): cards_f.columnconfigure(ci, weight=1)
+        caps = ("ПРИСТРОЇВ", "СЕР. ЧАС (ОСТ. 2)", "ШВИДШИЙ / ПОВІЛЬНИЙ", "СЕР. ШВИДКІСТЬ (ОСТ. 2)") if lang == "uk" else ("SYSTEMS", "AVG. TIME (LAST 2)", "FASTEST / SLOWEST", "AVG. SPEED (LAST 2)")
         c_vals = []
-        for idx, cap in enumerate(("ПРИСТРОЇВ", "СЕР. ЧАС (ОСТ. 2)", "ШВИДШИЙ / ПОВІЛЬНИЙ", "СЕР. ШВИДКІСТЬ (ОСТ. 2)")):
-            cf = tk.Frame(cards_f, bg=p["card"], bd=1, relief="solid", padx=8, pady=5)
-            cf.grid(row=0, column=idx, sticky="nsew", padx=(0 if idx == 0 else 6, 0))
-            tk.Label(cf, text=tr(cap, lang), bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
-            vl = tk.Label(cf, text="—", bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold"))
-            vl.pack(anchor="w")
-            c_vals.append(vl)
-
-        chart_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=10, pady=6)
-        chart_f.pack(fill="x", padx=14, pady=4)
+        for idx, cap in enumerate(caps):
+            cf = tk.Frame(cards_f, bg=p["card"], bd=1, relief="solid", padx=8, pady=5); cf.grid(row=0, column=idx, sticky="nsew", padx=(0 if idx == 0 else 6, 0))
+            tk.Label(cf, text=cap, bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
+            vl = tk.Label(cf, text="—", bg=p["card"], fg=p["cyan"], font=(fam, fs, "bold")); vl.pack(anchor="w"); c_vals.append(vl)
+        v_cnt, v_avg_t, v_minmax, v_avg_s = c_vals
+        chart_f = tk.Frame(dlg, bg=p["card"], bd=1, relief="solid", padx=10, pady=6); chart_f.pack(fill="x", padx=14, pady=4)
         tk.Label(chart_f, text="ЧИСТА ШВИДКІСТЬ ЗАВАНТАЖЕННЯ ЗА ОСТАННІМИ 2 АРХІВАМИ (МБ/с та повний час):" if lang == "uk" else "SYSTEM SPEED COMPARISON (LAST 2 ARCHIVES, MB/s & duration):", bg=p["card"], fg=p["muted"], font=(fam, max(7, fs - 3), "bold")).pack(anchor="w")
-        cv = tk.Canvas(chart_f, height=int(128 * k), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
-        cv.pack(fill="x", pady=(4, 0))
-
-        wrap = tk.Frame(dlg, bg=p["panel"])
-        wrap.pack(fill="both", expand=True, padx=14, pady=(2, 2))
+        cv = tk.Canvas(chart_f, height=int(180 * k), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"]); cv.pack(fill="x", pady=(4, 0))
+        wrap = tk.Frame(dlg, bg=p["panel"]); wrap.pack(fill="both", expand=True, padx=14, pady=(2, 2))
         st_tv = ttk.Style()
         try: st_tv.theme_use("clam")
         except Exception: pass
         st_tv.configure("HGBC.Treeview", background=p["log_bg"], foreground=p["text"], fieldbackground=p["log_bg"], rowheight=max(24, int((fs + 14) * k)), font=(fam, max(8, fs - 1)))
         st_tv.configure("HGBC.Treeview.Heading", background=p["card"], foreground=p["cyan"], font=(fam, max(8, fs - 1), "bold"))
         tree = ttk.Treeview(wrap, columns=("ts", "dev", "arc", "mb", "dur", "spd"), show="headings", style="HGBC.Treeview")
-        for cid, h_t, wc, anc in (("ts", "Дата та час", 145, "center"), ("dev", "Комп'ютер / ОС", 185, "w"), ("arc", "Архів", 260, "w"), ("mb", "Розмір", 80, "e"), ("dur", "Час (хв / с)", 115, "center"), ("spd", "МБ/с", 75, "e")):
-            tree.heading(cid, text=tr(h_t, lang))
-            tree.column(cid, width=int(wc * k), minwidth=50, anchor=anc, stretch=(cid == "arc"))
-        vsb = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=vsb.set)
-        vsb.pack(side="right", fill="y")
-        tree.pack(side="left", fill="both", expand=True)
-
+        for cid, h_t, wc, anc in (("ts", "Дата та час" if lang == "uk" else "Date & Time", 145, "center"), ("dev", "ОС / Система" if lang == "uk" else "OS / System", 118, "w"), ("arc", "Архів" if lang == "uk" else "Archive", 260, "w"), ("mb", "Розмір" if lang == "uk" else "Size", 80, "e"), ("dur", "Час (хв / с)" if lang == "uk" else "Duration", 90, "center"), ("spd", "МБ/с" if lang == "uk" else "MB/s", 75, "e")):
+            tree.heading(cid, text=h_t); tree.column(cid, width=int(wc * k), minwidth=50, anchor=anc, stretch=(cid == "arc"))
+        vsb = ttk.Scrollbar(wrap, orient="vertical", command=tree.yview); tree.configure(yscrollcommand=vsb.set); vsb.pack(side="right", fill="y"); tree.pack(side="left", fill="both", expand=True)
         state_box = {"ops": [], "devs": [], "rows": {}}
         def _draw_bars(_e=None):
             cv.delete("all")
             devs = state_box["devs"]
-            w, h = max(300, cv.winfo_width()), max(110, cv.winfo_height())
+            w, h = max(300, cv.winfo_width()), max(150, cv.winfo_height())
             if not devs:
-                cv.create_text(w // 2, h // 2, text=tr("Немає даних із pCloud", lang), fill=p["muted"], font=(fam, fs))
+                cv.create_text(w // 2, h // 2, text="Немає даних" if lang == "uk" else "No data", fill=p["muted"], font=(fam, fs))
                 return
             max_s = max([d["avg_spd"] for d in devs] + [0.1])
-            pad_x, top_y, bot_y = int(36 * k), int(28 * k), h - int(24 * k)
+            pad_x, top_y, bot_y = int(42 * k), int(34 * k), h - int(40 * k)
+            for g_i in range(1, 5):
+                gy = bot_y - int(((bot_y - top_y) * g_i) / 4)
+                cv.create_line(pad_x - 8, gy, w - pad_x + 12, gy, fill=p["border"], dash=(2, 4))
             slot = (w - pad_x * 2) / len(devs)
-            bw = min(64, max(24, slot * 0.45))
-            cv.create_line(pad_x - 8, bot_y, w - pad_x + 8, bot_y, fill=p["border"])
+            bw = min(68, max(28, slot * 0.44))
+            dx, dy = int(9 * k), int(7 * k)
+            cv.create_line(pad_x - 8, bot_y, w - pad_x + 12, bot_y, fill=p["border"], width=2)
             for i, d in enumerate(devs):
                 cx = pad_x + slot * (i + 0.5)
-                bh = max(4, int(((bot_y - top_y) * d["avg_spd"]) / max_s))
-                col = p["green"] if i == 0 else (p["cyan"] if d["is_own"] else p["blue"])
-                cv.create_rectangle(cx - bw / 2, bot_y - bh, cx + bw / 2, bot_y, fill=col, outline="")
+                x1, x2 = cx - bw / 2, cx + bw / 2
+                bh = max(int(12 * k), int(((bot_y - top_y) * d["avg_spd"]) / max_s))
+                y1 = bot_y - bh
+                if i == 0: c_f, c_s, c_t = "#10b981", "#059669", "#34d399"
+                elif d["is_own"]: c_f, c_s, c_t = "#38bdf8", "#0284c7", "#7dd3fc"
+                else: c_f, c_s, c_t = "#3b82f6", "#1d4ed8", "#93c5fd"
+                cv.create_polygon(x2, bot_y, x2 + dx + 5, bot_y - dy + 3, x2 + dx + 5, y1 - dy + 5, x2, y1 + 3, fill="#05080f", outline="")
+                cv.create_polygon(x2, y1, x2 + dx, y1 - dy, x2 + dx, bot_y - dy, x2, bot_y, fill=c_s, outline="")
+                cv.create_polygon(x1, y1, x1 + dx, y1 - dy, x2 + dx, y1 - dy, x2, y1, fill=c_t, outline="")
+                cv.create_rectangle(x1, y1, x2, bot_y, fill=c_f, outline="")
+                cv.create_line(x1 + 1, y1 + 1, x2 - 1, y1 + 1, fill="#e0f2fe")
                 dur_s = format_duration(d["avg_dur"], lang)
                 unit = "МБ/с" if lang == "uk" else "MB/s"
-                cv.create_text(cx, bot_y - bh - int(12 * k), text=f"{d['avg_spd']} {unit} • {dur_s}", fill=p["text"], font=(fam, max(8, fs - 1), "bold"))
+                cv.create_text(cx + dx // 2, y1 - dy - int(11 * k), text=f"{d['avg_spd']} {unit} • {dur_s}", fill=p["text"], font=(fam, max(8, fs - 1), "bold"))
                 lbl_d = d["label"] if len(d["label"]) <= 24 else d["label"][:21] + "..."
-                cv.create_text(cx, bot_y + int(12 * k), text=lbl_d, fill=p["green"] if i == 0 else p["muted"], font=(fam, max(8, fs - 1), "bold" if i == 0 else "normal"))
+                cv.create_text(cx, bot_y + int(16 * k), text=lbl_d, fill=p["green"] if i == 0 else p["muted"], font=(fam, max(8, fs - 1), "bold" if i == 0 else "normal"))
 
         def _render():
             for rid in tree.get_children(): tree.delete(rid)
             state_box["rows"].clear()
-            all_lbl = "Усі комп'ютери" if lang == "uk" else "All computers"
+            all_lbl = "Усі системи" if lang == "uk" else "All systems"
             sel = v_dev.get()
             ops = [o for o in state_box["ops"] if sel == all_lbl or o["dev_label"] == sel]
             devs = state_box["devs"]
-            c_vals[0].configure(text=f"{len(devs)}")
+            v_cnt.configure(text=f"{len(devs)}")
             sample = []
-            for d in devs:
-                sample.extend([o for o in ops if o["device_id"] == d["device_id"]][:2])
+            for d in devs: sample.extend([o for o in ops if o["device_id"] == d["device_id"]][:2])
             if sample:
-                c_vals[1].configure(text=format_duration(sum(x["dur_f"] for x in sample) / len(sample), lang))
-                c_vals[2].configure(text=f"{format_duration(min(x['dur_f'] for x in sample), lang)} / {format_duration(max(x['dur_f'] for x in sample), lang)}")
-                c_vals[3].configure(text=f"{round(sum(x['spd_f'] for x in sample) / len(sample), 2)} {'МБ/с' if lang == 'uk' else 'MB/s'}")
+                v_avg_t.configure(text=format_duration(sum(x["dur_f"] for x in sample) / len(sample), lang))
+                v_minmax.configure(text=f"{format_duration(min(x['dur_f'] for x in sample), lang)} / {format_duration(max(x['dur_f'] for x in sample), lang)}")
+                v_avg_s.configure(text=f"{round(sum(x['spd_f'] for x in sample) / len(sample), 2)} {'МБ/с' if lang == 'uk' else 'MB/s'}")
             else:
-                for v in c_vals[1:]: v.configure(text="—")
+                for v in (v_avg_t, v_minmax, v_avg_s): v.configure(text="—")
             for idx, o in enumerate(ops[:100]):
                 ts_s = str(o.get("timestamp") or "")[:19].replace("T", " ")
-                iid = f"c_{idx}"
-                state_box["rows"][iid] = o
-                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang), f"{o['spd_f']}"))
+                iid = f"c_{idx}"; state_box["rows"][iid] = o
+                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang).partition(" (").__getitem__(0), f"{o['spd_f']}"))
             _draw_bars()
 
         def _on_dbl(_e=None):
             s = tree.selection()
-            if not s or s[0] not in state_box["rows"]: return
-            o = state_box["rows"][s[0]]
-            lines = [f"{o['dev_label']}  •  {o.get('archive', '')}", f"Загальний час: {format_duration(o['dur_f'], lang)}  •  Швидкість: {o['spd_f']} МБ/с"]
-            for k_s, n_s in (("server_duration_sec", "Сервер"), ("download_duration_sec", "Завантаження"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("mirror_duration_sec", "Дзеркало")):
-                if float(o.get(k_s) or 0) > 0:
-                    lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang)}")
-            self._show_engine_modal({"type": "alert", "title": "Деталі швидкості (pCloud)", "text": "\n".join(lines)})
+            if not s: return
+            sid = next(iter(s))
+            if sid not in state_box["rows"]: return
+            o = state_box["rows"][sid]
+            lines = [f"{o['dev_label']}  •  {o.get('archive', '')}", f"{'Загальний час' if lang=='uk' else 'Total time'}: {format_duration(o['dur_f'], lang)}  •  {'Швидкість' if lang=='uk' else 'Speed'}: {o['spd_f']} {'МБ/с' if lang=='uk' else 'MB/s'}"]
+            for k_s, n_s in (("server_duration_sec", "Server"), ("download_duration_sec", "Download"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("mirror_duration_sec", "Mirror")):
+                if float(o.get(k_s) or 0) > 0: lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang)}")
+            self._show_engine_modal({"type": "alert", "title": "Деталі швидкості" if lang=="uk" else "Speed Details", "text": chr(10).join(lines)})
 
         def _load(refresh=True):
-            lbl_st.configure(text="Оновлення з pCloud..." if refresh else "Читання кешу...", fg=p["cyan"])
+            lbl_st.configure(text=("Оновлення..." if lang=="uk" else "Refreshing...") if refresh else ("Читання кешу..." if lang=="uk" else "Loading cache..."), fg=p["cyan"])
             def _w():
                 try:
                     from core.cloud import fetch_cloud_speed_stats
                     res, err = fetch_cloud_speed_stats(self.engine, refresh=refresh), ""
-                except Exception as ex:
-                    res, err = None, str(ex)
+                except Exception as ex: res, err = None, str(ex)
                 def _u():
                     if not dlg.winfo_exists(): return
-                    if err:
-                        lbl_st.configure(text=err, fg=p["red"])
-                        return
+                    if err: lbl_st.configure(text=err, fg=p["red"]); return
                     state_box["ops"], state_box["devs"] = res["ops"], res["devices"]
-                    all_lbl = "Усі комп'ютери" if lang == "uk" else "All computers"
+                    all_lbl = "Усі системи" if lang == "uk" else "All systems"
                     cb_dev.configure(values=[all_lbl] + [d["label"] for d in res["devices"]])
                     if v_dev.get() not in cb_dev["values"]: v_dev.set(all_lbl)
-                    lbl_st.configure(text=f"Оновлено ✔ ({len(res['ops'])} оп.)" if refresh else "Кеш", fg=p["green"])
+                    lbl_st.configure(text=(f"Оновлено ✔ ({len(res['ops'])})" if lang=="uk" else f"Updated ✔ ({len(res['ops'])})") if refresh else ("Cache" if lang!="uk" else "Кеш"), fg=p["green"])
                     _render()
                 self.root.after(0, _u)
             threading.Thread(target=_w, daemon=True).start()
@@ -1683,13 +1692,14 @@ class DialogsMixin:
         cb_dev.bind("<<ComboboxSelected>>", lambda _e: _render())
         tree.bind("<Double-1>", _on_dbl)
         cv.bind("<Configure>", _draw_bars)
-        tk.Button(top_bar, text="🔄 Оновити з pCloud" if lang == "uk" else "🔄 Refresh pCloud", command=lambda: _load(True), bg=p["card"], fg=p["cyan"], font=(fam, fs), padx=10, pady=2, cursor="hand2").pack(side="left")
+        tk.Button(top_bar, text="🔄 Оновити" if lang == "uk" else "🔄 Refresh", command=lambda: _load(True), bg=p["card"], fg=p["cyan"], font=(fam, fs), padx=10, pady=2, cursor="hand2").pack(side="left")
         _load(False)
         dlg.after(150, lambda: dlg.winfo_exists() and _load(True))
+
     def open_stats_modal(self):
         fs = self.metrics["font_sz"]
         lng_c = self.engine.state.get("lang", "en")
-        dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 780, 620)
+        dlg, p, _ = self._make_dialog("Статистика резервного копіювання", 820, 690)
         st = self.engine.get_detailed_stats() if hasattr(self.engine, "get_detailed_stats") else {}
 
         tk.Button(dlg, text=tr("Закрити", lng_c), command=dlg.destroy, bg=p["card"], fg=p["text"], font=(self._ui_fam(), fs, "bold"), padx=int(24 * self.metrics["k"]), pady=int(6 * self.metrics["k"])).pack(side="bottom", anchor="e", padx=16, pady=(6, 12))
@@ -1739,7 +1749,7 @@ class DialogsMixin:
         for idx, (cap, v_main, v_sub, col, act) in enumerate(cards):
             r_i, c_i = divmod(idx, 4)
             is_warn_sha = (act == "sha" and sha_c < disk_c)
-            c = tk.Frame(grid_f, bg=p["card"], bd=2 if is_warn_sha else 1, relief="solid", highlightbackground=p["amber"] if is_warn_sha else p["border"], highlightthickness=2 if is_warn_sha else 0, padx=9, pady=7, cursor="hand2" if act else "")
+            c = tk.Frame(grid_f, bg=p["card"], bd=2 if is_warn_sha else 1, relief="solid", highlightbackground=p["amber"] if is_warn_sha else p["border"], highlightthickness=2 if is_warn_sha else 0, padx=8, pady=4, cursor="hand2" if act else "")
             c.grid(row=r_i, column=c_i, sticky="nsew", padx=(0 if c_i == 0 else 6, 0), pady=(0 if r_i == 0 else 6, 0))
             w1 = tk.Label(c, text=cap, bg=p["card"], fg=p["muted"], font=("Segoe UI", max(7, fs - 3), "bold"))
             w2 = tk.Label(c, text=v_main, bg=p["card"], fg=col, font=("Segoe UI", fs + 1, "bold"))
@@ -1767,29 +1777,39 @@ class DialogsMixin:
         chart_card.pack(fill="both", expand=True, padx=14, pady=(4, 6))
         tk.Label(chart_card, text=tr("ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ", lng_c), bg=p["card"], fg=p["muted"], font=(self._ui_fam(), max(7, fs - 3), "bold")).pack(anchor="w", pady=(0, 6))
 
-        cv = tk.Canvas(chart_card, height=int(120 * self.metrics["k"]), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
+        cv = tk.Canvas(chart_card, height=int(225 * self.metrics["k"]), bg=p["log_bg"], highlightthickness=1, highlightbackground=p["border"])
         cv.pack(fill="both", expand=True)
 
         months = st.get("months", [])
         def _draw_chart(_e=None):
             cv.delete("all")
-            w, h = max(240, cv.winfo_width()), max(110, cv.winfo_height())
-            if not months:
-                return
+            w, h = max(300, cv.winfo_width()), max(180, cv.winfo_height())
+            if not months: return
             max_v = max([v for _, v in months] + [1])
             k = self.metrics["k"]
-            pad_x, top_y, bot_y = int(34 * k), int(32 * k), h - int(28 * k)
+            pad_x, top_y, bot_y = int(42 * k), int(34 * k), h - int(42 * k)
+            for g_i in range(1, 5):
+                gy = bot_y - int(((bot_y - top_y) * g_i) / 4)
+                cv.create_line(pad_x - 8, gy, w - pad_x + 12, gy, fill=p["border"], dash=(2, 4))
             slot_w = (w - pad_x * 2) / len(months)
-            bar_w = min(46, max(18, slot_w * 0.52))
-            cv.create_line(pad_x - 6, bot_y, w - pad_x + 6, bot_y, fill=p["border"])
+            bar_w = min(56, max(24, slot_w * 0.48))
+            dx, dy = int(9 * k), int(7 * k)
+            cv.create_line(pad_x - 8, bot_y, w - pad_x + 12, bot_y, fill=p["border"], width=2)
             for i, (m_lbl, val) in enumerate(months):
                 cx = pad_x + slot_w * (i + 0.5)
-                bh = int(((bot_y - top_y) * val) / max_v) if val > 0 else 2
-                y1 = bot_y - bh
-                cv.create_rectangle(cx - bar_w / 2, y1, cx + bar_w / 2, bot_y, fill=p["green"] if val > 0 else p["border"], outline="")
+                x1, x2 = cx - bar_w / 2, cx + bar_w / 2
                 if val > 0:
-                    cv.create_text(cx, y1 - int(12 * k), text=str(val), fill=p["text"], font=("Segoe UI", max(8, fs - 1), "bold"))
-                cv.create_text(cx, bot_y + int(14 * k), text=tr(m_lbl, lng_c), fill=p["muted"], font=(self._ui_fam(), max(8, fs - 1)))
+                    bh = max(int(12 * k), int(((bot_y - top_y) * val) / max_v))
+                    y1 = bot_y - bh
+                    cv.create_polygon(x2, bot_y, x2 + dx + 5, bot_y - dy + 3, x2 + dx + 5, y1 - dy + 5, x2, y1 + 3, fill="#05080f", outline="")
+                    cv.create_polygon(x2, y1, x2 + dx, y1 - dy, x2 + dx, bot_y - dy, x2, bot_y, fill="#0d7a53", outline="")
+                    cv.create_polygon(x1, y1, x1 + dx, y1 - dy, x2 + dx, y1 - dy, x2, y1, fill="#34d399", outline="")
+                    cv.create_rectangle(x1, y1, x2, bot_y, fill=p["green"], outline="")
+                    cv.create_line(x1 + 1, y1 + 1, x2 - 1, y1 + 1, fill="#a7f3d0")
+                    cv.create_text(cx + dx // 2, y1 - dy - int(11 * k), text=str(val), fill=p["text"], font=(self._ui_fam(), fs, "bold"))
+                else:
+                    cv.create_polygon(x1, bot_y - 3, x1 + dx, bot_y - 3 - dy, x2 + dx, bot_y - 3 - dy, x2, bot_y - 3, fill=p["border"], outline="")
+                cv.create_text(cx, bot_y + int(16 * k), text=tr(m_lbl, lng_c), fill=p["muted"], font=(self._ui_fam(), max(8, fs - 1), "bold" if val > 0 else "normal"))
 
         cv.bind("<Configure>", _draw_chart)
         dlg.after(40, _draw_chart)

@@ -80,6 +80,15 @@ def _print_cli_banner():
     _safe_con_write("+" + ("-" * 76) + "+\n")
     _safe_con_write("|" + title_line.ljust(76) + "|\n")
     _safe_con_write("|" + os_line.ljust(76) + "|\n")
+    try:
+        from core.config import load_state
+        st = load_state()
+        loc_s = st.get("backup_dir", "") if st.get("local_enabled", True) else "OFF"
+        net_s = st.get("net_dir", "") if (st.get("net_enabled") and st.get("net_dir")) else "OFF"
+        tgt_line = f"  Storage | Local: {loc_s} | Network: {net_s}"[:76]
+        _safe_con_write("|" + tgt_line.ljust(76) + "|\n")
+    except Exception:
+        pass
     _safe_con_write("+" + ("-" * 76) + "+\n")
 
 def _init_console_for_cli():

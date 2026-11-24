@@ -412,6 +412,31 @@ def _copy_to_mirror(engine, out_file, sha_file):
         if src_real == dst_real:
             return
         os.makedirs(dst_real, exist_ok=True)
+        st_n = engine.state
+        need_b = os.path.getsize(out_file) + (64 * 1024 * 1024)
+        max_c = max(0, int(st_n.get("net_max_archives", 0) or 0))
+        max_b = int(max(0.0, float(st_n.get("net_max_size_gb", 0.0) or 0.0)) * (1024 ** 3))
+        fit_f = bool(st_n.get("net_fit_free_space", True))
+        arcs = []
+        for fn_n in os.listdir(dst_real):
+            if fn_n.lower().endswith(".zip") and "_KEEP_" not in fn_n.upper():
+                fp_n = os.path.join(dst_real, fn_n)
+                try: st_f = os.stat(fp_n); arcs.append([fp_n, st_f.st_size, st_f.st_mtime])
+                except OSError: pass
+        arcs.sort(key=lambda x: x)
+        del_n = 0
+        while arcs:
+            free_b = shutil.disk_usage(dst_real).free
+            tot_b = sum(x for x in arcs) + os.path.getsize(out_file)
+            need_del = (fit_f and free_b < need_b) or (max_c > 0 and len(arcs) + 1 > max_c) or (max_b > 0 and tot_b > max_b)
+            if not need_del: break
+            old_p, _, _ = arcs.pop(0)
+            for rem_p in (old_p, old_p + ".sha256"):
+                try:
+                    if os.path.exists(rem_p): os.remove(rem_p)
+                except OSError: pass
+            del_n += 1
+        if del_n: engine.log(f"Network rotation: removed {del_n} oldest archive(s).", "info")
         shutil.copy2(out_file, os.path.join(dst_real, os.path.basename(out_file)))
         if os.path.exists(sha_file):
             shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
@@ -670,7 +695,13 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
         archive_sequence=max(0, int(engine.state.get("all_time_cnt", 0))) + 1
     )
     try:
-        bdir = engine.state["backup_dir"]
+        loc_on = bool(engine.state.get("local_enabled", True))
+        net_on = bool(engine.state.get("net_enabled", False)) and bool((engine.state.get("net_dir") or "").strip())
+        if not loc_on and not net_on:
+            raise RuntimeError("No storage enabled (Local and Network are both OFF).")
+        bdir = engine.state["backup_dir"] if loc_on else __import__("tempfile").gettempdir()
+        tgts = ([f"Local: {bdir}"] if loc_on else []) + ([f"Network: {engine.state.get('net_dir')}"] if net_on else [])
+        engine.log("Targets: " + " | ".join(tgts), "info")
         t_prep0 = time.time()
         _record_cloud_event(engine, operation_id, "stage_started", stage="server_connection_and_preparation")
         srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
@@ -755,6 +786,17 @@ def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, 
             )
 
         _copy_to_network(engine, out_file, sha_file)
+        with engine.lock:
+            if hasattr(engine, "_dest_stats"):
+                engine._dest_stats["network"] = None
+        if hasattr(engine, "request_dest_stats_refresh"):
+            engine.request_dest_stats_refresh()
+        if not bool(engine.state.get("local_enabled", True)):
+            for _tmp_f in (out_file, sha_file):
+                try:
+                    if _tmp_f and os.path.exists(_tmp_f): os.remove(_tmp_f)
+                except OSError: pass
+            engine.log("Temp local archive removed (Local storage is OFF).", "info")
         if engine.state["dirty"]:
             commit_state(engine.state)
             engine.log("Налаштування та ключі захищено збережено.", "ok")
