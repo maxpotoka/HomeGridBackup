@@ -318,7 +318,7 @@ class DialogsMixin:
                 self.engine.submit_modal(True)
             dlg.protocol("WM_DELETE_WINDOW", _close_rep)
             tot_s = max(0.1, float(d.get("total_sec", 0.1)))
-            tot_disp = format_duration(tot_s, lang).partition(" (").__getitem__(0)
+            tot_disp = format_duration(tot_s, lang).partition(' (').__getitem__(0)
             fn_s = d.get("file", "backup.zip")
             sz_s = d.get("size_mb", 0.0)
             fc_s = d.get("files_cnt", 0)
@@ -1281,7 +1281,7 @@ class DialogsMixin:
             for idx, o in enumerate(ops[:100]):
                 ts_s = str(o.get("timestamp") or "")[:19].replace("T", " ")
                 iid = f"c_{idx}"; state_box["rows"][iid] = o
-                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang).partition(" (").__getitem__(0), f"{o['spd_f']}", f"{o['net_spd_f']}" if o.get("net_spd_f", 0) > 0 else "—"))
+                tree.insert("", "end", iid=iid, values=(ts_s, o["dev_label"], o.get("archive") or "—", f"{o['mb_f']} {'МБ' if lang == 'uk' else 'MB'}", format_duration(o["dur_f"], lang).partition(' (').__getitem__(0), f"{o['spd_f']}", f"{o['net_spd_f']}" if o.get("net_spd_f", 0) > 0 else "—"))
             _draw_bars()
 
         def _on_dbl(_e=None):
@@ -1292,7 +1292,7 @@ class DialogsMixin:
             o = state_box["rows"][sid]
             lines = [f"{o['dev_label']}  •  {o.get('archive', '')}", f"{'Загальний час' if lang=='uk' else 'Total time'}: {format_duration(o['dur_f'], lang)}  •  {'Швидкість' if lang=='uk' else 'Speed'}: {o['spd_f']} {'МБ/с' if lang=='uk' else 'MB/s'}"]
             for k_s, n_s in (("server_duration_sec", "Server"), ("download_duration_sec", "Download"), ("crc_duration_sec", "CRC32"), ("sha256_duration_sec", "SHA-256"), ("net_duration_sec", "Network" if lang != "uk" else "Мережа"), ("mirror_duration_sec", "Mirror")):
-                if float(o.get(k_s) or 0) > 0: lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang).partition(" (").__getitem__(0)}")
+                if float(o.get(k_s) or 0) > 0: lines.append(f"• {n_s}: {format_duration(float(o[k_s]), lang).partition(' (').__getitem__(0)}")
             self._show_engine_modal({"type": "alert", "title": "Деталі швидкості" if lang=="uk" else "Speed Details", "text": chr(10).join(lines)})
 
         def _load(refresh=True):
