@@ -302,20 +302,22 @@ def _get_tray_img_safe(pct, is_run, pill_type, spin_idx=0):
 
 def _force_quit_app(engine):
     _TRAY_STOP.set()
-    try:
-        if engine.tray_icon is not None:
-            engine.tray_icon.visible = False
-            engine.tray_icon.stop()
-            engine.tray_icon = None
-            time.sleep(0.12)
-    except Exception:
-        pass
-    try:
-        if engine.app_ref is not None:
-            engine.app_ref.root.quit()
-            engine.app_ref.root.destroy()
-    except Exception:
-        pass
+    is_main = (threading.current_thread() is threading.main_thread())
+    if os.sys.platform != "darwin" or is_main:
+        try:
+            if engine.tray_icon is not None:
+                engine.tray_icon.visible = False
+                engine.tray_icon.stop()
+                engine.tray_icon = None
+                time.sleep(0.12)
+        except Exception:
+            pass
+        try:
+            if engine.app_ref is not None:
+                engine.app_ref.root.quit()
+                engine.app_ref.root.destroy()
+        except Exception:
+            pass
     os._exit(0)
 
 def _can_dock_linux_tray():
@@ -522,10 +524,26 @@ def _start_tray_thread(engine):
         if engine.app_ref is not None:
             _enqueue_tray_ui(engine.app_ref.show_window)
 
+    def _apply_tray_updates(new_icon, new_menu, new_title):
+        ic = engine.tray_icon
+        if ic is None or not engine.tray_ready or not getattr(ic, "visible", True):
+            return
+        try:
+            if new_icon is not None:
+                ic.icon = new_icon
+            if new_menu is not None:
+                ic.menu = new_menu
+                ic.update_menu()
+            if new_title is not None:
+                ic.title = new_title
+        except Exception:
+            pass
+
     def _anim_loop():
         err_streak = 0
         last_sig, last_menu_sig, last_title = None, None, ""
         last_menu_ts = 0.0
+        is_macos = (os.sys.platform == "darwin")
         while not _TRAY_STOP.is_set():
             _TRAY_STOP.wait(1.0)
             if _TRAY_STOP.is_set():
@@ -546,19 +564,28 @@ def _start_tray_thread(engine):
                     f"HomeGrid Backup: {_tray_status_text(engine, lng_s, elapsed_sec)}"
                     if engine.is_running else "HomeGrid Backup"
                 )
+                upd_icon = None
                 if sig != last_sig:
-                    engine.tray_icon.icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
+                    upd_icon = _get_tray_img_safe(cur_pct, engine.is_running, engine.pill_type, 0)
                     last_sig = sig
+                upd_menu = None
                 now_m = time.monotonic()
                 menu_due = (now_m - last_menu_ts) >= 3.0
                 if menu_sig != last_menu_sig or (engine.is_running and menu_due):
-                    engine.tray_icon.menu = _build_tray_menu()
-                    engine.tray_icon.update_menu()
+                    upd_menu = _build_tray_menu()
                     last_menu_sig = menu_sig
                     last_menu_ts = now_m
+                upd_title = None
                 if new_title != last_title:
-                    engine.tray_icon.title = new_title
+                    upd_title = new_title
                     last_title = new_title
+                if upd_icon is not None or upd_menu is not None or upd_title is not None:
+                    if is_macos:
+                        _enqueue_tray_ui(
+                            lambda i=upd_icon, m=upd_menu, t=upd_title: _apply_tray_updates(i, m, t)
+                        )
+                    else:
+                        _apply_tray_updates(upd_icon, upd_menu, upd_title)
                 err_streak = 0
             except AssertionError as exc:
                 _mark_tray_failed(exc)

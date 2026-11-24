@@ -1074,7 +1074,7 @@ class HomeGridApp(DialogsMixin):
                     self.last_modal_id = self.engine.modal["id"]
                     self.show_window()
                     self._show_engine_modal(self.engine.modal)
-                self.root.after(2000, self._poll_ui)
+                self.root.after(450, self._poll_ui)
                 return
             st = self.engine.state
             srv_in_state = (st.get("server") or "").strip()

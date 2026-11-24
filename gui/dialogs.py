@@ -559,8 +559,18 @@ class DialogsMixin:
         v_sep = tk.Frame(split_wrap, bg=p["border"], width=1)
         v_sep.pack(side="left", fill="y")
 
-        content_area = tk.Frame(split_wrap, bg=p["panel"], padx=8, pady=6)
-        content_area.pack(side="left", fill="both", expand=True)
+        right_wrap = tk.Frame(split_wrap, bg=p["panel"])
+        right_wrap.pack(side="left", fill="both", expand=True)
+        _r_cv = tk.Canvas(right_wrap, bg=p["panel"], highlightthickness=0, bd=0)
+        _r_vsb = tk.Scrollbar(right_wrap, orient="vertical", command=_r_cv.yview)
+        content_area = tk.Frame(_r_cv, bg=p["panel"], padx=8, pady=6)
+        content_area.bind("<Configure>", lambda _e: _r_cv.configure(scrollregion=_r_cv.bbox("all")))
+        _r_win = _r_cv.create_window((0, 0), window=content_area, anchor="nw")
+        _r_cv.bind("<Configure>", lambda e: _r_cv.itemconfigure(_r_win, width=e.width))
+        _r_cv.configure(yscrollcommand=_r_vsb.set)
+        _r_vsb.pack(side="right", fill="y")
+        _r_cv.pack(side="left", fill="both", expand=True)
+        dlg.bind("<MouseWheel>", lambda ev: _r_cv.yview_scroll(int(-1 * (ev.delta / 120)), "units"))
 
         tab_bkp = tk.Frame(content_area, bg=p["panel"])
         tab_sched = tk.Frame(content_area, bg=p["panel"])
@@ -591,6 +601,10 @@ class DialogsMixin:
                     pg.pack_forget()
             for i_n, nav_w in enumerate(_nav_items):
                 nav_w.set_active(i_n == idx)
+            try:
+                _r_cv.yview_moveto(0.0)
+            except Exception:
+                pass
 
         row_h = max(38, int(round(40 * self.metrics["k"])))
         for i_n, (grp_k, ico_k, fb_s, cap_k, add_gap) in enumerate(_nav_specs):
