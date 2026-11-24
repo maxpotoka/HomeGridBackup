@@ -3,6 +3,7 @@ import re
 import time
 
 # ==============================================================================
+# patch-id: fix-dialogs-fstring-syntax-2.99
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
 # patch-id: pcloud-only-simple-ui-2.27
@@ -24,7 +25,7 @@ import time
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: pcloud-inline-path-2.63
 # patch-id: fav-servers-pills-2.65
-# [ФАЙЛ: gui/dialogs.py (v2.29 | 23.11.2026 23:55)
+# [ФАЙЛ: gui/dialogs.py (v2.30 | 23.11.2026 23:55)
 # patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
 # ==============================================================================
 import tkinter as tk

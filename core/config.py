@@ -1,3 +1,4 @@
+# patch-id: fix-dialogs-fstring-syntax-2.99
 # patch-id: bump-version-2.99
 # patch-id: i18n-ping-and-retry-en-2.79
 # patch-id: fix-net-drive-status-and-build-retry-2.78
@@ -110,7 +111,7 @@ except Exception:
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
 SCRIPT_VER = "2.99"
-BUILD_DATE = "24.11.2026 22:14"
+BUILD_DATE = "24.11.2026 22:25"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")
