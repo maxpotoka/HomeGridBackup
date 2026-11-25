@@ -1,3 +1,4 @@
+# patch-id: backup-timeout-retry-3.00
 # patch-id: fix-dialogs-fstring-syntax-2.99
 # patch-id: bump-version-2.99
 # patch-id: i18n-ping-and-retry-en-2.79
@@ -37,7 +38,7 @@
 # patch-id: force-tall-pbar-and-grid-2.74
 # patch-id: single-pass-verify-speed-2.75
 # patch-id: fix-linux-tray-menu-2.76
-# [ФАЙЛ: core/config.py (v2.59 | 24.11.2026 22:14) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.60 | 25.11.2026 09:00) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # ==============================================================================
 import atexit
 import json
@@ -110,8 +111,8 @@ except Exception:
 # patch-id: center-storage-notepad-2.40
 # patch-id: homegrid-design-system-2.45
 # patch-id: settings-all-tabs-homegrid-2.46
-SCRIPT_VER = "2.99"
-BUILD_DATE = "24.11.2026 22:25"
+SCRIPT_VER = "3.00"
+BUILD_DATE = "25.11.2026 09:00"
 DEFAULT_TOK = "pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14"
 
 IS_ANDROID = ("ANDROID_ARGUMENT" in os.environ) or ("ANDROID_ROOT" in os.environ) or os.path.exists("/system/build.prop")

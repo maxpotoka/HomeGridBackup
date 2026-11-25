@@ -1,3 +1,4 @@
+# patch-id: backup-timeout-retry-3.00
 # patch-id: fix-net-drive-status-and-build-retry-2.78
 # ==============================================================================
 # patch-id: io-pause-buf128-2.18
@@ -7,7 +8,7 @@
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: single-pass-verify-speed-2.75
-# [ФАЙЛ: core/backup.py (v2.16 | 24.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.17 | 25.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 # ==============================================================================
 import hashlib
 import http.cookiejar
@@ -569,10 +570,11 @@ def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
 
         if st.get("ok") is False:
             err_code = st.get("error") or "невідома помилка сервера"
-            if err_code == "backup_job_not_found" and job_retries < 4:
+            if err_code in ("backup_job_not_found", "timeout") and job_retries < 4:
                 job_retries += 1
-                wait_sec = 4 * job_retries
-                engine.log(f"Сервер скинув завдання ({srv_label}). Повтор {job_retries}/4 через {wait_sec} с...", "warn")
+                wait_sec = (15 if err_code == "timeout" else 4) * job_retries
+                reason_lbl = "Час збірки на сервері вичерпано" if err_code == "timeout" else "Сервер скинув завдання"
+                engine.log(f"{reason_lbl} ({srv_label}). Повтор {job_retries}/4 через {wait_sec} с...", "warn")
                 for left_s in range(wait_sec, 0, -1):
                     engine.set_progress(22, f"[{srv_label}] Перезапуск збірки ({job_retries}/4) через {left_s} с...")
                     time.sleep(1.0)

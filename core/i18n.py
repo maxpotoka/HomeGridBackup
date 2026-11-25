@@ -1,3 +1,4 @@
+# patch-id: backup-timeout-retry-3.00
 # patch-id: startup-version-log-2.80
 # patch-id: i18n-ping-and-retry-en-2.79
 # patch-id: opt-log-i18n-ui-2.20
@@ -12,7 +13,7 @@
 # patch-id: lan-btn-layout68-2.64
 # patch-id: fav-servers-pills-2.65
 # patch-id: pcloud-stats-refresh-compact-2.67
-# [ФАЙЛ: core/i18n.py (v2.22 | 24.11.2026 00:25) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
+# [ФАЙЛ: core/i18n.py (v2.23 | 25.11.2026 09:00) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
 import re
 from functools import lru_cache
 
@@ -533,6 +534,7 @@ EN_SUBSTR = (
     ("Папку дзеркального копіювання увімкнено:", "Mirror backup folder enabled:"),
     ("Попередження: не вдалося скопіювати у дзеркальну папку", "Warning: failed to copy to mirror folder"),
     ("Сервер скинув завдання", "Server reset the job"),
+    ("Час збірки на сервері вичерпано", "Server build timeout reached"),
     ("перервав збірку архіву:", "aborted archive build:"),
     ("збережено у «Історія».", "saved to History."),
     ("Видалити назавжди з диска", "Permanently delete from disk"),
