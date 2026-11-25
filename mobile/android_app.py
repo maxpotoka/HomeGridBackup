@@ -1,8 +1,12 @@
-# ==============================================================================
 # [ФАЙЛ: mobile/android_app.py (v2.00 | 21.11.2026 03:24) — МОБИЛЬНЫЙ ИНТЕРФЕЙС ANDROID (KIVY)]
-# ==============================================================================
+_G='vertical'
+_F='server'
+_E='middle'
+_D='text_size'
+_C=False
+_B=True
+_A=None
 import threading
-
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
@@ -13,191 +17,47 @@ from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
-
-from core.backup import run_backup_task, verify_all_archives
-from core.config import BUILD_DATE, SCRIPT_VER, commit_state
+from core.backup import run_backup_task,verify_all_archives
+from core.config import BUILD_DATE,SCRIPT_VER,commit_state
 from core.i18n import tr
-from core.network import normalize_server_url, run_connect_task, run_scan_task
-
-Window.clearcolor = (0.04, 0.06, 0.10, 1)
-
-
+from core.network import normalize_server_url,run_connect_task,run_scan_task
+Window.clearcolor=.04,.06,.1,1
 class HomeGridAndroidApp(App):
-    def __init__(self, engine, **kwargs):
-        super().__init__(**kwargs)
-        self.engine = engine
-        self.last_log_len = 0
-        self.last_modal_id = None
-        self.active_popup = None
-
-    def _tr(self, text):
-        return tr(text, self.engine.state.get("lang", "en"))
-
-    def build(self):
-        self.title = f"HomeGrid Backup v{SCRIPT_VER}"
-        root = BoxLayout(orientation="vertical", padding=14, spacing=10)
-
-        lbl_hdr = Label(
-            text=self._tr(f"[b]HomeGrid Backup v{SCRIPT_VER}[/b]\n[size=13sp][color=#94a3b8]Оновлено: {BUILD_DATE}[/color][/size]"),
-            markup=True, size_hint_y=None, height=58, halign="left", valign="middle"
-        )
-        lbl_hdr.bind(size=lbl_hdr.setter("text_size"))
-        root.add_widget(lbl_hdr)
-
-        self.inp_srv = TextInput(
-            text=self.engine.state.get("server", ""),
-            hint_text=self._tr("Адреса сервера (напр. 192.168.1.246)"),
-            multiline=False, size_hint_y=None, height=48,
-            background_color=(0.08, 0.12, 0.20, 1), foreground_color=(1, 1, 1, 1)
-        )
-        root.add_widget(self.inp_srv)
-
-        row_net = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        btn_conn = Button(text=self._tr("Підключити"), background_color=(0.17, 0.50, 1.0, 1), bold=True)
-        btn_conn.bind(on_release=self.on_connect)
-        btn_scan = Button(text=self._tr("Пошук по LAN"), background_color=(0.12, 0.18, 0.30, 1), bold=True)
-        btn_scan.bind(on_release=self.on_scan)
-        row_net.add_widget(btn_conn)
-        row_net.add_widget(btn_scan)
-        root.add_widget(row_net)
-
-        self.lbl_disk = Label(
-            text=self._tr("Сховище: завантаження..."), size_hint_y=None, height=30,
-            color=(0.06, 0.73, 0.51, 1), halign="left", valign="middle"
-        )
-        self.lbl_disk.bind(size=self.lbl_disk.setter("text_size"))
-        root.add_widget(self.lbl_disk)
-
-        self.lbl_stage = Label(
-            text=self._tr(self.engine.stage), size_hint_y=None, height=34,
-            halign="left", valign="middle", bold=True
-        )
-        self.lbl_stage.bind(size=self.lbl_stage.setter("text_size"))
-        root.add_widget(self.lbl_stage)
-
-        self.pbar = ProgressBar(max=100, value=0, size_hint_y=None, height=22)
-        root.add_widget(self.pbar)
-
-        scroll = ScrollView(size_hint=(1, 1))
-        self.lbl_log = Label(
-            text="", size_hint_y=None, halign="left", valign="top",
-            font_size="13sp", color=(0.88, 0.92, 0.96, 1)
-        )
-        self.lbl_log.bind(texture_size=lambda inst, val: setattr(inst, "height", max(val[1], 100)))
-        self.lbl_log.bind(width=lambda inst, val: setattr(inst, "text_size", (val - 12, None)))
-        scroll.add_widget(self.lbl_log)
-        root.add_widget(scroll)
-
-        row_bot = BoxLayout(size_hint_y=None, height=54, spacing=8)
-        self.btn_start = Button(text=self._tr("ЗАПУСТИТИ БЕКАП"), background_color=(0.06, 0.73, 0.51, 1), bold=True)
-        self.btn_start.bind(on_release=self.on_backup)
-        btn_ver = Button(text=self._tr("Перевірити SHA-256"), background_color=(0.15, 0.22, 0.35, 1))
-        btn_ver.bind(on_release=self.on_verify)
-        row_bot.add_widget(self.btn_start)
-        row_bot.add_widget(btn_ver)
-        root.add_widget(row_bot)
-
-        Clock.schedule_interval(self._poll_state, 0.35)
-        return root
-
-    def _sync_url(self):
-        raw = self.inp_srv.text.strip()
-        if raw:
-            norm, has_bang = normalize_server_url(raw)
-            if norm:
-                self.inp_srv.text = f"{norm}!" if has_bang else norm
-                self.engine.state["server"] = norm
-                commit_state(self.engine.state)
-
-    def on_connect(self, *_):
-        if not self.engine.is_running:
-            self._sync_url()
-            threading.Thread(target=run_connect_task, args=(self.engine, self.inp_srv.text, False), daemon=True).start()
-
-    def on_scan(self, *_):
-        if not self.engine.is_running:
-            threading.Thread(target=run_scan_task, args=(self.engine,), daemon=True).start()
-
-    def on_backup(self, *_):
-        if not self.engine.is_running:
-            self._sync_url()
-            threading.Thread(target=run_backup_task, args=(self.engine, self.inp_srv.text, False, False, False), daemon=True).start()
-
-    def on_verify(self, *_):
-        if self.engine.is_running:
-            return
-        def _worker():
-            self.engine.log("Запуск перевірки цілісності CRC32 + SHA-256...", "info")
-            res = verify_all_archives(self.engine.state)
-            self.engine.log(f"Перевірку завершено: справних {res['ok_cnt']}, без .sha256: {res['warn_cnt']}, пошкоджених: {res['err_cnt']}", "ok" if res["err_cnt"] == 0 else "err")
-        threading.Thread(target=_worker, daemon=True).start()
-
-    def _open_modal(self, m):
-        if self.active_popup:
-            try:
-                self.active_popup.dismiss()
-            except Exception:
-                pass
-        box = BoxLayout(orientation="vertical", padding=12, spacing=10)
-        lbl = Label(text=self._tr(m["text"]), halign="center", valign="middle")
-        lbl.bind(size=lbl.setter("text_size"))
-        box.add_widget(lbl)
-
-        def _finish(val):
-            if self.active_popup:
-                self.active_popup.dismiss()
-                self.active_popup = None
-            self.engine.submit_modal(val)
-
-        if m["type"] == "pin":
-            inp = TextInput(password=True, multiline=False, size_hint_y=None, height=44, input_filter="int")
-            box.add_widget(inp)
-            btns = BoxLayout(size_hint_y=None, height=44, spacing=8)
-            b_cancel = Button(text=self._tr("Скасувати"))
-            b_cancel.bind(on_release=lambda *_: _finish(""))
-            b_ok = Button(text=self._tr("Підтвердити"), background_color=(0.06, 0.73, 0.51, 1))
-            b_ok.bind(on_release=lambda *_: _finish(inp.text.strip()))
-            btns.add_widget(b_cancel)
-            btns.add_widget(b_ok)
-            box.add_widget(btns)
-        elif m["type"] == "confirm":
-            btns = BoxLayout(size_hint_y=None, height=44, spacing=8)
-            b_no = Button(text=self._tr("Ні"))
-            b_no.bind(on_release=lambda *_: _finish(False))
-            b_yes = Button(text=self._tr("Так"), background_color=(0.95, 0.62, 0.05, 1))
-            b_yes.bind(on_release=lambda *_: _finish(True))
-            btns.add_widget(b_no)
-            btns.add_widget(b_yes)
-            box.add_widget(btns)
-        else:
-            b_ok = Button(text=self._tr("ОК"), size_hint_y=None, height=44, background_color=(0.06, 0.73, 0.51, 1))
-            b_ok.bind(on_release=lambda *_: _finish(True))
-            box.add_widget(b_ok)
-
-        self.active_popup = Popup(title=self._tr(m["title"]), content=box, size_hint=(0.9, 0.45), auto_dismiss=False)
-        self.active_popup.open()
-
-    def _poll_state(self, _dt):
-        srv_st = (self.engine.state.get("server") or "").strip()
-        if srv_st and not self.inp_srv.focus and self.inp_srv.text != srv_st:
-            self.inp_srv.text = srv_st
-
-        z_cnt, z_mb, free_gb = self.engine.get_storage_stats()
-        free_t = f" | Вільно: {free_gb} ГБ" if free_gb >= 0 else ""
-        self.lbl_disk.text = self._tr(f"Архівів: {z_cnt} шт. ({z_mb} МБ){free_t}")
-        self.lbl_stage.text = self._tr(f"{self.engine.stage} ({self.engine.progress}%)")
-        self.pbar.value = self.engine.progress
-        self.btn_start.disabled = self.engine.is_running
-
-        logs = self.engine.logs
-        if len(logs) != self.last_log_len:
-            self.last_log_len = len(logs)
-            self.lbl_log.text = "\n".join(f"[{x['ts']}] {x['msg']}" for x in logs[-60:])
-
-        if self.engine.modal and self.engine.modal.get("id") != self.last_modal_id:
-            self.last_modal_id = self.engine.modal["id"]
-            self._open_modal(self.engine.modal)
-
-
-def run_android_ui(engine):
-    HomeGridAndroidApp(engine).run()
+	def __init__(A,engine,**B):super().__init__(**B);A.engine=engine;A.last_log_len=0;A.last_modal_id=_A;A.active_popup=_A
+	def _tr(A,text):return tr(text,A.engine.state.get('lang','en'))
+	def build(A):C='left';A.title=f"HomeGrid Backup v{SCRIPT_VER}";B=BoxLayout(orientation=_G,padding=14,spacing=10);D=Label(text=A._tr(f"[b]HomeGrid Backup v{SCRIPT_VER}[/b]\n[size=13sp][color=#94a3b8]Оновлено: {BUILD_DATE}[/color][/size]"),markup=_B,size_hint_y=_A,height=58,halign=C,valign=_E);D.bind(size=D.setter(_D));B.add_widget(D);A.inp_srv=TextInput(text=A.engine.state.get(_F,''),hint_text=A._tr('Адреса сервера (напр. 192.168.1.246)'),multiline=_C,size_hint_y=_A,height=48,background_color=(.08,.12,.2,1),foreground_color=(1,1,1,1));B.add_widget(A.inp_srv);E=BoxLayout(size_hint_y=_A,height=48,spacing=8);G=Button(text=A._tr('Підключити'),background_color=(.17,.5,1.,1),bold=_B);G.bind(on_release=A.on_connect);H=Button(text=A._tr('Пошук по LAN'),background_color=(.12,.18,.3,1),bold=_B);H.bind(on_release=A.on_scan);E.add_widget(G);E.add_widget(H);B.add_widget(E);A.lbl_disk=Label(text=A._tr('Сховище: завантаження...'),size_hint_y=_A,height=30,color=(.06,.73,.51,1),halign=C,valign=_E);A.lbl_disk.bind(size=A.lbl_disk.setter(_D));B.add_widget(A.lbl_disk);A.lbl_stage=Label(text=A._tr(A.engine.stage),size_hint_y=_A,height=34,halign=C,valign=_E,bold=_B);A.lbl_stage.bind(size=A.lbl_stage.setter(_D));B.add_widget(A.lbl_stage);A.pbar=ProgressBar(max=100,value=0,size_hint_y=_A,height=22);B.add_widget(A.pbar);I=ScrollView(size_hint=(1,1));A.lbl_log=Label(text='',size_hint_y=_A,halign=C,valign='top',font_size='13sp',color=(.88,.92,.96,1));A.lbl_log.bind(texture_size=lambda inst,val:setattr(inst,'height',max(val[1],100)));A.lbl_log.bind(width=lambda inst,val:setattr(inst,_D,(val-12,_A)));I.add_widget(A.lbl_log);B.add_widget(I);F=BoxLayout(size_hint_y=_A,height=54,spacing=8);A.btn_start=Button(text=A._tr('ЗАПУСТИТИ БЕКАП'),background_color=(.06,.73,.51,1),bold=_B);A.btn_start.bind(on_release=A.on_backup);J=Button(text=A._tr('Перевірити SHA-256'),background_color=(.15,.22,.35,1));J.bind(on_release=A.on_verify);F.add_widget(A.btn_start);F.add_widget(J);B.add_widget(F);Clock.schedule_interval(A._poll_state,.35);return B
+	def _sync_url(A):
+		C=A.inp_srv.text.strip()
+		if C:
+			B,D=normalize_server_url(C)
+			if B:A.inp_srv.text=f"{B}!"if D else B;A.engine.state[_F]=B;commit_state(A.engine.state)
+	def on_connect(A,*B):
+		if not A.engine.is_running:A._sync_url();threading.Thread(target=run_connect_task,args=(A.engine,A.inp_srv.text,_C),daemon=_B).start()
+	def on_scan(A,*B):
+		if not A.engine.is_running:threading.Thread(target=run_scan_task,args=(A.engine,),daemon=_B).start()
+	def on_backup(A,*B):
+		if not A.engine.is_running:A._sync_url();threading.Thread(target=run_backup_task,args=(A.engine,A.inp_srv.text,_C,_C,_C),daemon=_B).start()
+	def on_verify(A,*C):
+		if A.engine.is_running:return
+		def B():C='err_cnt';A.engine.log('Запуск перевірки цілісності CRC32 + SHA-256...','info');B=verify_all_archives(A.engine.state);A.engine.log(f"Перевірку завершено: справних {B["ok_cnt"]}, без .sha256: {B["warn_cnt"]}, пошкоджених: {B[C]}",'ok'if B[C]==0 else'err')
+		threading.Thread(target=B,daemon=_B).start()
+	def _open_modal(A,m):
+		K='type'
+		if A.active_popup:
+			try:A.active_popup.dismiss()
+			except Exception:0
+		C=BoxLayout(orientation=_G,padding=12,spacing=10);F=Label(text=A._tr(m['text']),halign='center',valign=_E);F.bind(size=F.setter(_D));C.add_widget(F)
+		def D(val):
+			if A.active_popup:A.active_popup.dismiss();A.active_popup=_A
+			A.engine.submit_modal(val)
+		if m[K]=='pin':G=TextInput(password=_B,multiline=_C,size_hint_y=_A,height=44,input_filter='int');C.add_widget(G);B=BoxLayout(size_hint_y=_A,height=44,spacing=8);H=Button(text=A._tr('Скасувати'));H.bind(on_release=lambda*A:D(''));E=Button(text=A._tr('Підтвердити'),background_color=(.06,.73,.51,1));E.bind(on_release=lambda*A:D(G.text.strip()));B.add_widget(H);B.add_widget(E);C.add_widget(B)
+		elif m[K]=='confirm':B=BoxLayout(size_hint_y=_A,height=44,spacing=8);I=Button(text=A._tr('Ні'));I.bind(on_release=lambda*A:D(_C));J=Button(text=A._tr('Так'),background_color=(.95,.62,.05,1));J.bind(on_release=lambda*A:D(_B));B.add_widget(I);B.add_widget(J);C.add_widget(B)
+		else:E=Button(text=A._tr('ОК'),size_hint_y=_A,height=44,background_color=(.06,.73,.51,1));E.bind(on_release=lambda*A:D(_B));C.add_widget(E)
+		A.active_popup=Popup(title=A._tr(m['title']),content=C,size_hint=(.9,.45),auto_dismiss=_C);A.active_popup.open()
+	def _poll_state(A,_dt):
+		B=(A.engine.state.get(_F)or'').strip()
+		if B and not A.inp_srv.focus and A.inp_srv.text!=B:A.inp_srv.text=B
+		E,F,D=A.engine.get_storage_stats();G=f" | Вільно: {D} ГБ"if D>=0 else'';A.lbl_disk.text=A._tr(f"Архівів: {E} шт. ({F} МБ){G}");A.lbl_stage.text=A._tr(f"{A.engine.stage} ({A.engine.progress}%)");A.pbar.value=A.engine.progress;A.btn_start.disabled=A.engine.is_running;C=A.engine.logs
+		if len(C)!=A.last_log_len:A.last_log_len=len(C);A.lbl_log.text='\n'.join(f"[{A["ts"]}] {A["msg"]}"for A in C[-60:])
+		if A.engine.modal and A.engine.modal.get('id')!=A.last_modal_id:A.last_modal_id=A.engine.modal['id'];A._open_modal(A.engine.modal)
+def run_android_ui(engine):HomeGridAndroidApp(engine).run()

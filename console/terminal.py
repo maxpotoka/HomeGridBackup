@@ -1,167 +1,70 @@
-# ==============================================================================
 # patch-id: stage-window-2.21
 # [ФАЙЛ: console/terminal.py (v2.02 | 22.11.2026 09:10) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
-# ==============================================================================
-import ctypes
-import os
-import re
-import sys
-import time
+_C=False
+_B='replace'
+_A='\r'
+import ctypes,os,re,sys,time
 from datetime import datetime
-
-from core.config import BUILD_DATE, CLI_MODE, HIDDEN_MODE, SCRIPT_VER, SILENT_MODE
-
-_STAGE_TR_MAP = (
-    ("Обробка на сервері", "Processing on server"),
-    ("Перевірка сайту та сервера HGM...", "Checking HGM host and server..."),
-    ("Перевірка сесії та авторизація...", "Checking session and auth..."),
-    ("Запит на підготовку бекапу...", "Requesting backup preparation..."),
-    ("Підготовка на сервері", "Preparing on server"),
-    ("Копіювання бази та файлів", "Copying DB & files"),
-    ("Перевірка файлів", "Checking files"),
-    ("Стиснення ZIP-архіву", "Packing ZIP"),
-    ("Архів готовий (75%). Завантаження...", "Archive ready (75%). Downloading..."),
-    ("Архів готовий", "Archive ready"),
-    ("Обробка", "Processing"),
-    ("Збірка архіву на сервері", "Building archive on server"),
-    ("Етап сервера", "Server stage"),
-    ("Сервер HGM онлайн", "HGM server online"),
-    ("Сервер http", "Server http"),
-    ("Сервер ", "Server "),
-    ("Завантаження", "Downloading"),
-    ("Швидкість:", "Speed:"),
-    ("МБ/с", "MB/s"),
-    ("КБ/с", "KB/s"),
-    ("МБ", "MB"),
-    ("Перевірка CRC32", "Verifying CRC32"),
-    ("Розрахунок SHA-256:", "Calculating SHA-256:"),
-    ("Старі копії збережено (авторежим без видалення)...", "Old backups kept (no-clean mode)..."),
-    ("Ротація бекапів за обраною стратегією...", "Running GFS backup rotation..."),
-    ("Готово! Архів збережено", "Done! Archive saved"),
-    ("Помилка:", "Error:"),
-)
-
+from core.config import BUILD_DATE,CLI_MODE,HIDDEN_MODE,SCRIPT_VER,SILENT_MODE
+_STAGE_TR_MAP=('Обробка на сервері','Processing on server'),('Перевірка сайту та сервера HGM...','Checking HGM host and server...'),('Перевірка сесії та авторизація...','Checking session and auth...'),('Запит на підготовку бекапу...','Requesting backup preparation...'),('Підготовка на сервері','Preparing on server'),('Копіювання бази та файлів','Copying DB & files'),('Перевірка файлів','Checking files'),('Стиснення ZIP-архіву','Packing ZIP'),('Архів готовий (75%). Завантаження...','Archive ready (75%). Downloading...'),('Архів готовий','Archive ready'),('Обробка','Processing'),('Збірка архіву на сервері','Building archive on server'),('Етап сервера','Server stage'),('Сервер HGM онлайн','HGM server online'),('Сервер http','Server http'),('Сервер ','Server '),('Завантаження','Downloading'),('Швидкість:','Speed:'),('МБ/с','MB/s'),('КБ/с','KB/s'),('МБ','MB'),('Перевірка CRC32','Verifying CRC32'),('Розрахунок SHA-256:','Calculating SHA-256:'),('Старі копії збережено (авторежим без видалення)...','Old backups kept (no-clean mode)...'),('Ротація бекапів за обраною стратегією...','Running GFS backup rotation...'),('Готово! Архів збережено','Done! Archive saved'),('Помилка:','Error:')
 def _stage_to_en(txt):
-    s = re.sub(r"^\[[^\]]+\]\s*", "", (txt or "").strip())
-    for uk, en in _STAGE_TR_MAP:
-        s = s.replace(uk, en)
-    return s
-
+	A=re.sub('^\\[[^\\]]+\\]\\s*','',(txt or'').strip())
+	for(B,C)in _STAGE_TR_MAP:A=A.replace(B,C)
+	return A
 def _safe_con_write(text):
-    if not text:
-        return
-    if os.name == "nt":
-        try:
-            k32 = ctypes.windll.kernel32
-            h_out = k32.GetStdHandle(-11)
-            if h_out and h_out != -1 and h_out != 0:
-                written = ctypes.c_ulong(0)
-                if k32.WriteConsoleW(h_out, ctypes.c_wchar_p(text), len(text), ctypes.byref(written), None):
-                    return
-        except Exception:
-            pass
-    try:
-        sys.stdout.write(text)
-        sys.stdout.flush()
-    except Exception:
-        try:
-            enc = getattr(sys.stdout, "encoding", None) or "cp866"
-            sys.stdout.write(text.encode(enc, errors="replace").decode(enc, errors="replace"))
-            sys.stdout.flush()
-        except Exception:
-            pass
-
+	A=text
+	if not A:return
+	if os.name=='nt':
+		try:
+			C=ctypes.windll.kernel32;B=C.GetStdHandle(-11)
+			if B and B!=-1 and B!=0:
+				E=ctypes.c_ulong(0)
+				if C.WriteConsoleW(B,ctypes.c_wchar_p(A),len(A),ctypes.byref(E),None):return
+		except Exception:0
+	try:sys.stdout.write(A);sys.stdout.flush()
+	except Exception:
+		try:D=getattr(sys.stdout,'encoding',None)or'cp866';sys.stdout.write(A.encode(D,errors=_B).decode(D,errors=_B));sys.stdout.flush()
+		except Exception:0
 def _print_cli_banner():
-    from core.config import get_fast_sysinfo
-    sys_line = get_fast_sysinfo()
-    title_line = f"  HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup"
-    os_line = f"  {sys_line}"[:76]
-    _safe_con_write("+" + ("-" * 76) + "+\n")
-    _safe_con_write("|" + title_line.ljust(76) + "|\n")
-    _safe_con_write("|" + os_line.ljust(76) + "|\n")
-    try:
-        from core.config import load_state
-        st = load_state()
-        loc_s = st.get("backup_dir", "") if st.get("local_enabled", True) else "OFF"
-        net_s = st.get("net_dir", "") if (st.get("net_enabled") and st.get("net_dir")) else "OFF"
-        tgt_line = f"  Storage | Local: {loc_s} | Network: {net_s}"[:76]
-        _safe_con_write("|" + tgt_line.ljust(76) + "|\n")
-    except Exception:
-        pass
-    _safe_con_write("+" + ("-" * 76) + "+\n")
-
+	F='net_dir';E='OFF';D='+\n';C='|\n';B='|';from core.config import get_fast_sysinfo as G;H=G();I=f"  HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup";J=f"  {H}"[:76];_safe_con_write('+'+'-'*76+D);_safe_con_write(B+I.ljust(76)+C);_safe_con_write(B+J.ljust(76)+C)
+	try:from core.config import load_state as K;A=K();L=A.get('backup_dir','')if A.get('local_enabled',True)else E;M=A.get(F,'')if A.get('net_enabled')and A.get(F)else E;N=f"  Storage | Local: {L} | Network: {M}"[:76];_safe_con_write(B+N.ljust(76)+C)
+	except Exception:0
+	_safe_con_write('+'+'-'*76+D)
 def _init_console_for_cli():
-    if os.name != "nt":
-        try:
-            if sys.stdout.isatty():
-                _safe_con_write(f"\033]0;HomeGrid Backup v{SCRIPT_VER}\007")
-        except Exception:
-            pass
-        _print_cli_banner()
-        return
-    try:
-        k32 = ctypes.windll.kernel32
-        if k32.GetConsoleWindow() == 0:
-            if not k32.AttachConsole(-1):
-                k32.AllocConsole()
-        try:
-            k32.SetConsoleOutputCP(65001)
-            k32.SetConsoleCP(65001)
-            k32.SetConsoleTitleW(f"HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup")
-        except Exception:
-            pass
-        try:
-            sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace", buffering=1)
-            sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace", buffering=1)
-            sys.stdin = open("CONIN$", "r", encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-        _print_cli_banner()
-    except Exception:
-        pass
-
-def _print_cli_line(engine, force=False):
-    if HIDDEN_MODE or not (CLI_MODE or SILENT_MODE):
-        return
-    now = time.time()
-    if not force and (now - engine._last_cli_print) < 1.0:
-        return
-    engine._last_cli_print = now
-
-    st_txt = _stage_to_en(engine.stage)
-    if engine.indeterminate:
-        bar = "[  working...  ]"
-        pct_s = " ..."
-    else:
-        p = max(0, min(100, int(engine.progress)))
-        filled = int(round((p / 100.0) * 16))
-        bar = "[" + ("#" * filled) + ("." * (16 - filled)) + "]"
-        pct_s = f"{p:3d}%"
-
-    max_st = 54
-    if len(st_txt) > max_st:
-        st_txt = st_txt[:max_st - 3] + "..."
-    raw_line = f"{bar} {pct_s} | {st_txt}"
-
-    if SILENT_MODE and not CLI_MODE:
-        _safe_con_write("\r" + raw_line[:78].ljust(78))
-        engine._cli_inline_active = True
-    else:
-        ts = datetime.now().strftime("%H:%M:%S")
-        _safe_con_write(f"[{ts}] {raw_line}\n")
-
+	C='CONOUT$';B='utf-8'
+	if os.name!='nt':
+		try:
+			if sys.stdout.isatty():_safe_con_write(f"]0;HomeGrid Backup v{SCRIPT_VER}\a")
+		except Exception:0
+		_print_cli_banner();return
+	try:
+		A=ctypes.windll.kernel32
+		if A.GetConsoleWindow()==0:
+			if not A.AttachConsole(-1):A.AllocConsole()
+		try:A.SetConsoleOutputCP(65001);A.SetConsoleCP(65001);A.SetConsoleTitleW(f"HomeGrid Backup v{SCRIPT_VER} ({BUILD_DATE}) - Inverter Data Backup")
+		except Exception:0
+		try:sys.stdout=open(C,'w',encoding=B,errors=_B,buffering=1);sys.stderr=open(C,'w',encoding=B,errors=_B,buffering=1);sys.stdin=open('CONIN$','r',encoding=B,errors=_B)
+		except Exception:0
+		_print_cli_banner()
+	except Exception:0
+def _print_cli_line(engine,force=_C):
+	A=engine
+	if HIDDEN_MODE or not(CLI_MODE or SILENT_MODE):return
+	C=time.time()
+	if not force and C-A._last_cli_print<1.:return
+	A._last_cli_print=C;B=_stage_to_en(A.stage)
+	if A.indeterminate:D='[  working...  ]';E=' ...'
+	else:F=max(0,min(100,int(A.progress)));G=int(round(F/1e2*16));D='['+'#'*G+'.'*(16-G)+']';E=f"{F:3d}%"
+	H=54
+	if len(B)>H:B=B[:H-3]+'...'
+	I=f"{D} {E} | {B}"
+	if SILENT_MODE and not CLI_MODE:_safe_con_write(_A+I[:78].ljust(78));A._cli_inline_active=True
+	else:J=datetime.now().strftime('%H:%M:%S');_safe_con_write(f"[{J}] {I}\n")
 def _finish_cli_inline(engine):
-    if getattr(engine, "_cli_inline_active", False):
-        _safe_con_write("\r" + (" " * 78) + "\r")
-        engine._cli_inline_active = False
-
-def run_silent_exit_countdown(engine, total_sec=8):
-    if HIDDEN_MODE or not SILENT_MODE:
-        return
-    _finish_cli_inline(engine)
-    _safe_con_write("-" * 78 + "\n")
-    for rem in range(total_sec, 0, -1):
-        msg = f"[OK] Done! Window will close automatically in {rem}s..."
-        _safe_con_write("\r" + msg.ljust(78))
-        time.sleep(1.0)
-    _safe_con_write("\r" + (" " * 78) + "\r")
+	A=engine
+	if getattr(A,'_cli_inline_active',_C):_safe_con_write(_A+' '*78+_A);A._cli_inline_active=_C
+def run_silent_exit_countdown(engine,total_sec=8):
+	if HIDDEN_MODE or not SILENT_MODE:return
+	_finish_cli_inline(engine);_safe_con_write('-'*78+'\n')
+	for A in range(total_sec,0,-1):B=f"[OK] Done! Window will close automatically in {A}s...";_safe_con_write(_A+B.ljust(78));time.sleep(1.)
+	_safe_con_write(_A+' '*78+_A)

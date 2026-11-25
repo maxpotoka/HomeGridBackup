@@ -1,328 +1,164 @@
-import shutil
-import csv
-import json
-import os
-import platform
-import re
+# patch-id: net-scope-adapter-3.01-p2
+_h='.HomeGridBackup-sources'
+_g='net_dir'
+_f='net_speed_mbps'
+_e='net_duration_sec'
+_d='speed_mbps'
+_c='summary'
+_b='mirror_duration_sec'
+_a='sha256_duration_sec'
+_Z='crc_duration_sec'
+_Y='server_duration_sec'
+_X='files_count'
+_W='app_version'
+_V='archives'
+_U='download_speed_mbps'
+_T='download_duration_sec'
+_S='duration_sec'
+_R='size_mb'
+_Q='archive'
+_P='stage'
+_O='.jsonl'
+_N='architecture'
+_M='platform_version'
+_L='platform'
+_K='reports'
+_J='event'
+_I='utf-8'
+_H='unknown'
+_G=True
+_F='timestamp'
+_E='operation_id'
+_D=None
+_C=False
+_B='device_id'
+_A=.0
+import shutil,csv,json,os,platform,re
 from datetime import datetime
 from uuid import uuid4
-
-from core.config import SCRIPT_VER, get_logs_dir
-
-_DEVICE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
-
-
-class CloudRateLimitError(RuntimeError):
-    pass
-
-
-def cloud_sync_error_text(error, language="en"):
-    return str(error)
-
-
-def new_operation_id():
-    return uuid4().hex
-
-
-def validate_cloud_settings(remote, cloud_path):
-    path = (cloud_path or "").strip().strip("/")
-    return path or "HomeGridBackup"
-
-
+from core.config import SCRIPT_VER,get_logs_dir
+_DEVICE_ID_RE=re.compile('^[0-9a-f]{32}$')
+class CloudRateLimitError(RuntimeError):0
+def cloud_sync_error_text(error,language='en'):return str(error)
+def new_operation_id():return uuid4().hex
+def validate_cloud_settings(remote,cloud_path):A=(cloud_path or'').strip().strip('/');return A or'HomeGridBackup'
 def _device_id(state):
-    value = str(state.get("device_id") or "")
-    if not _DEVICE_ID_RE.fullmatch(value):
-        raise ValueError("The device ID is missing or invalid.")
-    return value
-
-
-def sync_cloud_backups(engine, prune=False, progress_cb=None):
-    return False
-
-
-def sync_cloud_reports(engine):
-    return False
-
-
-def sync_pending_cloud_data(engine, force=False):
-    return {"archives": 0, "reports": 0, "total": 0}
-
-
-def start_cloud_sync_worker(engine, force=False, on_complete=None):
-    return False
-
-
-def cloud_sync_queue_state(engine):
-    return {"archives": 0, "reports": 0, "total": 0}
-
-
-def cloud_archive_sync_status(engine, archive):
-    return "unknown"
-
-
-def get_cloud_dest_stats(state):
-    return None
-
-
-def _collect_report_records(source_dirs, device_id=None):
-    records = {}
-    for source_dir in source_dirs:
-        if not os.path.isdir(source_dir):
-            continue
-        for root, dirs, names in os.walk(source_dir):
-            dirs.sort()
-            for name in sorted(names):
-                if not name.endswith(".jsonl"):
-                    continue
-                source_path = os.path.join(root, name)
-                relative_path = os.path.relpath(source_path, source_dir)
-                try:
-                    with open(source_path, "r", encoding="utf-8") as source:
-                        for line_number, line in enumerate(source, 1):
-                            if not line.strip():
-                                continue
-                            record = json.loads(line)
-                            if not isinstance(record, dict):
-                                continue
-                            if device_id is not None and record.get("device_id") != device_id:
-                                continue
-                            event_key = tuple(
-                                record.get(key, "")
-                                for key in ("device_id", "operation_id", "event", "timestamp", "stage")
-                            )
-                            if not all(event_key[:4]):
-                                event_key = (relative_path, line_number, line.strip())
-                            records[event_key] = record
-                except Exception:
-                    continue
-    return records
-
-
+	A=str(state.get(_B)or'')
+	if not _DEVICE_ID_RE.fullmatch(A):raise ValueError('The device ID is missing or invalid.')
+	return A
+def sync_cloud_backups(engine,prune=_C,progress_cb=_D):return _C
+def sync_cloud_reports(engine):return _C
+def sync_pending_cloud_data(engine,force=_C):return{_V:0,_K:0,'total':0}
+def start_cloud_sync_worker(engine,force=_C,on_complete=_D):return _C
+def cloud_sync_queue_state(engine):return{_V:0,_K:0,'total':0}
+def cloud_archive_sync_status(engine,archive):return _H
+def get_cloud_dest_stats(state):0
+def _collect_report_records(source_dirs,device_id=_D):
+	E=device_id;F={}
+	for B in source_dirs:
+		if not os.path.isdir(B):continue
+		for(I,J,K)in os.walk(B):
+			J.sort()
+			for G in sorted(K):
+				if not G.endswith(_O):continue
+				H=os.path.join(I,G);L=os.path.relpath(H,B)
+				try:
+					with open(H,'r',encoding=_I)as M:
+						for(N,C)in enumerate(M,1):
+							if not C.strip():continue
+							A=json.loads(C)
+							if not isinstance(A,dict):continue
+							if E is not _D and A.get(_B)!=E:continue
+							D=tuple(A.get(B,'')for B in(_B,_E,_J,_F,_P))
+							if not all(D[:4]):D=L,N,C.strip()
+							F[D]=A
+				except Exception:continue
+	return F
 def _ordered_report_records(records):
-    def sort_key(record):
-        timestamp = record.get("timestamp", "")
-        try:
-            timestamp_key = datetime.fromisoformat(timestamp).timestamp()
-        except (TypeError, ValueError, OverflowError):
-            timestamp_key = 0.0
-        return (
-            timestamp_key,
-            record.get("device_id", ""),
-            record.get("operation_id", ""),
-            record.get("event", ""),
-            record.get("stage", ""),
-        )
-
-    return sorted(records.values(), key=sort_key)
-
-
-def _write_jsonl_report(records, output_path):
-    ordered = _ordered_report_records(records)[-50:]
-    with open(output_path, "w", encoding="utf-8", newline="") as output:
-        for record in ordered:
-            output.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + chr(10))
-    return len(ordered)
-
-
-def _write_plain_text_report(records, output_path):
-    ordered = _ordered_report_records(records)
-    fixed_fields = {
-        "timestamp", "device_id", "operation_id", "event",
-        "platform", "platform_version", "architecture",
-    }
-    with open(output_path, "w", encoding="utf-8", newline="") as output:
-        for record in ordered:
-            platform_name = " ".join(
-                str(record.get(key, "")).strip()
-                for key in ("platform", "platform_version", "architecture")
-                if record.get(key)
-            ) or "unknown"
-            fields = [
-                f"[{record.get('timestamp', 'unknown')}]",
-                f"OS={platform_name}",
-                f"device={record.get('device_id', 'unknown')}",
-                f"event={record.get('event', 'unknown')}",
-            ]
-            if record.get("operation_id"):
-                fields.append(f"operation={record['operation_id']}")
-            for key in sorted(record):
-                if key not in fixed_fields:
-                    value = json.dumps(record[key], ensure_ascii=False, sort_keys=True)
-                    fields.append(f"{key}={value}")
-            output.write(" | ".join(fields) + chr(10))
-    return len(ordered)
-
-
-def _write_speed_csv_report(records, output_path):
-    ordered = [r for r in _ordered_report_records(records) if r.get("event") == "success"]
-    cols = (
-        "timestamp", "device_id", "platform", "platform_version", "architecture",
-        "app_version", "archive", "size_mb", "files_count", "duration_sec",
-        "download_duration_sec", "download_speed_mbps", "server_duration_sec",
-        "crc_duration_sec", "sha256_duration_sec", "mirror_duration_sec", "summary",
-    )
-    with open(output_path, "w", encoding="utf-8-sig", newline="") as out_f:
-        writer = csv.writer(out_f, delimiter=";")
-        writer.writerow(cols)
-        for rec in ordered:
-            writer.writerow([rec.get(c, "") for c in cols])
-    return len(ordered)
-
-
-def record_operation_event(engine, operation_id, event, stage="", archive="", size_mb=0.0, duration_sec=None, **details):
-    if str(event).startswith("stage_"):
-        return
-    device_id = _device_id(engine.state)
-    now = datetime.now().astimezone()
-    report_dir = os.path.join(get_logs_dir(engine.state), "reports", device_id)
-    os.makedirs(report_dir, mode=0o700, exist_ok=True)
-    report_path = os.path.join(report_dir, "operations.jsonl")
-    record = {
-        "timestamp": now.isoformat(timespec="milliseconds"),
-        "device_id": device_id,
-        "operation_id": operation_id,
-        "event": event,
-        "app_version": SCRIPT_VER,
-        "platform": platform.system(),
-        "platform_version": platform.release(),
-        "architecture": platform.machine(),
-        "python_version": platform.python_version(),
-        "archives_total": max(0, int(engine.state.get("all_time_cnt", 0))),
-    }
-    if stage:
-        record["stage"] = stage
-    if archive:
-        record["archive"] = os.path.basename(archive)
-    if size_mb:
-        record["size_mb"] = round(float(size_mb), 1)
-    if "size_bytes" in details:
-        record["size_bytes"] = max(0, int(details.pop("size_bytes")))
-    if duration_sec is not None:
-        duration_sec = max(0.0, float(duration_sec))
-        record["duration_sec"] = round(duration_sec, 3)
-        record["duration_ms"] = round(duration_sec * 1000)
-    allowed_details = {
-        "files_count", "archive_sequence", "speed_mbps", "download_speed_mbps",
-        "download_duration_sec", "server_duration_sec", "server_preparing_sec",
-        "server_copying_sec", "server_processing_sec", "server_packing_sec",
-        "server_checking_sec", "crc_duration_sec", "sha256_duration_sec",
-        "mirror_enabled", "mirror_duration_sec", "net_enabled", "net_duration_sec",
-        "net_speed_mbps", "gfs_removed_count", "system_info", "summary", "result", "error_type",
-    }
-    for key in allowed_details.intersection(details):
-        value = details[key]
-        if value is not None:
-            record[key] = value
-    with open(report_path, "a", encoding="utf-8") as report:
-        report.write(json.dumps(record, ensure_ascii=False) + chr(10))
-    try:
-        for fn in os.listdir(report_dir):
-            if fn.endswith(".jsonl") and fn != "operations.jsonl":
-                os.remove(os.path.join(report_dir, fn))
-        with open(report_path, "r", encoding="utf-8") as rf:
-            lines = [ln for ln in rf if ln.strip()]
-        if len(lines) > 50:
-            tmp_p = report_path + ".tmp"
-            with open(tmp_p, "w", encoding="utf-8") as wf:
-                wf.writelines(lines[-50:])
-            os.replace(tmp_p, report_path)
-    except Exception:
-        pass
-
+	def A(record):
+		A=record;C=A.get(_F,'')
+		try:B=datetime.fromisoformat(C).timestamp()
+		except(TypeError,ValueError,OverflowError):B=_A
+		return B,A.get(_B,''),A.get(_E,''),A.get(_J,''),A.get(_P,'')
+	return sorted(records.values(),key=A)
+def _write_jsonl_report(records,output_path):
+	A=_ordered_report_records(records)[-50:]
+	with open(output_path,'w',encoding=_I,newline='')as B:
+		for C in A:B.write(json.dumps(C,ensure_ascii=_C,sort_keys=_G)+chr(10))
+	return len(A)
+def _write_plain_text_report(records,output_path):
+	D=_ordered_report_records(records);E={_F,_B,_E,_J,_L,_M,_N}
+	with open(output_path,'w',encoding=_I,newline='')as F:
+		for A in D:
+			G=' '.join(str(A.get(B,'')).strip()for B in(_L,_M,_N)if A.get(B))or _H;B=[f"[{A.get(_F,_H)}]",f"OS={G}",f"device={A.get(_B,_H)}",f"event={A.get(_J,_H)}"]
+			if A.get(_E):B.append(f"operation={A[_E]}")
+			for C in sorted(A):
+				if C not in E:H=json.dumps(A[C],ensure_ascii=_C,sort_keys=_G);B.append(f"{C}={H}")
+			F.write(' | '.join(B)+chr(10))
+	return len(D)
+def _write_speed_csv_report(records,output_path):
+	A=[A for A in _ordered_report_records(records)if A.get(_J)=='success'];B=_F,_B,_L,_M,_N,_W,_Q,_R,_X,_S,_T,_U,_Y,_Z,_a,_b,'host_name','net_scope','srv_host','srv_conn_est','net_adapter_type','net_link_mbps','net_adapter_name',_c
+	with open(output_path,'w',encoding='utf-8-sig',newline='')as D:
+		C=csv.writer(D,delimiter=';');C.writerow(B)
+		for E in A:C.writerow([E.get(A,'')for A in B])
+	return len(A)
+def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb=_A,duration_sec=_D,**C):
+	R='operations.jsonl';L=size_mb;K=archive;J=stage;I=event;H='size_bytes';F=engine;B=duration_sec
+	if str(I).startswith('stage_'):return
+	M=_device_id(F.state);S=datetime.now().astimezone();D=os.path.join(get_logs_dir(F.state),_K,M);os.makedirs(D,mode=448,exist_ok=_G);E=os.path.join(D,R);A={_F:S.isoformat(timespec='milliseconds'),_B:M,_E:operation_id,_J:I,_W:SCRIPT_VER,_L:platform.system(),_M:platform.release(),_N:platform.machine(),'python_version':platform.python_version(),'archives_total':max(0,int(F.state.get('all_time_cnt',0))),'host_name':platform.node()}
+	if J:A[_P]=J
+	if K:A[_Q]=os.path.basename(K)
+	if L:A[_R]=round(float(L),1)
+	if H in C:A[H]=max(0,int(C.pop(H)))
+	if B is not _D:B=max(_A,float(B));A[_S]=round(B,3);A['duration_ms']=round(B*1000)
+	T={_X,'archive_sequence',_d,_U,_T,_Y,'server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec',_Z,_a,'mirror_enabled',_b,'net_enabled',_e,_f,'gfs_removed_count','system_info','host_name','net_scope','srv_host','srv_conn_est','net_adapter_name','net_adapter_type','net_link_mbps','net_adapter_label',_c,'result','error_type'}
+	for N in T.intersection(C):
+		O=C[N]
+		if O is not _D:A[N]=O
+	with open(E,'a',encoding=_I)as U:U.write(json.dumps(A,ensure_ascii=_C)+chr(10))
+	try:
+		for G in os.listdir(D):
+			if G.endswith(_O)and G!=R:os.remove(os.path.join(D,G))
+		with open(E,'r',encoding=_I)as V:P=[A for A in V if A.strip()]
+		if len(P)>50:
+			Q=E+'.tmp'
+			with open(Q,'w',encoding=_I)as W:W.writelines(P[-50:])
+			os.replace(Q,E)
+	except Exception:0
 def sync_network_shared_journal(engine):
-    state = engine.state
-    net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
-    if not net_dir or not os.path.isdir(net_dir):
-        return False
-    device_id = _device_id(state)
-    report_dir = os.path.join(get_logs_dir(state), "reports", device_id)
-    net_sources = os.path.join(net_dir, ".HomeGridBackup-sources")
-    os.makedirs(net_sources, exist_ok=True)
-    own_records = _collect_report_records((net_sources, report_dir), device_id=device_id)
-    if own_records:
-        tmp_src = os.path.join(net_sources, f"{device_id}.jsonl.tmp")
-        _write_jsonl_report(own_records, tmp_src)
-        os.replace(tmp_src, os.path.join(net_sources, f"{device_id}.jsonl"))
-    all_records = _collect_report_records((net_sources,))
-    tmp_log = os.path.join(net_dir, "HomeGridBackup.log.tmp")
-    _write_plain_text_report(all_records, tmp_log)
-    os.replace(tmp_log, os.path.join(net_dir, "HomeGridBackup.log"))
-    tmp_csv = os.path.join(net_dir, "speed_journal.csv.tmp")
-    _write_speed_csv_report(all_records, tmp_csv)
-    os.replace(tmp_csv, os.path.join(net_dir, "speed_journal.csv"))
-    return True
-
-
-def fetch_cloud_speed_stats(engine, refresh=True):
-    state = engine.state
-    net_dir = os.path.expanduser((state.get("net_dir") or "").strip())
-    local_reports = os.path.join(get_logs_dir(state), "reports")
-    net_cache = os.path.join(local_reports, "net_cache")
-    net_src = os.path.join(net_dir, ".HomeGridBackup-sources") if net_dir else ""
-    if net_src and os.path.isdir(net_src):
-        try:
-            os.makedirs(net_cache, exist_ok=True)
-            for fn in os.listdir(net_src):
-                if fn.endswith(".jsonl"):
-                    shutil.copy2(os.path.join(net_src, fn), os.path.join(net_cache, fn))
-        except Exception:
-            pass
-    scan_dirs = [local_reports]
-    if net_src and os.path.isdir(net_src):
-        scan_dirs.append(net_src)
-    recs = _collect_report_records(tuple(scan_dirs))
-    grouped = {}
-    for r in _ordered_report_records(recs):
-        did = str(r.get("device_id") or "unknown")
-        oid = str(r.get("operation_id") or r.get("timestamp") or "")
-        g = grouped.setdefault((did, oid), {"device_id": did, "operation_id": oid})
-        for k, v in r.items():
-            if v not in (None, "", 0, 0.0) or k not in g:
-                g[k] = v
-    own_id = str(state.get("device_id") or "")
-    ops = []
-    for op in grouped.values():
-        dur = float(op.get("duration_sec") or 0.0)
-        mb = float(op.get("size_mb") or 0.0)
-        if dur <= 0.0 or (mb <= 0.0 and not str(op.get("archive", "")).lower().endswith(".zip")):
-            continue
-        dl_d = float(op.get("download_duration_sec") or 0.0)
-        spd = float(op.get("download_speed_mbps") or 0.0)
-        if spd <= 0.0 and mb > 0.0 and dl_d > 0.0:
-            spd = round(mb / dl_d, 2)
-        if spd <= 0.0:
-            spd = float(op.get("speed_mbps") or (round(mb / dur, 2) if mb > 0.0 else 0.0))
-        _op = str(op.get("platform") or "").strip()
-        _ov = str(op.get("platform_version") or "").strip().partition("-").__getitem__(0)
-        if _op == "Linux" and "." in _ov:
-            _a, _, _b = _ov.partition(".")
-            _ov = f"{_a}.{_b.partition('.').__getitem__(0)}"
-        elif _op == "Darwin":
-            _op = "macOS"
-            _ov = _ov.partition(".").__getitem__(0)
-        os_n = f"{_op} {_ov}".strip() or "OS"
-        did = op["device_id"]
-        op["dev_label"] = (f"* {os_n}" if did == own_id else os_n).strip()
-        op["dur_f"], op["mb_f"], op["spd_f"] = round(dur, 1), round(mb, 1), round(spd, 2)
-        net_d = float(op.get("net_duration_sec") or 0.0)
-        op["net_spd_f"] = round(float(op.get("net_speed_mbps") or (mb / net_d if net_d > 0 else 0)), 2)
-        ops.append(op)
-    ops.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
-    by_dev = {}
-    for op in ops:
-        by_dev.setdefault(op["device_id"], []).append(op)
-    dev_stats = []
-    for did, d_ops in by_dev.items():
-        last2 = d_ops[:2]
-        avg_dur = round(sum(x["dur_f"] for x in last2) / len(last2), 1)
-        avg_spd = round(sum(x["spd_f"] for x in last2) / len(last2), 2)
-        ns = [x for x in last2 if x.get("net_spd_f", 0) > 0]
-        dev_stats.append({
-            "device_id": did, "label": d_ops[0]["dev_label"], "is_own": did == own_id,
-            "total_cnt": len(d_ops), "sample_cnt": len(last2),
-            "avg_dur": avg_dur, "min_dur": min(x["dur_f"] for x in last2),
-            "avg_net_spd": round(sum(x["net_spd_f"] for x in ns) / len(ns), 1) if ns else 0.0,
-            "avg_spd": avg_spd,
-        })
-    dev_stats.sort(key=lambda d: (-d["avg_spd"], d["avg_dur"]))
-    return {"ops": ops, "devices": dev_stats}
+	D=engine.state;A=os.path.expanduser((D.get(_g)or'').strip())
+	if not A or not os.path.isdir(A):return _C
+	C=_device_id(D);J=os.path.join(get_logs_dir(D),_K,C);B=os.path.join(A,_h);os.makedirs(B,exist_ok=_G);E=_collect_report_records((B,J),device_id=C)
+	if E:F=os.path.join(B,f"{C}.jsonl.tmp");_write_jsonl_report(E,F);os.replace(F,os.path.join(B,f"{C}.jsonl"))
+	G=_collect_report_records((B,));H=os.path.join(A,'HomeGridBackup.log.tmp');_write_plain_text_report(G,H);os.replace(H,os.path.join(A,'HomeGridBackup.log'));I=os.path.join(A,'speed_journal.csv.tmp');_write_speed_csv_report(G,I);os.replace(I,os.path.join(A,'speed_journal.csv'));return _G
+def fetch_cloud_speed_stats(engine,refresh=_G):
+	k='avg_spd';j='avg_dur';i='spd_f';h='dev_label';S='net_spd_f';R='dur_f';K='.';L=engine.state;T=os.path.expanduser((L.get(_g)or'').strip());U=os.path.join(get_logs_dir(L),_K);V=os.path.join(U,'net_cache');B=os.path.join(T,_h)if T else''
+	if B and os.path.isdir(B):
+		try:
+			os.makedirs(V,exist_ok=_G)
+			for M in os.listdir(B):
+				if M.endswith(_O):shutil.copy2(os.path.join(B,M),os.path.join(V,M))
+		except Exception:0
+	W=[U]
+	if B and os.path.isdir(B):W.append(B)
+	l=_collect_report_records(tuple(W));X={}
+	for H in _ordered_report_records(l):
+		C=str(H.get(_B)or _H);Y=str(H.get(_E)or H.get(_F)or'');Z=X.setdefault((C,Y),{_B:C,_E:Y})
+		for(a,b)in H.items():
+			if b not in(_D,'',0,_A)or a not in Z:Z[a]=b
+	c=str(L.get(_B)or'');I=[]
+	for A in X.values():
+		N=float(A.get(_S)or _A);D=float(A.get(_R)or _A)
+		if N<=_A or D<=_A and not str(A.get(_Q,'')).lower().endswith('.zip'):continue
+		d=float(A.get(_T)or _A);G=float(A.get(_U)or _A)
+		if G<=_A and D>_A and d>_A:G=round(D/d,2)
+		if G<=_A:G=float(A.get(_d)or(round(D/N,2)if D>_A else _A))
+		J=str(A.get(_L)or'').strip();F=str(A.get(_M)or'').strip().partition('-').__getitem__(0)
+		if J=='Linux'and K in F:m,q,n=F.partition(K);F=f"{m}.{n.partition(K).__getitem__(0)}"
+		elif J=='Darwin':J='macOS';F=F.partition(K).__getitem__(0)
+		hn=str(A.get('host_name')or(platform.node()if A.get(_B)==c else'')).strip();e_base=f"{J} {F}".strip()or'OS';e=f"{e_base} • {hn}"if hn else e_base;C=A[_B];A[h]=(f"* {e}"if C==c else e).strip();nt=str(A.get('net_adapter_type')or'').strip();lm=int(A.get('net_link_mbps')or 0);ls=f"{lm//1000} Gbps"if lm>=1000 and lm%1000==0 else(f"{lm} Mbps"if lm>0 else'');al=str(A.get('net_adapter_label')or'').strip()or(f"{nt} • {ls}"if nt and ls else nt);A['net_lbl']=al or'—';A['scope_norm']=str(A.get('net_scope')or'').strip()or'LAN';sh_v=str(A.get('srv_host')or'').strip();sh_v=sh_v or(str((engine.state.get('server')if'engine'in dir()else'')or'').strip().replace('http://','').replace('https://','').rstrip('/')if A.get(_B)==c else'');A['srv_norm']=sh_v;A[R],A['mb_f'],A[i]=round(N,1),round(D,1),round(G,2);f=float(A.get(_e)or _A);A[S]=round(float(A.get(_f)or(D/f if f>0 else 0)),2);I.append(A)
+	I.sort(key=lambda x:str(x.get(_F)or''),reverse=_G);g={}
+	for A in I:g.setdefault(A[_B],[]).append(A)
+	O=[]
+	for(C,P)in g.items():E=P[:2];o=round(sum(A[R]for A in E)/len(E),1);p=round(sum(A[i]for A in P)/len(P),2);Q=[A for A in P if A.get(S,0)>0];O.append({_B:C,'label':P[0][h],'is_own':C==c,'total_cnt':len(P),'sample_cnt':len(E),j:o,'min_dur':min(A[R]for A in E),'avg_net_spd':round(sum(A[S]for A in Q)/len(Q),1)if Q else _A,k:p})
+	O.sort(key=lambda d:(-d[k],d[j]));return{'ops':I,'devices':O}

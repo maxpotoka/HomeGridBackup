@@ -1,6 +1,7 @@
+# patch-id: main-win-adapter-badge-3.02
+# patch-id: net-scope-adapter-3.01-p2
 # patch-id: backup-timeout-retry-3.00
 # patch-id: fix-net-drive-status-and-build-retry-2.78
-# ==============================================================================
 # patch-id: io-pause-buf128-2.18
 # patch-id: stage-window-2.21
 # patch-id: adaptive-status-poll-2.11
@@ -9,1031 +10,457 @@
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: single-pass-verify-speed-2.75
 # [ФАЙЛ: core/backup.py (v2.17 | 25.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
-# ==============================================================================
-import hashlib
-import http.cookiejar
-import json
-import os
-import re
-import shutil
-import time
-import urllib.request
-import zipfile
-import zlib
+# patch-id: pcloud-speed-progress-gradient-2.33
+_z='_last_srv_timings'
+_y='HomeGridBackup_stage'
+_x='copying'
+_w='_KEEP_'
+_v='net_fit_free_space'
+_u='net_max_size_gb'
+_t='net_max_archives'
+_s='mirror_dir'
+_r='mirror_enabled'
+_q='job_id'
+_p='<[^>]+>'
+_o='editor_pin_required'
+_n='HomeGrid Backup'
+_m='network'
+_l='download_buf_kb'
+_k='cloud_save_archives'
+_j='dl_t0'
+_i='packing'
+_h='preparing'
+_g='.zip'
+_f='stop'
+_e='backup_dir'
+_d='pcloud'
+_c='checking'
+_b='processing'
+_a='{}'
+_Z='dirty'
+_Y='\\'
+_X='error'
+_W='.sha256'
+_V='editor_pin'
+_U='pin'
+_T='net_enabled'
+_S='en'
+_R='lang'
+_Q='login_pin'
+_P='session_token'
+_O='local_enabled'
+_N='cloud_enabled'
+_M='stage_started'
+_L='POST'
+_K='net_dir'
+_J='stage_completed'
+_I='err'
+_H='info'
+_G='status'
+_F='ok'
+_E='warn'
+_D=None
+_C=.0
+_B=False
+_A=True
+import hashlib,http.cookiejar,json,os,re,shutil,time,urllib.request,zipfile,zlib
 from datetime import datetime
 from urllib.parse import urlparse
-
-# patch-id: pcloud-speed-progress-gradient-2.33
-from core.config import (
-    DEFAULT_TOK,
-    NO_CLEAN,
-    SCRIPT_VER,
-    SILENT_MODE,
-    commit_state,
-    get_fast_sysinfo,
-)
-from core.files import format_backup_dt, format_duration, pretty_phase
-from core.network import (
-    BROWSER_UA,
-    _seed_cookie,
-    invoke_http,
-    normalize_server_url,
-    scan_lan_servers,
-    verify_host_and_hgm,
-)
-
-
-def _record_cloud_event(engine, operation_id, event, **details):
-    try:
-        from core.cloud import record_operation_event
-        record_operation_event(engine, operation_id, event, **details)
-    except Exception as exc:
-        engine.log(f"Попередження: не вдалося записати локальний звіт: {exc}", "warn")
-
-def _cloud_sync_warning(engine, prefix, exc):
-    from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-    from core.cloud import CloudRateLimitError, cloud_sync_error_text
-    if WINDOWS7_CLOUD_SYNC_PREVIEW and isinstance(exc, CloudRateLimitError):
-        engine.log(cloud_sync_error_text(exc, engine.state.get("lang", "en")), "warn")
-    else:
-        engine.log(f"{prefix}{exc}", "warn")
-
+from core.config import DEFAULT_TOK,NO_CLEAN,SCRIPT_VER,SILENT_MODE,commit_state,get_fast_sysinfo
+from core.files import format_backup_dt,format_duration,pretty_phase
+from core.network import BROWSER_UA,_seed_cookie,detect_network_adapter,invoke_http,normalize_server_url,scan_lan_servers,verify_host_and_hgm
+def _record_cloud_event(engine,operation_id,event,**B):
+	A=engine
+	try:from core.cloud import record_operation_event as C;C(A,operation_id,event,**B)
+	except Exception as D:A.log(f"Попередження: не вдалося записати локальний звіт: {D}",_E)
+def _cloud_sync_warning(engine,prefix,exc):
+	B=exc;A=engine;from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW as C;from core.cloud import CloudRateLimitError as D,cloud_sync_error_text as E
+	if C and isinstance(B,D):A.log(E(B,A.state.get(_R,_S)),_E)
+	else:A.log(f"{prefix}{B}",_E)
 def _sync_cloud_reports(engine):
-    st = engine.state
-    mode = st.get("journal_sync_target") or "auto"
-    cld_on = bool(st.get("cloud_enabled"))
-    net_dir = os.path.expanduser((st.get("net_dir") or "").strip())
-    net_avail = bool(net_dir and os.path.isdir(net_dir))
-    if mode == "auto":
-        use_cld = cld_on
-        use_net = (not cld_on) and net_avail
-    elif mode == "pcloud":
-        use_cld, use_net = cld_on, False
-    elif mode == "network":
-        use_cld, use_net = False, net_avail
-    else:
-        use_cld, use_net = cld_on, net_avail
-    if use_cld:
-        try:
-            from core.cloud import sync_cloud_reports
-            sync_cloud_reports(engine)
-        except Exception as exc:
-            _cloud_sync_warning(engine, "Попередження: не вдалося передати хмарний звіт: ", exc)
-            from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-            if WINDOWS7_CLOUD_SYNC_PREVIEW:
-                from core.cloud import start_cloud_sync_worker
-                start_cloud_sync_worker(engine)
-    if use_net:
-        try:
-            from core.cloud import sync_network_shared_journal
-            sync_network_shared_journal(engine)
-        except Exception as exc:
-            engine.log(f"Попередження: не вдалося оновити мережевий журнал швидкості: {exc}", "warn")
-
-def _sync_cloud_backups(engine, prune=False, progress_cb=None):
-    if not engine.state.get("cloud_enabled"):
-        return False
-    try:
-        from core.cloud import sync_cloud_backups
-        return sync_cloud_backups(engine, prune=prune, progress_cb=progress_cb) is not False
-    except Exception as exc:
-        _cloud_sync_warning(engine, "Попередження: не вдалося синхронізувати хмарні архіви: ", exc)
-        from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-        if WINDOWS7_CLOUD_SYNC_PREVIEW:
-            from core.cloud import start_cloud_sync_worker
-            start_cloud_sync_worker(engine)
-        return False
-
-def _desktop_notify(title, text):
-    import subprocess
-    import sys
-    try:
-        if sys.platform.startswith("linux"):
-            if (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and shutil.which("notify-send"):
-                subprocess.Popen(
-                    ["notify-send", "-a", "HomeGrid Backup", title, text],
-                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-        elif sys.platform == "darwin":
-            t_esc = str(title).replace('\\', '\\\\').replace('"', '\\"')
-            m_esc = str(text).replace('\\', '\\\\').replace('"', '\\"')
-            subprocess.Popen(
-                ["osascript", "-e", f'display notification "{m_esc}" with title "{t_esc}"'],
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        elif os.name == "nt":
-            t_ps = str(title).replace("'", "''")
-            m_ps = str(text).replace("'", "''")
-            ps_cmd = (
-                "Add-Type -AssemblyName System.Windows.Forms;"
-                "$n=New-Object System.Windows.Forms.NotifyIcon;"
-                "$n.Icon=[System.Drawing.SystemIcons]::Information;"
-                "$n.Visible=$true;"
-                f"$n.ShowBalloonTip(5000,'{t_ps}','{m_ps}',[System.Windows.Forms.ToolTipIcon]::Info);"
-                "Start-Sleep -Seconds 6;$n.Dispose()"
-            )
-            subprocess.Popen(
-                ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                creationflags=0x08000000
-            )
-    except Exception:
-        pass
-
+	J='auto';A=engine;E=A.state;F=E.get('journal_sync_target')or J;B=bool(E.get(_N));I=os.path.expanduser((E.get(_K)or'').strip());G=bool(I and os.path.isdir(I))
+	if F==J:C=B;D=not B and G
+	elif F==_d:C,D=B,_B
+	elif F==_m:C,D=_B,G
+	else:C,D=B,G
+	if C:
+		try:from core.cloud import sync_cloud_reports as K;K(A)
+		except Exception as H:
+			_cloud_sync_warning(A,'Попередження: не вдалося передати хмарний звіт: ',H);from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW as L
+			if L:from core.cloud import start_cloud_sync_worker as M;M(A)
+	if D:
+		try:from core.cloud import sync_network_shared_journal as N;N(A)
+		except Exception as H:A.log(f"Попередження: не вдалося оновити мережевий журнал швидкості: {H}",_E)
+def _sync_cloud_backups(engine,prune=_B,progress_cb=_D):
+	A=engine
+	if not A.state.get(_N):return _B
+	try:from core.cloud import sync_cloud_backups as B;return B(A,prune=prune,progress_cb=progress_cb)is not _B
+	except Exception as C:
+		_cloud_sync_warning(A,'Попередження: не вдалося синхронізувати хмарні архіви: ',C);from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW as D
+		if D:from core.cloud import start_cloud_sync_worker as E;E(A)
+		return _B
+def _desktop_notify(title,text):
+	F='\\"';E='\\\\';D='notify-send';C=text;B=title;import subprocess as A,sys
+	try:
+		if sys.platform.startswith('linux'):
+			if(os.environ.get('DISPLAY')or os.environ.get('WAYLAND_DISPLAY'))and shutil.which(D):A.Popen([D,'-a',_n,B,C],stdin=A.DEVNULL,stdout=A.DEVNULL,stderr=A.DEVNULL)
+		elif sys.platform=='darwin':G=str(B).replace(_Y,E).replace('"',F);H=str(C).replace(_Y,E).replace('"',F);A.Popen(['osascript','-e',f'display notification "{H}" with title "{G}"'],stdin=A.DEVNULL,stdout=A.DEVNULL,stderr=A.DEVNULL)
+		elif os.name=='nt':I=str(B).replace("'","''");J=str(C).replace("'","''");K=f"Add-Type -AssemblyName System.Windows.Forms;$n=New-Object System.Windows.Forms.NotifyIcon;$n.Icon=[System.Drawing.SystemIcons]::Information;$n.Visible=$true;$n.ShowBalloonTip(5000,'{I}','{J}',[System.Windows.Forms.ToolTipIcon]::Info);Start-Sleep -Seconds 6;$n.Dispose()";A.Popen(['powershell','-NoProfile','-WindowStyle','Hidden','-Command',K],stdin=A.DEVNULL,stdout=A.DEVNULL,stderr=A.DEVNULL,creationflags=134217728)
+	except Exception:0
 def _is_slow_or_cloud_path(path_str):
-    if not path_str:
-        return False
-    norm = os.path.normpath(os.path.expanduser(str(path_str)))
-    low = norm.lower().replace(chr(92), "/")
-    if norm.startswith(chr(92) * 2) or low.startswith("//"):
-        return True
-    markers = (
-        "/library/cloudstorage/",
-        "/library/mobile documents/",
-        "googledrive",
-        "google-drive",
-        "/run/user/",
-        "google drive",
-        "onedrive",
-        "dropbox",
-        "icloud",
-        "pcloud",
-        "nextcloud",
-        "owncloud",
-        "yandexdisk",
-        "/gvfs/",
-        "/volumes/",
-        "/mnt/",
-        "/media/",
-    )
-    if any(m in low for m in markers):
-        return True
-    if os.name == "nt":
-        try:
-            import ctypes
-            drive = os.path.splitdrive(norm)
-            if drive:
-                root_p = drive + chr(92)
-                if ctypes.windll.kernel32.GetDriveTypeW(root_p) == 4:
-                    return True
-                fs_buf = ctypes.create_unicode_buffer(64)
-                vol_buf = ctypes.create_unicode_buffer(256)
-                if ctypes.windll.kernel32.GetVolumeInformationW(root_p, vol_buf, 256, None, None, None, fs_buf, 64):
-                    fs_low = fs_buf.value.lower()
-                    vol_low = vol_buf.value.lower()
-                    if any(k in fs_low or k in vol_low for k in ("dokan", "winfsp", "fuse", "pcloud", "google", "mega", "raidrive", "webdav")):
-                        return True
-        except Exception:
-            pass
-    return False
-
-
-def _backup_stage1_prepare(engine, raw_url, force_skip):
-    local_on = bool(engine.state.get("local_enabled", True))
-    net_dir = os.path.expanduser((engine.state.get("net_dir") or "").strip())
-    net_on = bool(engine.state.get("net_enabled", False)) and bool(net_dir)
-    if not local_on and not net_on:
-        raise RuntimeError("Увімкніть хоча б одне сховище (Локально або Мережа).")
-    bdir = engine.state["backup_dir"] if local_on else net_dir
-    os.makedirs(bdir, exist_ok=True)
-    srv, has_bang = normalize_server_url(raw_url if raw_url is not None else engine.state["server"])
-    skip_check = force_skip or has_bang
-
-    if not srv:
-        engine.log("Адресу не вказано. Запуск автопошуку в LAN...", "info")
-        servers = scan_lan_servers(engine)
-        if not servers:
-            raise RuntimeError("Сервери HomeGrid Monitor у мережі не знайдено.")
-        sel_ip, _, _ = next(iter(servers))
-        srv = f"http://{sel_ip}:18899"
-        engine.log(f"Автоматично обрано сервер: {srv}", "ok")
-
-    parsed = urlparse(srv)
-    p_host = parsed.hostname or srv
-    c_port = parsed.port or (443 if parsed.scheme == "https" else 80)
-
-    if skip_check:
-        engine.log(f"Перевірку сайту/порту пропущено для {p_host}:{c_port}.", "warn")
-    else:
-        engine.set_progress(5, "Перевірка сайту та сервера HGM...")
-        ok_v, _, v_msg, tcp_ping, api_ping = verify_host_and_hgm(engine, srv)
-        if not ok_v:
-            engine.diag_net = f"{p_host}:{c_port} (ОФЛАЙН)"
-            raise RuntimeError(v_msg)
-        engine.diag_net = f"{p_host}:{c_port} (ОНЛАЙН)"
-        engine.diag_ping = f"TCP {tcp_ping} мс | API {api_ping} мс"
-        engine.log(f"Сервер HGM онлайн (TCP: {tcp_ping} мс, API: {api_ping} мс)", "ok")
-
-    if srv != engine.state["server"]:
-        engine.state["server"] = srv
-        engine.state["dirty"] = True
-
-    engine.set_progress(12, "Перевірка сесії та авторизація...")
-    need_login = (engine.state["session_token"] == "")
-    if not need_login:
-        ts = int(time.time() * 1000)
-        _, _, ar_body, _, _, _ = invoke_http(f"{srv}/api/auth/status?_t={ts}", engine.state)
-        if not re.search(r'"authenticated"\s*:\s*true', ar_body):
-            need_login = True
-            engine.state["session_token"] = ""
-            engine.log("Збережена сесія застаріла. Повторний вхід...", "warn")
-
-    if need_login:
-        while True:
-            p1 = engine.state["login_pin"] or engine.ask_modal("pin", "Авторизація HomeGrid", "Введіть LOGIN PIN:")
-            if not p1:
-                raise RuntimeError("Вхід скасовано (не введено LOGIN PIN).")
-            _, _, l_body, l_ses, l_err, _ = invoke_http(
-                f"{srv}/api/auth/login", engine.state, "POST", json.dumps({"pin": p1}), srv, f"{srv}/login", 10.0, send_ses=False
-            )
-            if not l_body:
-                raise RuntimeError(f"Мережева помилка під час входу: {l_err}")
-            if re.search(r'"ok"\s*:\s*false', l_body):
-                engine.log("Невірний LOGIN PIN!", "err")
-                engine.state["login_pin"] = ""
-                if SILENT_MODE:
-                    raise RuntimeError("Збережений LOGIN PIN відхилено сервером.")
-                continue
-            engine.state["login_pin"] = p1
-            engine.state["dirty"] = True
-            if l_ses:
-                engine.state["session_token"] = l_ses
-                engine.log("Авторизація успішна!", "ok")
-                break
-            if re.search(r'"ok"\s*:\s*true', l_body):
-                engine.log("Авторизацію підтверджено сервером!", "ok")
-                break
-            raise RuntimeError("Сервер не повернув cookie сесії.")
-    else:
-        engine.log("Активну сесію підтверджено.", "ok")
-
-    engine.set_progress(20, "Запит на підготовку бекапу...")
-    _, pr_code, pr_body, _, pr_err, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=15.0)
-    tried_login_as_editor = False
-    while pr_body and "editor_pin_required" in pr_body:
-        if engine.state["editor_pin"]:
-            p2 = engine.state["editor_pin"]
-        elif not tried_login_as_editor and engine.state["login_pin"]:
-            p2 = engine.state["login_pin"]
-            tried_login_as_editor = True
-        else:
-            p2 = engine.ask_modal("pin", "Права редактора", "Для експорту потрібен EDITOR PIN:")
-            if not p2:
-                raise RuntimeError("Експорт скасовано (не введено EDITOR PIN).")
-        _, _, u_body, u_ses, u_err, _ = invoke_http(
-            f"{srv}/api/auth/editor/unlock", engine.state, "POST", json.dumps({"pin": p2}), srv, f"{srv}/service.html", 10.0
-        )
-        if not u_body:
-            raise RuntimeError(f"Помилка розблокування редактора: {u_err}")
-        if re.search(r'"ok"\s*:\s*false', u_body):
-            engine.state["editor_pin"] = ""
-            if SILENT_MODE and not tried_login_as_editor:
-                raise RuntimeError("Збережений EDITOR PIN відхилено.")
-            continue
-        engine.state["editor_pin"] = p2
-        engine.state["dirty"] = True
-        if u_ses:
-            engine.state["session_token"] = u_ses
-        _, pr_code, pr_body, _, pr_err, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=15.0)
-
-    if not pr_body or not pr_body.strip():
-        raise RuntimeError(f"Помилка підготовки (порожня відповідь сервера, HTTP {pr_code}): {pr_err}")
-    try:
-        pr_data = json.loads(pr_body)
-    except Exception:
-        snippet = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", pr_body)).strip()[:120]
-        raise RuntimeError(f"Сервер повернув некоректну відповідь замість JSON (HTTP {pr_code}): {snippet or 'порожньо'}")
-    job_id = pr_data.get("job_id")
-    if not job_id:
-        raise RuntimeError(f"Сервер не створив завдання експорту: {pr_body[:160]}")
-    srv_label = f"{p_host}:{c_port}" if c_port not in (80, 443) else p_host
-    return srv, srv_label, job_id
-
-VERIFY_PAUSE_LITE = 0.012  # пауза в LITE, с на каждые 4 МБ (подбирается замером)
-
+	C=path_str
+	if not C:return _B
+	B=os.path.normpath(os.path.expanduser(str(C)));D=B.lower().replace(chr(92),'/')
+	if B.startswith(chr(92)*2)or D.startswith('//'):return _A
+	I='/library/cloudstorage/','/library/mobile documents/','googledrive','google-drive','/run/user/','google drive','onedrive','dropbox','icloud',_d,'nextcloud','owncloud','yandexdisk','/gvfs/','/volumes/','/mnt/','/media/'
+	if any(A in D for A in I):return _A
+	if os.name=='nt':
+		try:
+			import ctypes as A;E=os.path.splitdrive(B)
+			if E:
+				F=E+chr(92)
+				if A.windll.kernel32.GetDriveTypeW(F)==4:return _A
+				G=A.create_unicode_buffer(64);H=A.create_unicode_buffer(256)
+				if A.windll.kernel32.GetVolumeInformationW(F,H,256,_D,_D,_D,G,64):
+					J=G.value.lower();K=H.value.lower()
+					if any(A in J or A in K for A in('dokan','winfsp','fuse',_d,'google','mega','raidrive','webdav')):return _A
+		except Exception:0
+	return _B
+def _backup_stage1_prepare(engine,raw_url,force_skip):
+	Z='"ok"\\s*:\\s*false';O=raw_url;N='server';A=engine;P=bool(A.state.get(_O,_A));Q=os.path.expanduser((A.state.get(_K)or'').strip());a=bool(A.state.get(_T,_B))and bool(Q)
+	if not P and not a:raise RuntimeError('Увімкніть хоча б одне сховище (Локально або Мережа).')
+	b=A.state[_e]if P else Q;os.makedirs(b,exist_ok=_A);C,c=normalize_server_url(O if O is not _D else A.state[N]);d=force_skip or c
+	if not C:
+		A.log('Адресу не вказано. Запуск автопошуку в LAN...',_H);R=scan_lan_servers(A)
+		if not R:raise RuntimeError('Сервери HomeGrid Monitor у мережі не знайдено.')
+		e,B,B=next(iter(R));C=f"http://{e}:18899";A.log(f"Автоматично обрано сервер: {C}",_F)
+	H=urlparse(C);E=H.hostname or C;F=H.port or(443 if H.scheme=='https'else 80)
+	if d:A.log(f"Перевірку сайту/порту пропущено для {E}:{F}.",_E)
+	else:
+		A.set_progress(5,'Перевірка сайту та сервера HGM...');f,B,g,S,T=verify_host_and_hgm(A,C)
+		if not f:A.diag_net=f"{E}:{F} (ОФЛАЙН)";raise RuntimeError(g)
+		A.diag_net=f"{E}:{F} (ОНЛАЙН)";A.diag_ping=f"TCP {S} мс | API {T} мс";A.diag_adapter=detect_network_adapter(A.state.get('server','')).get('label','');A.log(f"Сервер HGM онлайн (TCP: {S} мс, API: {T} мс)",_F)
+	if C!=A.state[N]:A.state[N]=C;A.state[_Z]=_A
+	A.set_progress(12,'Перевірка сесії та авторизація...');I=A.state[_P]==''
+	if not I:
+		h=int(time.time()*1000);B,B,i,B,B,B=invoke_http(f"{C}/api/auth/status?_t={h}",A.state)
+		if not re.search('"authenticated"\\s*:\\s*true',i):I=_A;A.state[_P]='';A.log('Збережена сесія застаріла. Повторний вхід...',_E)
+	if I:
+		while _A:
+			J=A.state[_Q]or A.ask_modal(_U,'Авторизація HomeGrid','Введіть LOGIN PIN:')
+			if not J:raise RuntimeError('Вхід скасовано (не введено LOGIN PIN).')
+			B,B,K,U,j,B=invoke_http(f"{C}/api/auth/login",A.state,_L,json.dumps({_U:J}),C,f"{C}/login",1e1,send_ses=_B)
+			if not K:raise RuntimeError(f"Мережева помилка під час входу: {j}")
+			if re.search(Z,K):
+				A.log('Невірний LOGIN PIN!',_I);A.state[_Q]=''
+				if SILENT_MODE:raise RuntimeError('Збережений LOGIN PIN відхилено сервером.')
+				continue
+			A.state[_Q]=J;A.state[_Z]=_A
+			if U:A.state[_P]=U;A.log('Авторизація успішна!',_F);break
+			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
+			raise RuntimeError('Сервер не повернув cookie сесії.')
+	else:A.log('Активну сесію підтверджено.',_F)
+	A.set_progress(20,'Запит на підготовку бекапу...');B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare",A.state,_L,_a,timeout=15.);M=_B
+	while D and _o in D:
+		if A.state[_V]:G=A.state[_V]
+		elif not M and A.state[_Q]:G=A.state[_Q];M=_A
+		else:
+			G=A.ask_modal(_U,'Права редактора','Для експорту потрібен EDITOR PIN:')
+			if not G:raise RuntimeError('Експорт скасовано (не введено EDITOR PIN).')
+		B,B,W,X,k,B=invoke_http(f"{C}/api/auth/editor/unlock",A.state,_L,json.dumps({_U:G}),C,f"{C}/service.html",1e1)
+		if not W:raise RuntimeError(f"Помилка розблокування редактора: {k}")
+		if re.search(Z,W):
+			A.state[_V]=''
+			if SILENT_MODE and not M:raise RuntimeError('Збережений EDITOR PIN відхилено.')
+			continue
+		A.state[_V]=G;A.state[_Z]=_A
+		if X:A.state[_P]=X
+		B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare",A.state,_L,_a,timeout=15.)
+	if not D or not D.strip():raise RuntimeError(f"Помилка підготовки (порожня відповідь сервера, HTTP {L}): {V}")
+	try:l=json.loads(D)
+	except Exception:m=re.sub('\\s+',' ',re.sub(_p,' ',D)).strip()[:120];raise RuntimeError(f"Сервер повернув некоректну відповідь замість JSON (HTTP {L}): {m or"порожньо"}")
+	Y=l.get(_q)
+	if not Y:raise RuntimeError(f"Сервер не створив завдання експорту: {D[:160]}")
+	n=f"{E}:{F}"if F not in(80,443)else E;return C,n,Y
+VERIFY_PAUSE_LITE=.012
 class _HashingReader:
-    def __init__(self, raw_file):
-        self._f = raw_file
-        self.hasher = hashlib.sha256()
-        self.hashed_pos = 0
-
-    def read(self, size=-1):
-        pos = self._f.tell()
-        data = self._f.read(size)
-        if not data:
-            return data
-        end = pos + len(data)
-        if pos == self.hashed_pos:
-            self.hasher.update(data)
-            self.hashed_pos = end
-        elif pos < self.hashed_pos < end:
-            self.hasher.update(data[self.hashed_pos - pos :])
-            self.hashed_pos = end
-        return data
-
-    def seek(self, offset, whence=0):
-        return self._f.seek(offset, whence)
-
-    def tell(self):
-        return self._f.tell()
-
-    def seekable(self):
-        return self._f.seekable()
-
-    def readable(self):
-        return True
-
-    @property
-    def closed(self):
-        return getattr(self._f, "closed", False)
-
-    def finalize_tail(self, buf_size=1048576):
-        self._f.seek(self.hashed_pos)
-        while True:
-            blk = self._f.read(buf_size)
-            if not blk:
-                break
-            self.hasher.update(blk)
-            self.hashed_pos += len(blk)
-
-def verify_single_archive(zip_path, progress_callback=None, overall_start=0, overall_total=0, buf_size=1048576, cancel_flag=None, io_pause=0.0):
-    name = os.path.basename(zip_path)
-    if not os.path.isfile(zip_path):
-        return {"name": name, "status": "err", "detail": "Файл не знайдено"}
-    sha_path = zip_path + ".sha256"
-    has_sha = os.path.exists(sha_path)
-    expected_hash = ""
-    if has_sha:
-        try:
-            with open(sha_path, "r", encoding="utf-8") as fs:
-                expected_hash = next(iter(fs.read().split()), "").strip().lower()
-        except Exception as e:
-            return {"name": name, "status": "err", "detail": f"Помилка читання .sha256: {e}"}
-
-    processed = 0
-    since_sleep = 0
-    last_rep_t = 0.0
-    chunk_sz = max(4096, int(buf_size))
-    stage_lbl = "CRC32 + SHA-256" if has_sha else "CRC32"
-
-    def report():
-        nonlocal last_rep_t
-        if not progress_callback:
-            return
-        now = time.time()
-        if (now - last_rep_t) < 0.15:
-            return
-        last_rep_t = now
-        pct = int(min(99, (overall_start + processed) * 100.0 / overall_total)) if overall_total else 0
-        progress_callback(pct, f"{stage_lbl} {processed / 1048576.0:.1f} МБ: {name}")
-
-    try:
-        with open(zip_path, "rb", buffering=max(1048576, chunk_sz)) as raw_f:
-            reader = _HashingReader(raw_f)
-            with zipfile.ZipFile(reader, "r") as zf:
-                infos = zf.infolist()
-                cnt = len(infos)
-                if cnt < 1:
-                    return {"name": name, "status": "err", "detail": "Порожній ZIP-архів"}
-                for info in infos:
-                    crc = 0
-                    with zf.open(info, "r") as member:
-                        while True:
-                            if cancel_flag and cancel_flag.get("stop"):
-                                return {"name": name, "status": "warn", "detail": "Перевірку перервано"}
-                            chunk = member.read(chunk_sz)
-                            if not chunk:
-                                break
-                            crc = zlib.crc32(chunk, crc)
-                            processed += len(chunk)
-                            since_sleep += len(chunk)
-                            if io_pause and since_sleep >= 4194304:
-                                since_sleep = 0
-                                time.sleep(io_pause)
-                            report()
-                    if (crc & 0xFFFFFFFF) != info.CRC:
-                        return {"name": name, "status": "err", "detail": f"Пошкоджений CRC32 у файлі: {info.filename}"}
-            if has_sha:
-                reader.finalize_tail(max(1048576, chunk_sz))
-    except Exception as e:
-        return {"name": name, "status": "err", "detail": f"Помилка перевірки архіву: {e}"}
-
-    if not has_sha:
-        return {"name": name, "status": "warn", "detail": f"ZIP OK ({cnt} файлів), але файл .sha256 відсутній"}
-    if reader.hasher.hexdigest().lower() == expected_hash and expected_hash:
-        return {"name": name, "status": "ok", "detail": f"Цілісність 100% підтверджена ({cnt} файлів)"}
-    return {"name": name, "status": "err", "detail": "УВАГА! Контрольна сума SHA-256 не збігається"}
-
-def verify_all_archives(state, progress_callback=None, buf_size=1048576, cancel_flag=None):
-    t0 = time.time()
-    io_pause = VERIFY_PAUSE_LITE if state.get("lite_mode") else 0.0
-    bdir = state["backup_dir"]
-    os.makedirs(bdir, exist_ok=True)
-    file_entries = []
-    for f in os.listdir(bdir):
-        if f.lower().endswith(".zip"):
-            p = os.path.join(bdir, f)
-            try:
-                st_f = os.stat(p)
-                file_entries.append((p, st_f.st_size, st_f.st_mtime))
-            except OSError:
-                pass
-    file_entries.sort(key=lambda x: x[2], reverse=True)
-    zips = [x[0] for x in file_entries]
-    raw_sizes = [x[1] for x in file_entries]
-    work_sizes = [sz * 2 for sz in raw_sizes]
-    total_work, completed_work, results = sum(work_sizes), 0, []
-    for index, path in enumerate(zips, 1):
-        if cancel_flag and cancel_flag.get("stop"):
-            break
-        if progress_callback:
-            progress_callback(int(completed_work * 100 / max(1, total_work)), f"Архів {index}/{len(zips)}: {os.path.basename(path)}")
-        results.append(verify_single_archive(path, progress_callback, completed_work, total_work, buf_size=buf_size, cancel_flag=cancel_flag, io_pause=io_pause))
-        completed_work += work_sizes[index - 1]
-    elapsed = max(0.001, time.time() - t0)
-    total_mb = sum(raw_sizes) / 1048576.0
-    speed_mbs = total_mb / elapsed
-    return {"total": len(results), "ok_cnt": sum(1 for r in results if r["status"] == "ok"), "warn_cnt": sum(1 for r in results if r["status"] == "warn"), "err_cnt": sum(1 for r in results if r["status"] == "err"), "elapsed": round(elapsed, 2), "speed_mbs": round(speed_mbs, 1), "total_mb": round(total_mb, 1), "cancelled": bool(cancel_flag and cancel_flag.get("stop")), "items": results}
-
-def _copy_to_mirror(engine, out_file, sha_file):
-    if not bool(engine.state.get("mirror_enabled", False)):
-        return
-    mirror_dir = (engine.state.get("mirror_dir") or "").strip()
-    if not mirror_dir or mirror_dir in (".", "./", ".\\", "/", "\\"):
-        return
-    try:
-        src_real = os.path.normcase(os.path.realpath(os.path.dirname(out_file)))
-        dst_real = os.path.normcase(os.path.realpath(os.path.expanduser(mirror_dir)))
-        if src_real == dst_real:
-            return
-        os.makedirs(dst_real, exist_ok=True)
-        st_n = engine.state
-        need_b = os.path.getsize(out_file) + (64 * 1024 * 1024)
-        max_c = max(0, int(st_n.get("net_max_archives", 0) or 0))
-        max_b = int(max(0.0, float(st_n.get("net_max_size_gb", 0.0) or 0.0)) * (1024 ** 3))
-        fit_f = bool(st_n.get("net_fit_free_space", True))
-        arcs = []
-        for fn_n in os.listdir(dst_real):
-            if fn_n.lower().endswith(".zip") and "_KEEP_" not in fn_n.upper():
-                fp_n = os.path.join(dst_real, fn_n)
-                try: st_f = os.stat(fp_n); arcs.append([fp_n, st_f.st_size, st_f.st_mtime])
-                except OSError: pass
-        arcs.sort(key=lambda x: x)
-        del_n = 0
-        while arcs:
-            free_b = shutil.disk_usage(dst_real).free
-            tot_b = sum(x for x in arcs) + os.path.getsize(out_file)
-            need_del = (fit_f and free_b < need_b) or (max_c > 0 and len(arcs) + 1 > max_c) or (max_b > 0 and tot_b > max_b)
-            if not need_del: break
-            old_p, _, _ = arcs.pop(0)
-            for rem_p in (old_p, old_p + ".sha256"):
-                try:
-                    if os.path.exists(rem_p): os.remove(rem_p)
-                except OSError: pass
-            del_n += 1
-        if del_n: engine.log(f"Network rotation: removed {del_n} oldest archive(s).", "info")
-        shutil.copy2(out_file, os.path.join(dst_real, os.path.basename(out_file)))
-        if os.path.exists(sha_file):
-            shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
-        engine.log(f"Дзеркальну копію збережено у: {dst_real}", "ok")
-    except Exception as e:
-        engine.log(f"Попередження: не вдалося скопіювати у дзеркальну папку ({mirror_dir}): {e}", "warn")
-
-def _copy_to_network(engine, out_file, sha_file):
-    if not bool(engine.state.get("net_enabled", False)): return
-    net_dir = (engine.state.get("net_dir") or "").strip()
-    if not net_dir or net_dir in (".", "./", ".\\", "/", "\\"): return
-    try:
-        from operator import itemgetter
-        src_real = os.path.normcase(os.path.realpath(os.path.dirname(out_file)))
-        dst_real = os.path.normcase(os.path.realpath(os.path.expanduser(net_dir)))
-        if src_real == dst_real: return
-        os.makedirs(dst_real, exist_ok=True)
-        fname = os.path.basename(out_file)
-        f_mb = os.path.getsize(out_file) / 1048576.0
-        engine.set_progress(96, f"Копіювання у мережу ({f_mb:.1f} МБ)...")
-        engine.log(f"Копіювання архіву у мережеву папку: {dst_real}...", "info")
-        st_n = engine.state
-        need_b = os.path.getsize(out_file) + (64 * 1024 * 1024)
-        max_c = max(0, int(st_n.get("net_max_archives", 0) or 0))
-        max_b = int(max(0.0, float(st_n.get("net_max_size_gb", 0.0) or 0.0)) * (1024 ** 3))
-        fit_f = bool(st_n.get("net_fit_free_space", True))
-        arcs = [(os.path.join(dst_real, f), os.path.getsize(os.path.join(dst_real, f)), os.path.getmtime(os.path.join(dst_real, f))) for f in os.listdir(dst_real) if f.lower().endswith(".zip") and "_KEEP_" not in f.upper()]
-        arcs.sort(key=itemgetter(2))
-        del_n = 0
-        while arcs and ((fit_f and shutil.disk_usage(dst_real).free < need_b) or (max_c > 0 and len(arcs) + 1 > max_c) or (max_b > 0 and sum(sz for _, sz, _ in arcs) + os.path.getsize(out_file) > max_b)):
-            old_p, _, _ = arcs.pop(0)
-            for rem_p in (old_p, old_p + ".sha256"):
-                if os.path.exists(rem_p): os.remove(rem_p)
-            del_n += 1
-        if del_n: engine.log(f"Ротація мережі: видалено {del_n} старих архівів.", "info")
-        t_cp = time.time()
-        shutil.copy2(out_file, os.path.join(dst_real, fname))
-        if os.path.exists(sha_file): shutil.copy2(sha_file, os.path.join(dst_real, os.path.basename(sha_file)))
-        cp_sec = round(max(0.1, time.time() - t_cp), 1)
-        cp_spd = round(f_mb / cp_sec, 1)
-        engine.log(f"Мережеву копію збережено у: {dst_real} ({cp_sec} с, {cp_spd} МБ/с)", "ok")
-    except Exception as e:
-        engine.log(f"Попередження: не вдалося скопіювати у мережеву папку ({net_dir}): {e}", "warn")
-
-def _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id):
-    engine.log(f"Збірка архіву на сервері {srv_label}...", "info")
-    last_phase = ""
-    phase_start_t = time.time()
-    srv_times = {"preparing": 0.0, "copying": 0.0, "processing": 0.0, "packing": 0.0, "checking": 0.0}
-    tot_b = 0
-    job_retries = 0
-    bad_json_cnt = 0
-    poll_interval = 1.5
-    while True:
-        time.sleep(poll_interval)
-        _, sr_code, sr_body, _, sr_err, _ = invoke_http(f"{srv}/api/migration/export/status?job_id={job_id}", engine.state, timeout=45.0)
-        if not sr_body or not sr_body.strip():
-            bad_json_cnt += 1
-            if bad_json_cnt in (1, 5, 15, 30):
-                engine.log(f"Втрачено зв'язок із {srv_label} під час збірки (HTTP {sr_code}: {sr_err}). Повтор {bad_json_cnt}/45...", "warn")
-            engine.set_progress(None, f"[{srv_label}] Очікування мережі ({bad_json_cnt}/45)...")
-            if bad_json_cnt >= 45:
-                raise RuntimeError(f"Сервер {srv_label} перестав відповідати під час збірки (HTTP {sr_code}): {sr_err}")
-            time.sleep(2.5)
-            continue
-        try:
-            st = json.loads(sr_body)
-            bad_json_cnt = 0
-        except Exception:
-            bad_json_cnt += 1
-            if bad_json_cnt >= 15:
-                snippet = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", sr_body)).strip()[:100]
-                raise RuntimeError(f"Сайт {srv_label} повернув HTML замість статусу JSON (HTTP {sr_code}): {snippet}")
-            time.sleep(0.8)
-            continue
-
-        if st.get("ok") is False:
-            err_code = st.get("error") or "невідома помилка сервера"
-            if err_code in ("backup_job_not_found", "timeout") and job_retries < 4:
-                job_retries += 1
-                wait_sec = (15 if err_code == "timeout" else 4) * job_retries
-                reason_lbl = "Час збірки на сервері вичерпано" if err_code == "timeout" else "Сервер скинув завдання"
-                engine.log(f"{reason_lbl} ({srv_label}). Повтор {job_retries}/4 через {wait_sec} с...", "warn")
-                for left_s in range(wait_sec, 0, -1):
-                    engine.set_progress(22, f"[{srv_label}] Перезапуск збірки ({job_retries}/4) через {left_s} с...")
-                    time.sleep(1.0)
-                _, _, pr_body2, _, pr_err2, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=20.0)
-                if pr_body2 and "editor_pin_required" in pr_body2:
-                    pin_ed = engine.state.get("editor_pin") or engine.state.get("login_pin") or ""
-                    if pin_ed:
-                        _, _, _, u_ses2, _, _ = invoke_http(
-                            f"{srv}/api/auth/editor/unlock", engine.state, "POST", json.dumps({"pin": pin_ed}), srv, f"{srv}/service.html", 10.0
-                        )
-                        if u_ses2:
-                            engine.state["session_token"] = u_ses2
-                        _, _, pr_body2, _, pr_err2, _ = invoke_http(f"{srv}/api/migration/export/prepare", engine.state, "POST", "{}", timeout=20.0)
-                if not pr_body2 or not pr_body2.strip():
-                    raise RuntimeError(f"Помилка повторної підготовки: {pr_err2}")
-                try:
-                    job_id = json.loads(pr_body2).get("job_id")
-                except Exception:
-                    raise RuntimeError("Сервер повернув некоректну відповідь під час повторного запуску.")
-                if not job_id:
-                    raise RuntimeError(f"Сервер не створив нове завдання експорту: {pr_body2[:140]}")
-                last_phase = ""
-                continue
-            raise RuntimeError(f"Сервер {srv_label} перервав збірку архіву: {err_code}")
-
-        pct = int(st.get("progress", 0))
-        ph = st.get("phase") or "working"
-        poll_interval = 1.5 if ph in ("preparing", "ready") else (4.0 if ph in ("checking", "packing") else 2.5)
-        tot_b = st.get("total_bytes", 0) or 0
-        proc_b = st.get("processed_bytes", 0) or 0
-        if ph != last_phase:
-            if last_phase:
-                phase_duration = max(0.0, time.time() - phase_start_t)
-                srv_times[last_phase if last_phase in srv_times else "processing"] += phase_duration
-                _record_cloud_event(
-                    engine, operation_id, "stage_completed",
-                    stage=f"server_{last_phase}", duration_sec=phase_duration
-                )
-            last_phase = ph
-            phase_start_t = time.time()
-            _record_cloud_event(engine, operation_id, "stage_started", stage=f"server_{ph}")
-            engine.log(f"Етап сервера ({srv_label}): {pretty_phase(ph)}", "info")
-
-        elapsed_ph = max(0.05, time.time() - phase_start_t)
-        if tot_b > 0:
-            spd_ph = (proc_b / 1048576.0) / elapsed_ph if proc_b > 0 and elapsed_ph > 0.25 else 0.0
-            spd_part = f", {spd_ph:.1f} МБ/с" if spd_ph > 0.05 else ""
-            sz_txt = f" ({proc_b/1048576:.1f}/{tot_b/1048576:.1f} МБ{spd_part})"
-        else:
-            sz_txt = ""
-
-        _lng_p = engine.state.get("lang", "en")
-        _el_s = f"{elapsed_ph:.1f} {'с' if _lng_p == 'uk' else 's'}" if elapsed_ph < 60 else format_duration(elapsed_ph, _lng_p).partition(" (").__getitem__(0)
-        if ph == "checking":
-            engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)} ({_el_s})...")
-        elif ph != "ready" and st.get("ready") is not True:
-            pct_part = f": {pct}%" if pct > 0 else f" ({_el_s})"
-            engine.set_progress(None, f"[{srv_label}] {pretty_phase(ph)}{pct_part}{sz_txt}")
-
-        if ph == "ready" or st.get("ready") is True:
-            if last_phase and last_phase != "ready":
-                phase_duration = max(0.0, time.time() - phase_start_t)
-                srv_times[last_phase if last_phase in srv_times else "processing"] += phase_duration
-                _record_cloud_event(
-                    engine, operation_id, "stage_completed",
-                    stage=f"server_{last_phase}", duration_sec=phase_duration
-                )
-            engine._last_srv_timings = {k: round(v, 1) for k, v in srv_times.items()}
-            engine._last_srv_timings["dl_t0"] = time.time()
-            p_rdy = 45 if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else 75
-            engine.set_progress(p_rdy, f"[{srv_label}] Архів готовий ({p_rdy}%). Завантаження...")
-            break
-        if st.get("status") == "error" or ph == "error":
-            raise RuntimeError(f"Сервер {srv_label} повідомив про помилку під час створення архіву!")
-
-    date_eng = format_backup_dt(datetime.now())
-    out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}.zip")
-    collision_id = 1
-    while os.path.exists(out_file):
-        out_file = os.path.join(bdir, f"homegrid_backup_DAILY_{date_eng}_{collision_id}.zip")
-        collision_id += 1
-    import tempfile
-    use_ssd_stage = False
-    stage_dir = bdir
-    net_only = (not bool(engine.state.get("local_enabled", True))) and bool(engine.state.get("net_enabled")) and bool((engine.state.get("net_dir") or "").strip())
-    if _is_slow_or_cloud_path(bdir) or net_only:
-        tmp_root = tempfile.gettempdir()
-        try:
-            free_tmp = shutil.disk_usage(tmp_root).free
-        except OSError:
-            free_tmp = 0
-        need_bytes = int(tot_b * 1.25) + 104857600 if tot_b > 0 else 536870912
-        if not _is_slow_or_cloud_path(tmp_root) and free_tmp >= need_bytes:
-            stage_dir = os.path.join(tmp_root, "HomeGridBackup_stage")
-            os.makedirs(stage_dir, exist_ok=True)
-            use_ssd_stage = True
-            engine.log("Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.", "warn")
-            reason_txt = "??????? ?????? ???????? ?????" if net_only else "????? ??????????? ? ???????? / ?????????? ???????"
-            engine.log(f"???? ({reason_txt}): ?????? ????????? ?? ???????? ? ????????? ????? ?? SSD, ? ????? ???????? ? ????? ???????????.", "warn")
-    stage_out_file = os.path.join(stage_dir, os.path.basename(out_file)) if use_ssd_stage else out_file
-    part_file = stage_out_file + ".part"
-    cli_tok = engine.state["client_token"] or DEFAULT_TOK
-    ses_tok = engine.state["session_token"]
-    dt_tok = st.get("download_token") or cli_tok
-    du = f"{srv}{st['download_url']}" if st.get("download_url") else f"{srv}/api/migration/export?_t={int(time.time()*1000)}&job_id={job_id}&_download_token={dt_tok}"
-
-    from core.network import set_socket_buffer_kb
-    set_socket_buffer_kb(engine.state.get("download_buf_kb", 0))
-    engine.log(f"Завантаження ZIP-архіву з {srv_label}...", "info")
-    download_started = time.time()
-    _record_cloud_event(engine, operation_id, "stage_started", stage="archive_download")
-    eb = float(tot_b) if tot_b > 0 else 0.0
-    max_attempts = 7
-    retry_delays = (10, 15, 20, 25, 25, 25)
-    for attempt in range(1, max_attempts + 1):
-        if os.path.exists(part_file):
-            os.remove(part_file)
-        d0 = time.time()
-        dl_ok = False
-        dl_err = ""
-        net_h = None
-        for no_proxy in (True, False):
-            try:
-                jar = engine.state.get("_jar") or http.cookiejar.CookieJar()
-                _seed_cookie(jar, du, "hg_client", cli_tok)
-                _seed_cookie(jar, du, "homegrid_dash_session", ses_tok)
-                handlers = [urllib.request.HTTPCookieProcessor(jar)]
-                if no_proxy:
-                    handlers.append(urllib.request.ProxyHandler({}))
-                opener = urllib.request.build_opener(*handlers)
-                req = urllib.request.Request(du, headers={"User-Agent": BROWSER_UA, "Accept-Encoding": "identity"})
-                with opener.open(req, timeout=300) as resp, open(part_file, "wb", buffering=1048576) as out_f:
-                    srv_sha = (resp.headers.get("X-Checksum-Sha256") or st.get("sha256") or "").strip().lower()
-                    net_h = hashlib.sha256()
-                    cb = 0
-                    last_ui = time.time()
-                    last_speed_t = d0
-                    last_speed_bytes = 0
-                    smooth_speed = None
-                    dl_chunk_sz = max(16384, int(engine.state.get("download_buf_kb", 64) or 64) * 1024)
-                    while True:
-                        chunk = resp.read(dl_chunk_sz)
-                        if not chunk:
-                            break
-                        out_f.write(chunk)
-                        net_h.update(chunk)
-                        cb += len(chunk)
-                        now = time.time()
-                        if now - last_ui >= 1.0:
-                            last_ui = now
-                            cm = cb / 1048576.0
-                            sample_sec = max(0.001, now - last_speed_t)
-                            sample_speed = ((cb - last_speed_bytes) / 1048576.0) / sample_sec
-                            smooth_speed = sample_speed if smooth_speed is None else (0.35 * sample_speed + 0.65 * smooth_speed)
-                            last_speed_t = now
-                            last_speed_bytes = cb
-                            speed_txt = f"{smooth_speed:.2f} МБ/с" if smooth_speed >= 1.0 else f"{smooth_speed * 1024:.0f} КБ/с"
-                            att_lbl = f" [спроба {attempt}/{max_attempts}]" if attempt > 1 else ""
-                            if eb > 0:
-                                dpct = min(99, int((cb / eb) * 100))
-                                dl_b, dl_s = (45, 20) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (75, 17)
-                                engine.set_progress(dl_b + int(dpct * (dl_s / 100.0)), f"Завантаження{att_lbl}: {cm:.1f}/{eb/1048576.0:.1f} МБ | Швидкість: {speed_txt}")
-                            else:
-                                engine.set_progress(83, f"Завантаження{att_lbl}: {cm:.1f} МБ | Швидкість: {speed_txt}")
-                dl_ok = True
-                break
-            except Exception as e:
-                dl_err = str(e)
-                if os.path.exists(part_file):
-                    os.remove(part_file)
-        actual_sz = os.path.getsize(part_file) if os.path.exists(part_file) else 0
-        size_valid = (actual_sz >= int(tot_b * 0.99)) if tot_b > 0 else (actual_sz >= 1024)
-        net_sha_hex = net_h.hexdigest().lower() if (dl_ok and net_h is not None) else ""
-        if dl_ok and size_valid and srv_sha and len(srv_sha) == 64 and net_sha_hex != srv_sha:
-            dl_ok = False
-            dl_err = "SHA-256 не збігається з контрольним хешем сервера"
-            if os.path.exists(part_file):
-                os.remove(part_file)
-        if dl_ok and size_valid:
-            os.replace(part_file, stage_out_file)
-            download_duration = max(0.05, time.time() - d0)
-            if hasattr(engine, "_last_srv_timings"):
-                engine._last_srv_timings["dl_t0"] = d0
-            engine.log(f"Архів завантажено: {actual_sz / 1048576.0:.2f} МБ за {round(download_duration, 1)} с", "ok")
-            _record_cloud_event(
-                engine, operation_id, "stage_completed", stage="archive_download",
-                archive=out_file, size_mb=actual_sz / 1048576.0,
-                size_bytes=actual_sz, duration_sec=download_duration,
-                speed_mbps=(actual_sz / 1048576.0) / max(download_duration, 0.001)
-            )
-            return stage_out_file, out_file, net_sha_hex
-        if dl_ok and not size_valid:
-            dl_err = f"завантажено лише {actual_sz/1048576.0:.1f} із {tot_b/1048576.0:.1f} МБ (обрив потоку)"
-            if os.path.exists(part_file):
-                os.remove(part_file)
-        if attempt < max_attempts:
-            wait_s = retry_delays[min(attempt - 1, len(retry_delays) - 1)]
-            engine.log(f"Збій завантаження ({dl_err}). Повтор {attempt + 1}/{max_attempts} через {wait_s} с...", "warn")
-            for left_s in range(wait_s, 0, -1):
-                engine.set_progress(75, f"Очікування мережі: повтор {attempt + 1}/{max_attempts} через {left_s} с...")
-                time.sleep(1.0)
-        else:
-            raise RuntimeError(f"Помилка завантаження після {max_attempts} спроб: {dl_err}")
-
-def run_backup_task(engine, raw_url=None, force_skip=False, skip_cleanup=False, auto_quiet=False):
-    with engine.lock:
-        if engine.is_running:
-            return
-        engine.is_running = True
-    engine.set_pill("Резервне копіювання...", "work")
-    t_total_start = time.time()
-    ts_start_str = datetime.now().strftime("%H:%M:%S")
-    from core.cloud import new_operation_id
-    operation_id = new_operation_id()
-    out_file = ""
-    total_mb = 0.0
-    _record_cloud_event(
-        engine, operation_id, "started", stage="server_connection",
-        archive_sequence=max(0, int(engine.state.get("all_time_cnt", 0))) + 1
-    )
-    try:
-        loc_on = bool(engine.state.get("local_enabled", True))
-        net_on = bool(engine.state.get("net_enabled", False)) and bool((engine.state.get("net_dir") or "").strip())
-        if not loc_on and not net_on:
-            raise RuntimeError("No storage enabled (Local and Network are both OFF).")
-        local_on = bool(engine.state.get("local_enabled", True))
-        bdir = engine.state["backup_dir"] if local_on else os.path.expanduser((engine.state.get("net_dir") or "").strip()) if loc_on else __import__("tempfile").gettempdir()
-        tgts = ([f"Local: {bdir}"] if loc_on else []) + ([f"Network: {engine.state.get('net_dir')}"] if net_on else [])
-        engine.log("Targets: " + " | ".join(tgts), "info")
-        if loc_on and net_on:
-            engine.log("Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.", "info")
-        t_prep0 = time.time()
-        _record_cloud_event(engine, operation_id, "stage_started", stage="server_connection_and_preparation")
-        srv, srv_label, job_id = _backup_stage1_prepare(engine, raw_url, force_skip)
-        _record_cloud_event(
-            engine, operation_id, "stage_completed", stage="server_connection_and_preparation",
-            duration_sec=time.time() - t_prep0, result="success"
-        )
-        t_dl0 = time.time()
-        _record_cloud_event(engine, operation_id, "milestone", stage="server_job_ready")
-        stage_file, final_out_file, net_sha_hex = _download_backup_zip(engine, srv, srv_label, job_id, bdir, operation_id)
-        out_file = stage_file
-        t_ver0 = time.time()
-
-        total_bytes = os.path.getsize(out_file)
-        total_mb = total_bytes / 1048576.0
-        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_crc32_verification", archive=out_file)
-        _record_cloud_event(engine, operation_id, "stage_started", stage="archive_sha256_verification", archive=out_file)
-        h_b, h_s = (66, 5) if (engine.state.get("cloud_enabled") and engine.state.get("cloud_save_archives", True)) else (92, 5)
-        engine.set_progress(h_b, f"Перевірка CRC32 + SHA-256: 0.0 / {total_mb:.1f} МБ")
-        processed_uncomp = 0
-        last_ui = time.time()
-        with open(out_file, "rb", buffering=1048576) as raw_f:
-            reader = _HashingReader(raw_f)
-            with zipfile.ZipFile(reader, "r") as zf:
-                infos = zf.infolist()
-                cnt = len(infos)
-                if cnt < 1:
-                    os.remove(out_file)
-                    raise RuntimeError("ZIP-архів порожній!")
-                for info in infos:
-                    crc = 0
-                    with zf.open(info, "r") as member:
-                        for chunk in iter(lambda: member.read(1048576), b""):
-                            crc = zlib.crc32(chunk, crc)
-                            processed_uncomp += len(chunk)
-                            now_v = time.time()
-                            if now_v - last_ui >= 0.5:
-                                last_ui = now_v
-                                pct = h_b + int(min(1.0, reader.hashed_pos / max(1, total_bytes)) * h_s)
-                                engine.set_progress(pct, f"Перевірка CRC32 + SHA-256: {reader.hashed_pos / 1048576.0:.1f} / {total_mb:.1f} МБ")
-                    if (crc & 0xFFFFFFFF) != info.CRC:
-                        os.remove(out_file)
-                        raise RuntimeError(f"Пошкоджений файл в архіві: {info.filename}")
-            t_tail0 = time.time()
-            reader.finalize_tail(1048576)
-        t_ver_end = time.time()
-        crc_duration = max(0.001, t_tail0 - t_ver0)
-        sha_duration = max(0.001, t_ver_end - t_tail0)
-        crc_sec = round(max(0.1, crc_duration), 1)
-        sha_sec = round(max(0.1, sha_duration), 1)
-        ver_sec = round(max(0.1, t_ver_end - t_ver0), 1)
-        _record_cloud_event(
-            engine, operation_id, "stage_completed", stage="archive_crc32_verification",
-            archive=out_file, duration_sec=crc_duration, files_count=cnt
-        )
-
-        disk_sha_low = reader.hasher.hexdigest().lower()
-        if net_sha_hex and disk_sha_low != net_sha_hex:
-            os.remove(out_file)
-            raise RuntimeError("Помилка запису на диск: SHA-256 файлу на носії не збігається зі завантаженим потоком!")
-        zip_hash = disk_sha_low.upper()
-        sha_file = out_file + ".sha256"
-        with open(sha_file, "w", encoding="utf-8") as f_sha:
-            f_sha.write(f"{zip_hash.lower()}  {os.path.basename(final_out_file)}\n")
-        if os.path.normcase(os.path.realpath(out_file)) != os.path.normcase(os.path.realpath(final_out_file)):
-            engine.set_progress(97, "?????????? ???????????? ?????? ? ????? ???????????...")
-            os.makedirs(os.path.dirname(final_out_file), exist_ok=True)
-            final_sha_file = final_out_file + ".sha256"
-            shutil.move(out_file, final_out_file)
-            if os.path.exists(sha_file):
-                shutil.move(sha_file, final_sha_file)
-            out_file = final_out_file
-            sha_file = final_sha_file
-            engine.log(f"???? ?? .sha256 ?????????? ? ????? ???????????: {os.path.dirname(out_file)}", "ok")
-        engine.log(f"Цілісність перевірено в 1 прохід ({cnt} файлів) за {ver_sec} с. Збережено {os.path.basename(sha_file)}", "ok")
-        _record_cloud_event(
-            engine, operation_id, "stage_completed", stage="archive_sha256_verification",
-            archive=out_file, size_mb=total_mb, duration_sec=sha_duration, files_count=cnt,
-            size_bytes=total_bytes
-        )
-
-        mir_active = bool(engine.state.get("mirror_enabled", False)) and bool((engine.state.get("mirror_dir") or "").strip())
-        mir_sec = 0.0
-        if mir_active:
-            t_mir0 = time.time()
-            _record_cloud_event(engine, operation_id, "stage_started", stage="local_mirror", archive=out_file)
-            _copy_to_mirror(engine, out_file, sha_file)
-            mir_duration = max(0.001, time.time() - t_mir0)
-            mir_sec = round(max(0.1, mir_duration), 1)
-            _record_cloud_event(
-                engine, operation_id, "stage_completed", stage="local_mirror",
-                archive=out_file, duration_sec=mir_duration
-            )
-
-        net_active = bool(engine.state.get("net_enabled", False)) and bool((engine.state.get("net_dir") or "").strip())
-        t_net0 = time.time()
-        if bool(engine.state.get("local_enabled", True)):
-            _copy_to_network(engine, out_file, sha_file)
-        net_sec = round(max(0.1, time.time() - t_net0), 1) if net_active else 0.0
-        with engine.lock:
-            if hasattr(engine, "_dest_stats"):
-                engine._dest_stats["network"] = None
-        if hasattr(engine, "request_dest_stats_refresh"):
-            engine.request_dest_stats_refresh()
-        if not bool(engine.state.get("local_enabled", True)):
-            for _tmp_f in (out_file, sha_file):
-                try:
-                    if _tmp_f and os.path.exists(_tmp_f): os.remove(_tmp_f)
-                except OSError: pass
-            engine.log("Temp local archive removed (Local storage is OFF).", "info")
-        if engine.state["dirty"]:
-            commit_state(engine.state)
-            engine.log("Налаштування та ключі захищено збережено.", "ok")
-
-        from core.gfs import apply_gfs_cleanup, compute_gfs_plan
-        engine.set_progress(98, "Ротація бекапів за обраною стратегією...")
-        gfs_started = time.time()
-        _record_cloud_event(engine, operation_id, "stage_started", stage="gfs_rotation", archive=out_file)
-        _, _, del_it = compute_gfs_plan(engine.state)
-        old_cnt_before = len(del_it)
-        gfs_cleanup_applied = False
-        if not skip_cleanup and not NO_CLEAN and (auto_quiet or bool(engine.state.get("silent_cleanup", False))):
-            deleted_count, _, _ = apply_gfs_cleanup(engine, skip_prompt=True, sync_cloud=False)
-            gfs_cleanup_applied = deleted_count == len(del_it)
-        _record_cloud_event(
-            engine, operation_id, "stage_completed", stage="gfs_rotation",
-            archive=out_file, duration_sec=time.time() - gfs_started
-        )
-        cloud_sync_started = time.time()
-        def _pcloud_cb(cpct, cinfo):
-            p_val = 73 + int(((cpct or 0) / 100.0) * 26)
-            engine.set_progress(min(99, p_val), f"pCloud: {cinfo}")
-        cloud_synced = _sync_cloud_backups(engine, prune=gfs_cleanup_applied, progress_cb=_pcloud_cb)
-        _record_cloud_event(
-            engine, operation_id, "stage_completed", stage="cloud_archive_sync",
-            archive=out_file, duration_sec=time.time() - cloud_sync_started,
-            result="success" if cloud_synced else ("disabled" if not engine.state.get("cloud_enabled") else "failed")
-        )
-
-        t_end = time.time()
-        ts_end_str = datetime.now().strftime("%H:%M:%S")
-        _st_t = getattr(engine, "_last_srv_timings", {})
-        dl_t0_real = _st_t.get("dl_t0", t_dl0)
-        dl_sec = round(max(0.1, t_ver0 - dl_t0_real), 1)
-        srv_prep_s = round(_st_t.get("preparing", 0.0), 1)
-        srv_copy_s = round(_st_t.get("copying", 0.0), 1)
-        srv_pack_s = round(_st_t.get("packing", 0.0), 1)
-        srv_proc_s = round(_st_t.get("processing", 0.0), 1)
-        srv_chk_s = round(_st_t.get("checking", 0.0), 1)
-        total_sec = round(max(0.1, t_end - t_total_start), 1)
-        srv_sec = round(srv_prep_s + srv_copy_s + srv_proc_s + srv_pack_s + srv_chk_s, 1)
-        spd_mbs = round(total_mb / max(0.1, dl_sec), 1)
-        final_name = os.path.basename(out_file)
-        engine.set_progress(100, f"Готово! Архів збережено ({total_mb:.2f} МБ)")
-        engine.set_pill(f"ГОТОВО | {total_mb:.1f} МБ", "ok")
-        tot_fmt = format_duration(total_sec, engine.state.get("lang", "en")).partition(" (").__getitem__(0)
-        engine.log(f"УСПІХ! Резервне копіювання завершено за {tot_fmt} ({ts_start_str} → {ts_end_str}).", "ok")
-        system_info = get_fast_sysinfo()
-        summary = f"v{SCRIPT_VER} | {system_info} | download {spd_mbs} MB/s ({dl_sec} s) | server {srv_sec} s | total {total_sec} s | files {cnt}"
-        engine.log(f"[SUMMARY] {summary}", "info")
-        from core.i18n import tr as _tr_n
-        _lng_n = engine.state.get("lang", "en")
-        _desktop_notify("HomeGrid Backup", _tr_n(f"Резервну копію створено: {final_name} ({total_mb:.1f} МБ)", _lng_n))
-        engine.state["all_time_cnt"] = max(int(engine.state.get("all_time_cnt", 0)), 0) + 1
-        engine.state["all_time_mb"] = round(max(float(engine.state.get("all_time_mb", 0.0)), 0.0) + total_mb, 1)
-        commit_state(engine.state)
-        if hasattr(engine, "record_op_event"):
-            engine.record_op_event(
-                "Успішно", final_name, round(total_mb, 1), dur_sec=total_sec,
-                started_at=t_total_start, finished_at=t_end,
-            )
-        _record_cloud_event(
-            engine, operation_id, "success", archive=final_name,
-            size_mb=total_mb, size_bytes=total_bytes, files_count=cnt,
-            duration_sec=t_end - t_total_start,
-            speed_mbps=total_mb / max(t_end - t_total_start, 0.001),
-            download_speed_mbps=spd_mbs,
-            download_duration_sec=dl_sec,
-            server_duration_sec=srv_sec,
-            server_preparing_sec=srv_prep_s,
-            server_copying_sec=srv_copy_s,
-            server_processing_sec=srv_proc_s,
-            server_packing_sec=srv_pack_s,
-            server_checking_sec=srv_chk_s,
-            crc_duration_sec=crc_sec,
-            sha256_duration_sec=sha_sec,
-            mirror_enabled=mir_active,
-            mirror_duration_sec=mir_sec,
-            gfs_removed_count=old_cnt_before,
-            system_info=system_info,
-            summary=summary,
-        )
-        _sync_cloud_reports(engine)
-        if not SILENT_MODE and not auto_quiet:
-            z_cnt, z_mb, free_gb = engine.get_storage_stats()
-            rep = {"file": final_name, "srv": srv, "size_mb": round(total_mb, 2), "files_cnt": cnt, "ts_start": ts_start_str, "ts_end": ts_end_str, "total_sec": total_sec, "srv_prep_sec": srv_prep_s, "srv_copy_sec": srv_copy_s, "srv_proc_sec": srv_proc_s, "srv_pack_sec": srv_pack_s, "srv_chk_sec": srv_chk_s, "dl_sec": dl_sec, "buf_kb": int(engine.state.get("download_buf_kb", 64) or 64), "spd_mbs": spd_mbs, "crc_sec": crc_sec, "sha_sec": sha_sec, "mir_active": mir_active, "mir_sec": mir_sec, "net_active": net_active, "net_sec": net_sec, "z_cnt": z_cnt, "z_mb": z_mb, "free_gb": free_gb, "old_cnt": old_cnt_before}
-            engine.ask_modal("backup_report", "Звіт про резервне копіювання", json.dumps(rep, ensure_ascii=False))
-    except Exception as exc:
-        engine.exit_code = 1
-        engine.log(f"ПОМИЛКА: {exc}", "err")
-        from core.i18n import tr as _tr_e
-        _desktop_notify(_tr_e("HomeGrid Backup: помилка", engine.state.get("lang", "en")), str(exc)[:200])
-        engine.set_pill("Помилка бекапу", "err")
-        if hasattr(engine, "record_op_event"):
-            error_time = time.time()
-            engine.record_op_event(
-                "Помилка", str(exc), 0.0, dur_sec=round(error_time - t_total_start, 1),
-                started_at=t_total_start, finished_at=error_time,
-            )
-        _record_cloud_event(
-            engine, operation_id, "error", archive=out_file,
-            size_mb=total_mb, duration_sec=time.time() - t_total_start,
-            result="error", error_type=type(exc).__name__
-        )
-        _sync_cloud_reports(engine)
-        engine.set_progress(0, f"Помилка: {exc}")
-        if not SILENT_MODE:
-            engine.ask_modal("alert", "Помилка резервного копіювання", str(exc))
-    finally:
-        if hasattr(engine, "flush_logs"):
-            engine.flush_logs()
-        try:
-            import tempfile
-            st_d = os.path.join(tempfile.gettempdir(), "HomeGridBackup_stage")
-            if os.path.isdir(st_d):
-                shutil.rmtree(st_d, ignore_errors=True)
-        except Exception:
-            pass
-        with engine.lock:
-            engine.is_running = False
-            engine.indeterminate = False
+	def __init__(A,raw_file):A._f=raw_file;A.hasher=hashlib.sha256();A.hashed_pos=0
+	def read(A,size=-1):
+		C=A._f.tell();B=A._f.read(size)
+		if not B:return B
+		D=C+len(B)
+		if C==A.hashed_pos:A.hasher.update(B);A.hashed_pos=D
+		elif C<A.hashed_pos<D:A.hasher.update(B[A.hashed_pos-C:]);A.hashed_pos=D
+		return B
+	def seek(A,offset,whence=0):return A._f.seek(offset,whence)
+	def tell(A):return A._f.tell()
+	def seekable(A):return A._f.seekable()
+	def readable(A):return _A
+	@property
+	def closed(self):return getattr(self._f,'closed',_B)
+	def finalize_tail(A,buf_size=1048576):
+		A._f.seek(A.hashed_pos)
+		while _A:
+			B=A._f.read(buf_size)
+			if not B:break
+			A.hasher.update(B);A.hashed_pos+=len(B)
+def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_total=0,buf_size=1048576,cancel_flag=_D,io_pause=_C):
+	T=io_pause;S=cancel_flag;R=overall_total;Q=progress_callback;D=zip_path;C='detail';B='name';A=os.path.basename(D)
+	if not os.path.isfile(D):return{B:A,_G:_I,C:'Файл не знайдено'}
+	U=D+_W;E=os.path.exists(U);G=''
+	if E:
+		try:
+			with open(U,'r',encoding='utf-8')as X:G=next(iter(X.read().split()),'').strip().lower()
+		except Exception as H:return{B:A,_G:_I,C:f"Помилка читання .sha256: {H}"}
+	I=0;J=0;K=_C;L=max(4096,int(buf_size));Y='CRC32 + SHA-256'if E else'CRC32'
+	def Z():
+		nonlocal K
+		if not Q:return
+		B=time.time()
+		if B-K<.15:return
+		K=B;C=int(min(99,(overall_start+I)*1e2/R))if R else 0;Q(C,f"{Y} {I/1048576.:.1f} МБ: {A}")
+	try:
+		with open(D,'rb',buffering=max(1048576,L))as a:
+			M=_HashingReader(a)
+			with zipfile.ZipFile(M,'r')as V:
+				W=V.infolist();N=len(W)
+				if N<1:return{B:A,_G:_I,C:'Порожній ZIP-архів'}
+				for O in W:
+					P=0
+					with V.open(O,'r')as b:
+						while _A:
+							if S and S.get(_f):return{B:A,_G:_E,C:'Перевірку перервано'}
+							F=b.read(L)
+							if not F:break
+							P=zlib.crc32(F,P);I+=len(F);J+=len(F)
+							if T and J>=4194304:J=0;time.sleep(T)
+							Z()
+					if P&4294967295!=O.CRC:return{B:A,_G:_I,C:f"Пошкоджений CRC32 у файлі: {O.filename}"}
+			if E:M.finalize_tail(max(1048576,L))
+	except Exception as H:return{B:A,_G:_I,C:f"Помилка перевірки архіву: {H}"}
+	if not E:return{B:A,_G:_E,C:f"ZIP OK ({N} файлів), але файл .sha256 відсутній"}
+	if M.hasher.hexdigest().lower()==G and G:return{B:A,_G:_F,C:f"Цілісність 100% підтверджена ({N} файлів)"}
+	return{B:A,_G:_I,C:'УВАГА! Контрольна сума SHA-256 не збігається'}
+def verify_all_archives(state,progress_callback=_D,buf_size=1048576,cancel_flag=_D):
+	G=state;D=progress_callback;B=cancel_flag;S=time.time();T=VERIFY_PAUSE_LITE if G.get('lite_mode')else _C;E=G[_e];os.makedirs(E,exist_ok=_A);C=[]
+	for H in os.listdir(E):
+		if H.lower().endswith(_g):
+			I=os.path.join(E,H)
+			try:J=os.stat(I);C.append((I,J.st_size,J.st_mtime))
+			except OSError:0
+	C.sort(key=lambda x:x[2],reverse=_A);K=[A[0]for A in C];L=[A[1]for A in C];M=[A*2 for A in L];N,F,A=sum(M),0,[]
+	for(O,P)in enumerate(K,1):
+		if B and B.get(_f):break
+		if D:D(int(F*100/max(1,N)),f"Архів {O}/{len(K)}: {os.path.basename(P)}")
+		A.append(verify_single_archive(P,D,F,N,buf_size=buf_size,cancel_flag=B,io_pause=T));F+=M[O-1]
+	Q=max(.001,time.time()-S);R=sum(L)/1048576.;U=R/Q;return{'total':len(A),'ok_cnt':sum(1 for A in A if A[_G]==_F),'warn_cnt':sum(1 for A in A if A[_G]==_E),'err_cnt':sum(1 for A in A if A[_G]==_I),'elapsed':round(Q,2),'speed_mbs':round(U,1),'total_mb':round(R,1),'cancelled':bool(B and B.get(_f)),'items':A}
+def _copy_to_mirror(engine,out_file,sha_file):
+	F=sha_file;D=out_file;B=engine
+	if not bool(B.state.get(_r,_B)):return
+	E=(B.state.get(_s)or'').strip()
+	if not E or E in('.','./','.\\','/',_Y):return
+	try:
+		P=os.path.normcase(os.path.realpath(os.path.dirname(D)));A=os.path.normcase(os.path.realpath(os.path.expanduser(E)))
+		if P==A:return
+		os.makedirs(A,exist_ok=_A);G=B.state;Q=os.path.getsize(D)+67108864;J=max(0,int(G.get(_t,0)or 0));K=int(max(_C,float(G.get(_u,_C)or _C))*1024**3);R=bool(G.get(_v,_A));C=[]
+		for H in os.listdir(A):
+			if H.lower().endswith(_g)and _w not in H.upper():
+				L=os.path.join(A,H)
+				try:M=os.stat(L);C.append([L,M.st_size,M.st_mtime])
+				except OSError:0
+		C.sort(key=lambda x:x);I=0
+		while C:
+			S=shutil.disk_usage(A).free;T=sum(A for A in C)+os.path.getsize(D);U=R and S<Q or J>0 and len(C)+1>J or K>0 and T>K
+			if not U:break
+			N,V,V=C.pop(0)
+			for O in(N,N+_W):
+				try:
+					if os.path.exists(O):os.remove(O)
+				except OSError:0
+			I+=1
+		if I:B.log(f"Network rotation: removed {I} oldest archive(s).",_H)
+		shutil.copy2(D,os.path.join(A,os.path.basename(D)))
+		if os.path.exists(F):shutil.copy2(F,os.path.join(A,os.path.basename(F)))
+		B.log(f"Дзеркальну копію збережено у: {A}",_F)
+	except Exception as W:B.log(f"Попередження: не вдалося скопіювати у дзеркальну папку ({E}): {W}",_E)
+def _copy_to_network(engine,out_file,sha_file):
+	F=sha_file;C=out_file;B=engine
+	if not bool(B.state.get(_T,_B)):return
+	E=(B.state.get(_K)or'').strip()
+	if not E or E in('.','./','.\\','/',_Y):return
+	try:
+		from operator import itemgetter as O;P=os.path.normcase(os.path.realpath(os.path.dirname(C)));A=os.path.normcase(os.path.realpath(os.path.expanduser(E)))
+		if P==A:return
+		os.makedirs(A,exist_ok=_A);Q=os.path.basename(C);I=os.path.getsize(C)/1048576.;B.set_progress(96,f"Копіювання у мережу ({I:.1f} МБ)...");B.log(f"Копіювання архіву у мережеву папку: {A}...",_H);G=B.state;R=os.path.getsize(C)+67108864;J=max(0,int(G.get(_t,0)or 0));K=int(max(_C,float(G.get(_u,_C)or _C))*1024**3);S=bool(G.get(_v,_A));D=[(os.path.join(A,B),os.path.getsize(os.path.join(A,B)),os.path.getmtime(os.path.join(A,B)))for B in os.listdir(A)if B.lower().endswith(_g)and _w not in B.upper()];D.sort(key=O(2));H=0
+		while D and(S and shutil.disk_usage(A).free<R or J>0 and len(D)+1>J or K>0 and sum(B for(A,B,A)in D)+os.path.getsize(C)>K):
+			L,T,T=D.pop(0)
+			for M in(L,L+_W):
+				if os.path.exists(M):os.remove(M)
+			H+=1
+		if H:B.log(f"Ротація мережі: видалено {H} старих архівів.",_H)
+		U=time.time();shutil.copy2(C,os.path.join(A,Q))
+		if os.path.exists(F):shutil.copy2(F,os.path.join(A,os.path.basename(F)))
+		N=round(max(.1,time.time()-U),1);V=round(I/N,1);B.log(f"Мережеву копію збережено у: {A} ({N} с, {V} МБ/с)",_F)
+	except Exception as W:B.log(f"Попередження: не вдалося скопіювати у мережеву папку ({E}): {W}",_E)
+def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
+	AQ='archive_download';AP='download_url';u='timeout';a=bdir;Z=job_id;S=operation_id;R='ready';I=srv;C=srv_label;A=engine;A.log(f"Збірка архіву на сервері {C}...",_H);E='';b=time.time();T={_h:_C,_x:_C,_b:_C,_i:_C,_c:_C};H=0;U=0;J=0;v=1.5
+	while _A:
+		time.sleep(v);B,h,c,B,w,B=invoke_http(f"{I}/api/migration/export/status?job_id={Z}",A.state,timeout=45.)
+		if not c or not c.strip():
+			J+=1
+			if J in(1,5,15,30):A.log(f"Втрачено зв'язок із {C} під час збірки (HTTP {h}: {w}). Повтор {J}/45...",_E)
+			A.set_progress(_D,f"[{C}] Очікування мережі ({J}/45)...")
+			if J>=45:raise RuntimeError(f"Сервер {C} перестав відповідати під час збірки (HTTP {h}): {w}")
+			time.sleep(2.5);continue
+		try:D=json.loads(c);J=0
+		except Exception:
+			J+=1
+			if J>=15:AR=re.sub('\\s+',' ',re.sub(_p,' ',c)).strip()[:100];raise RuntimeError(f"Сайт {C} повернув HTML замість статусу JSON (HTTP {h}): {AR}")
+			time.sleep(.8);continue
+		if D.get(_F)is _B:
+			d=D.get(_X)or'невідома помилка сервера'
+			if d in('backup_job_not_found',u)and U<4:
+				U+=1;x=(15 if d==u else 4)*U;AS='Час збірки на сервері вичерпано'if d==u else'Сервер скинув завдання';A.log(f"{AS} ({C}). Повтор {U}/4 через {x} с...",_E)
+				for i in range(x,0,-1):A.set_progress(22,f"[{C}] Перезапуск збірки ({U}/4) через {i} с...");time.sleep(1.)
+				B,B,K,B,y,B=invoke_http(f"{I}/api/migration/export/prepare",A.state,_L,_a,timeout=2e1)
+				if K and _o in K:
+					z=A.state.get(_V)or A.state.get(_Q)or''
+					if z:
+						B,B,B,A0,B,B=invoke_http(f"{I}/api/auth/editor/unlock",A.state,_L,json.dumps({_U:z}),I,f"{I}/service.html",1e1)
+						if A0:A.state[_P]=A0
+						B,B,K,B,y,B=invoke_http(f"{I}/api/migration/export/prepare",A.state,_L,_a,timeout=2e1)
+				if not K or not K.strip():raise RuntimeError(f"Помилка повторної підготовки: {y}")
+				try:Z=json.loads(K).get(_q)
+				except Exception:raise RuntimeError('Сервер повернув некоректну відповідь під час повторного запуску.')
+				if not Z:raise RuntimeError(f"Сервер не створив нове завдання експорту: {K[:140]}")
+				E='';continue
+			raise RuntimeError(f"Сервер {C} перервав збірку архіву: {d}")
+		A1=int(D.get('progress',0));F=D.get('phase')or'working';v=1.5 if F in(_h,R)else 4. if F in(_c,_i)else 2.5;H=D.get('total_bytes',0)or 0;j=D.get('processed_bytes',0)or 0
+		if F!=E:
+			if E:V=max(_C,time.time()-b);T[E if E in T else _b]+=V;_record_cloud_event(A,S,_J,stage=f"server_{E}",duration_sec=V)
+			E=F;b=time.time();_record_cloud_event(A,S,_M,stage=f"server_{F}");A.log(f"Етап сервера ({C}): {pretty_phase(F)}",_H)
+		W=max(.05,time.time()-b)
+		if H>0:A2=j/1048576./W if j>0 and W>.25 else _C;AT=f", {A2:.1f} МБ/с"if A2>.05 else'';A3=f" ({j/1048576:.1f}/{H/1048576:.1f} МБ{AT})"
+		else:A3=''
+		A4=A.state.get(_R,_S);A5=f"{W:.1f} {"с"if A4=="uk"else"s"}"if W<60 else format_duration(W,A4).partition(' (').__getitem__(0)
+		if F==_c:A.set_progress(_D,f"[{C}] {pretty_phase(F)} ({A5})...")
+		elif F!=R and D.get(R)is not _A:AU=f": {A1}%"if A1>0 else f" ({A5})";A.set_progress(_D,f"[{C}] {pretty_phase(F)}{AU}{A3}")
+		if F==R or D.get(R)is _A:
+			if E and E!=R:V=max(_C,time.time()-b);T[E if E in T else _b]+=V;_record_cloud_event(A,S,_J,stage=f"server_{E}",duration_sec=V)
+			A._last_srv_timings={A:round(B,1)for(A,B)in T.items()};A._last_srv_timings[_j]=time.time();A6=45 if A.state.get(_N)and A.state.get(_k,_A)else 75;A.set_progress(A6,f"[{C}] Архів готовий ({A6}%). Завантаження...");break
+		if D.get(_G)==_X or F==_X:raise RuntimeError(f"Сервер {C} повідомив про помилку під час створення архіву!")
+	A7=format_backup_dt(datetime.now());M=os.path.join(a,f"homegrid_backup_DAILY_{A7}.zip");A8=1
+	while os.path.exists(M):M=os.path.join(a,f"homegrid_backup_DAILY_{A7}_{A8}.zip");A8+=1
+	import tempfile as AV;A9=_B;k=a;AA=not bool(A.state.get(_O,_A))and bool(A.state.get(_T))and bool((A.state.get(_K)or'').strip())
+	if _is_slow_or_cloud_path(a)or AA:
+		l=AV.gettempdir()
+		try:AB=shutil.disk_usage(l).free
+		except OSError:AB=0
+		AW=int(H*1.25)+104857600 if H>0 else 536870912
+		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='??????? ?????? ???????? ?????'if AA else'????? ??????????? ? ???????? / ?????????? ???????';A.log(f"???? ({AX}): ?????? ????????? ?? ???????? ? ????????? ????? ?? SSD, ? ????? ???????? ? ????? ???????????.",_E)
+	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження ZIP-архіву з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25
+	for O in range(1,N+1):
+		if os.path.exists(G):os.remove(G)
+		p=time.time();P=_B;X='';e=_D
+		for Ab in(_A,_B):
+			try:
+				q=A.state.get('_jar')or http.cookiejar.CookieJar();_seed_cookie(q,n,'hg_client',AC);_seed_cookie(q,n,'homegrid_dash_session',AY);AE=[urllib.request.HTTPCookieProcessor(q)]
+				if Ab:AE.append(urllib.request.ProxyHandler({}))
+				Ac=urllib.request.build_opener(*AE);Ad=urllib.request.Request(n,headers={'User-Agent':BROWSER_UA,'Accept-Encoding':'identity'})
+				with Ac.open(Ad,timeout=300)as AF,open(G,'wb',buffering=1048576)as Ae:
+					r=(AF.headers.get('X-Checksum-Sha256')or D.get('sha256')or'').strip().lower();e=hashlib.sha256();Y=0;AG=time.time();AH=p;AI=0;Q=_D;Af=max(16384,int(A.state.get(_l,64)or 64)*1024)
+					while _A:
+						f=AF.read(Af)
+						if not f:break
+						Ae.write(f);e.update(f);Y+=len(f);g=time.time()
+						if g-AG>=1.:
+							AG=g;AJ=Y/1048576.;Ag=max(.001,g-AH);AK=(Y-AI)/1048576./Ag;Q=AK if Q is _D else .35*AK+.65*Q;AH=g;AI=Y;AL=f"{Q:.2f} МБ/с"if Q>=1. else f"{Q*1024:.0f} КБ/с";AM=f" [спроба {O}/{N}]"if O>1 else''
+							if o>0:Ah=min(99,int(Y/o*100));Ai,Aj=(45,20)if A.state.get(_N)and A.state.get(_k,_A)else(75,17);A.set_progress(Ai+int(Ah*(Aj/1e2)),f"Завантаження{AM}: {AJ:.1f}/{o/1048576.:.1f} МБ | Швидкість: {AL}")
+							else:A.set_progress(83,f"Завантаження{AM}: {AJ:.1f} МБ | Швидкість: {AL}")
+				P=_A;break
+			except Exception as Ak:
+				X=str(Ak)
+				if os.path.exists(G):os.remove(G)
+		L=os.path.getsize(G)if os.path.exists(G)else 0;s=L>=int(H*.99)if H>0 else L>=1024;AN=e.hexdigest().lower()if P and e is not _D else''
+		if P and s and r and len(r)==64 and AN!=r:
+			P=_B;X='SHA-256 не збігається з контрольним хешем сервера'
+			if os.path.exists(G):os.remove(G)
+		if P and s:
+			os.replace(G,m);t=max(.05,time.time()-p)
+			if hasattr(A,_z):A._last_srv_timings[_j]=p
+			A.log(f"Архів завантажено: {L/1048576.:.2f} МБ за {round(t,1)} с",_F);_record_cloud_event(A,S,_J,stage=AQ,archive=M,size_mb=L/1048576.,size_bytes=L,duration_sec=t,speed_mbps=L/1048576./max(t,.001));return m,M,AN
+		if P and not s:
+			X=f"завантажено лише {L/1048576.:.1f} із {H/1048576.:.1f} МБ (обрив потоку)"
+			if os.path.exists(G):os.remove(G)
+		if O<N:
+			AO=AD[min(O-1,len(AD)-1)];A.log(f"Збій завантаження ({X}). Повтор {O+1}/{N} через {AO} с...",_E)
+			for i in range(AO,0,-1):A.set_progress(75,f"Очікування мережі: повтор {O+1}/{N} через {i} с...");time.sleep(1.)
+		else:raise RuntimeError(f"Помилка завантаження після {N} спроб: {X}")
+def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_B):
+	AI='record_op_event';AH='all_time_mb';AG='gfs_rotation';AF='local_mirror';AE='archive_sha256_verification';AD='archive_crc32_verification';AC='server_connection_and_preparation';AB='%H:%M:%S';h=auto_quiet;g='success';f='all_time_cnt';A=engine
+	with A.lock:
+		if A.is_running:return
+		A.is_running=_A
+	A.set_pill('Резервне копіювання...','work');F=time.time();i=datetime.now().strftime(AB);from core.cloud import new_operation_id as AJ;C=AJ();B='';D=_C;_record_cloud_event(A,C,'started',stage='server_connection',archive_sequence=max(0,int(A.state.get(f,0)))+1)
+	try:
+		L=bool(A.state.get(_O,_A));R=bool(A.state.get(_T,_B))and bool((A.state.get(_K)or'').strip())
+		if not L and not R:raise RuntimeError('No storage enabled (Local and Network are both OFF).')
+		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"Local: {j}"]if L else[])+([f"Network: {A.state.get(_K)}"]if R else[]);A.log('Targets: '+' | '.join(AL),_H)
+		if L and R:A.log('Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.',_H)
+		AM=time.time();_record_cloud_event(A,C,_M,stage=AC);k,AN,AO=_backup_stage1_prepare(A,raw_url,force_skip);_record_cloud_event(A,C,_J,stage=AC,duration_sec=time.time()-AM,result=g);AP=time.time();_record_cloud_event(A,C,'milestone',stage='server_job_ready');AQ,H,l=_download_backup_zip(A,k,AN,AO,j,C);B=AQ;S=time.time();M=os.path.getsize(B);D=M/1048576.;_record_cloud_event(A,C,_M,stage=AD,archive=B);_record_cloud_event(A,C,_M,stage=AE,archive=B);m,AR=(66,5)if A.state.get(_N)and A.state.get(_k,_A)else(92,5);A.set_progress(m,f"Перевірка CRC32 + SHA-256: 0.0 / {D:.1f} МБ");AS=0;n=time.time()
+		with open(B,'rb',buffering=1048576)as AT:
+			K=_HashingReader(AT)
+			with zipfile.ZipFile(K,'r')as o:
+				p=o.infolist();G=len(p)
+				if G<1:os.remove(B);raise RuntimeError('ZIP-архів порожній!')
+				for T in p:
+					U=0
+					with o.open(T,'r')as AU:
+						for q in iter(lambda:AU.read(1048576),b''):
+							U=zlib.crc32(q,U);AS+=len(q);r=time.time()
+							if r-n>=.5:n=r;AV=m+int(min(1.,K.hashed_pos/max(1,M))*AR);A.set_progress(AV,f"Перевірка CRC32 + SHA-256: {K.hashed_pos/1048576.:.1f} / {D:.1f} МБ")
+					if U&4294967295!=T.CRC:os.remove(B);raise RuntimeError(f"Пошкоджений файл в архіві: {T.filename}")
+			s=time.time();K.finalize_tail(1048576)
+		t=time.time();u=max(.001,s-S);v=max(.001,t-s);w=round(max(.1,u),1);x=round(max(.1,v),1);AW=round(max(.1,t-S),1);_record_cloud_event(A,C,_J,stage=AD,archive=B,duration_sec=u,files_count=G);y=K.hasher.hexdigest().lower()
+		if l and y!=l:os.remove(B);raise RuntimeError('Помилка запису на диск: SHA-256 файлу на носії не збігається зі завантаженим потоком!')
+		AX=y.upper();E=B+_W
+		with open(E,'w',encoding='utf-8')as AY:AY.write(f"{AX.lower()}  {os.path.basename(H)}\n")
+		if os.path.normcase(os.path.realpath(B))!=os.path.normcase(os.path.realpath(H)):
+			A.set_progress(97,'?????????? ???????????? ?????? ? ????? ???????????...');os.makedirs(os.path.dirname(H),exist_ok=_A);z=H+_W;shutil.move(B,H)
+			if os.path.exists(E):shutil.move(E,z)
+			B=H;E=z;A.log(f"???? ?? .sha256 ?????????? ? ????? ???????????: {os.path.dirname(B)}",_F)
+		A.log(f"Цілісність перевірено в 1 прохід ({G} файлів) за {AW} с. Збережено {os.path.basename(E)}",_F);_record_cloud_event(A,C,_J,stage=AE,archive=B,size_mb=D,duration_sec=v,files_count=G,size_bytes=M);V=bool(A.state.get(_r,_B))and bool((A.state.get(_s)or'').strip());W=_C
+		if V:AZ=time.time();_record_cloud_event(A,C,_M,stage=AF,archive=B);_copy_to_mirror(A,B,E);A0=max(.001,time.time()-AZ);W=round(max(.1,A0),1);_record_cloud_event(A,C,_J,stage=AF,archive=B,duration_sec=A0)
+		A1=bool(A.state.get(_T,_B))and bool((A.state.get(_K)or'').strip());Aa=time.time()
+		if bool(A.state.get(_O,_A)):_copy_to_network(A,B,E)
+		Ab=round(max(.1,time.time()-Aa),1)if A1 else _C
+		with A.lock:
+			if hasattr(A,'_dest_stats'):A._dest_stats[_m]=_D
+		if hasattr(A,'request_dest_stats_refresh'):A.request_dest_stats_refresh()
+		if not bool(A.state.get(_O,_A)):
+			for X in(B,E):
+				try:
+					if X and os.path.exists(X):os.remove(X)
+				except OSError:0
+			A.log('Temp local archive removed (Local storage is OFF).',_H)
+		if A.state[_Z]:commit_state(A.state);A.log('Налаштування та ключі захищено збережено.',_F)
+		from core.gfs import apply_gfs_cleanup as Ac,compute_gfs_plan as Ad;A.set_progress(98,'Ротація бекапів за обраною стратегією...');Ae=time.time();_record_cloud_event(A,C,_M,stage=AG,archive=B);Y,Y,A2=Ad(A.state);A3=len(A2);A4=_B
+		if not skip_cleanup and not NO_CLEAN and(h or bool(A.state.get('silent_cleanup',_B))):Af,Y,Y=Ac(A,skip_prompt=_A,sync_cloud=_B);A4=Af==len(A2)
+		_record_cloud_event(A,C,_J,stage=AG,archive=B,duration_sec=time.time()-Ae);Ag=time.time()
+		def Ah(cpct,cinfo):B=73+int((cpct or 0)/1e2*26);A.set_progress(min(99,B),f"pCloud: {cinfo}")
+		Ai=_sync_cloud_backups(A,prune=A4,progress_cb=Ah);_record_cloud_event(A,C,_J,stage='cloud_archive_sync',archive=B,duration_sec=time.time()-Ag,result=g if Ai else'disabled'if not A.state.get(_N)else'failed');N=time.time();A5=datetime.now().strftime(AB);I=getattr(A,_z,{});Aj=I.get(_j,AP);O=round(max(.1,S-Aj),1);Z=round(I.get(_h,_C),1);a=round(I.get(_x,_C),1);b=round(I.get(_i,_C),1);c=round(I.get(_b,_C),1);d=round(I.get(_c,_C),1);P=round(max(.1,N-F),1);A6=round(Z+a+c+b+d,1);e=round(D/max(.1,O),1);Q=os.path.basename(B);A.set_progress(100,f"Готово! Архів збережено ({D:.2f} МБ)");A.set_pill(f"ГОТОВО | {D:.1f} МБ",_F);Ak=format_duration(P,A.state.get(_R,_S)).partition(' (').__getitem__(0);A.log(f"УСПІХ! Резервне копіювання завершено за {Ak} ({i} → {A5}).",_F);A7=get_fast_sysinfo();ni=detect_network_adapter(k);ni_s=f" | {ni['scope']} {ni['label']} ({ni['desc'] or ni['name']})"if ni.get('label')else'';A8=f"v{SCRIPT_VER} | {A7}{ni_s} | download {e} MB/s ({O} s) | server {A6} s | total {P} s | files {G}";A.log(f"[SUMMARY] {A8}",_H);from core.i18n import tr as Al;Am=A.state.get(_R,_S);_desktop_notify(_n,Al(f"Резервну копію створено: {Q} ({D:.1f} МБ)",Am));A.state[f]=max(int(A.state.get(f,0)),0)+1;A.state[AH]=round(max(float(A.state.get(AH,_C)),_C)+D,1);commit_state(A.state)
+		if hasattr(A,AI):A.record_op_event('Успішно',Q,round(D,1),dur_sec=P,started_at=F,finished_at=N)
+		_record_cloud_event(A,C,g,archive=Q,size_mb=D,size_bytes=M,files_count=G,duration_sec=N-F,speed_mbps=D/max(N-F,.001),download_speed_mbps=e,download_duration_sec=O,server_duration_sec=A6,server_preparing_sec=Z,server_copying_sec=a,server_processing_sec=c,server_packing_sec=b,server_checking_sec=d,crc_duration_sec=w,sha256_duration_sec=x,mirror_enabled=V,mirror_duration_sec=W,gfs_removed_count=A3,system_info=A7,net_scope=ni.get('scope',''),srv_host=ni.get('srv_host',''),srv_conn_est=ni.get('srv_conn_est',''),net_adapter_name=ni.get('desc')or ni.get('name',''),net_adapter_type=ni.get('type',''),net_link_mbps=ni.get('link_mbps',0),net_adapter_label=ni.get('label',''),summary=A8);_sync_cloud_reports(A)
+		if not SILENT_MODE and not h:An,Ao,Ap=A.get_storage_stats();Aq={'file':Q,'srv':k,'size_mb':round(D,2),'files_cnt':G,'ts_start':i,'ts_end':A5,'total_sec':P,'srv_prep_sec':Z,'srv_copy_sec':a,'srv_proc_sec':c,'srv_pack_sec':b,'srv_chk_sec':d,'dl_sec':O,'buf_kb':int(A.state.get(_l,64)or 64),'spd_mbs':e,'crc_sec':w,'sha_sec':x,'mir_active':V,'mir_sec':W,'net_active':A1,'net_sec':Ab,'z_cnt':An,'z_mb':Ao,'free_gb':Ap,'old_cnt':A3,'net_scope':ni.get('scope',''),'srv_conn_est':ni.get('srv_conn_est',''),'net_adapter_label':ni.get('label',''),'net_adapter_name':ni.get('desc')or ni.get('name','')};A.ask_modal('backup_report','Звіт про резервне копіювання',json.dumps(Aq,ensure_ascii=_B))
+	except Exception as J:
+		A.exit_code=1;A.log(f"ПОМИЛКА: {J}",_I);from core.i18n import tr as Ar;_desktop_notify(Ar('HomeGrid Backup: помилка',A.state.get(_R,_S)),str(J)[:200]);A.set_pill('Помилка бекапу',_I)
+		if hasattr(A,AI):A9=time.time();A.record_op_event('Помилка',str(J),_C,dur_sec=round(A9-F,1),started_at=F,finished_at=A9)
+		_record_cloud_event(A,C,_X,archive=B,size_mb=D,duration_sec=time.time()-F,result=_X,error_type=type(J).__name__);_sync_cloud_reports(A);A.set_progress(0,f"Помилка: {J}")
+		if not SILENT_MODE:A.ask_modal('alert','Помилка резервного копіювання',str(J))
+	finally:
+		if hasattr(A,'flush_logs'):A.flush_logs()
+		try:
+			import tempfile as As;AA=os.path.join(As.gettempdir(),_y)
+			if os.path.isdir(AA):shutil.rmtree(AA,ignore_errors=_A)
+		except Exception:0
+		with A.lock:A.is_running=_B;A.indeterminate=_B

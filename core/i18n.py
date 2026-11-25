@@ -14,753 +14,109 @@
 # patch-id: fav-servers-pills-2.65
 # patch-id: pcloud-stats-refresh-compact-2.67
 # [ФАЙЛ: core/i18n.py (v2.23 | 25.11.2026 09:00) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
-import re
-from functools import lru_cache
-
-EN_EXACT = {
-    "Січень": "January", "Лютий": "February", "Березень": "March", "Квітень": "April",
-    "Травень": "May", "Червень": "June", "Липень": "July", "Серпень": "August",
-    "Вересень": "September", "Жовтень": "October", "Листопад": "November", "Грудень": "December",
-    "Файл не знайдено": "File not found",
-    "Порожній ZIP-архів": "Empty ZIP archive",
-    "Перевірку перервано": "Verification aborted",
-    "папка порожня": "folder is empty",
-    "Перевірка захисту SHA-256": "SHA-256 Protection Check",
-    "1 день": "1 day",
-    "Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).": "Tray unavailable. Window minimized to taskbar (running in background).",
-    "HomeGrid Backup: помилка": "HomeGrid Backup: Error",
-    "Автопошук": "Auto-scan",
-    "Виявлені сервери в мережі": "Discovered Servers on Network",
-    "Сервер не знайдено": "Server not found",
-    "Збережено (!)": "Saved (!)",
-    "Очищення старих бекапів": "Old Backups Cleanup",
-    "Збережені PIN-коди та токен сесії очищено (Keyring / .env).": "Saved PIN codes and session token cleared (Keyring / .env).",
-    "Сервер повідомив про помилку під час створення архіву!": "Server reported an error while creating archive!",
-    "Введіть IP-адресу або домен сайту перед підключенням!": "Enter server IP or domain before connecting!",
-    "Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?": "Are you sure you want to stop HomeGrid Backup and exit the application?",
-    "Видалити підключення?": "Delete connection?",
-    "Замінити підключення?": "Replace connection?",
-    "Підключення з таким ім'ям уже існує. Замінити його? Файли у хмарі залишаться.": "A connection with this name already exists. Replace it? Files in the cloud will remain.",
-    "Сервер збережено": "Server saved",
-    "Підключення успішне": "Connection successful",
-    "Не є сервером HGM": "Not an HGM server",
-    "Сайт недоступний": "Host unreachable",
-    "ZIP-архів порожній!": "ZIP archive is empty!",
-    "Збережений LOGIN PIN відхилено сервером.": "Saved LOGIN PIN rejected by server.",
-    "Збережений EDITOR PIN відхилено.": "Saved EDITOR PIN rejected.",
-    "Авторизація HomeGrid": "HomeGrid Authorization",
-    "Введіть LOGIN PIN:": "Enter LOGIN PIN:",
-    "Права редактора": "Editor Rights",
-    "Для експорту потрібен EDITOR PIN:": "EDITOR PIN is required for export:",
-    "Невірний LOGIN PIN!": "Invalid LOGIN PIN!",
-    "Вхід скасовано (не введено LOGIN PIN).": "Login cancelled (LOGIN PIN not entered).",
-    "Експорт скасовано (не введено EDITOR PIN).": "Export cancelled (EDITOR PIN not entered).",
-    "Сервери HomeGrid Monitor у мережі не знайдено.": "No HomeGrid Monitor servers found on the network.",
-    "Оберіть папку": "Select folder",
-    "Запуск...": "Starting...",
-    "✨ Повна графіка (стандартний режим)": "✨ Full Graphics (standard mode)",
-    "⚡ Ультралегкий LITE-режим (швидкий текст)": "⚡ Ultra-light LITE mode (fast text)",
-    "⚙️ Налаштування екрана та шрифту...": "⚙️ Screen and font settings...",
-    "✓ Збережені PIN-коди очищено": "✓ Saved PIN codes cleared",
-    "Авто (під монітор і DPI)": "Auto (by monitor and DPI)",
-    "Авто (за розміром вікна)": "Auto (by window size)",
-    "Цифровий лічильник (тільки відсотки)": "Digital counter (percentages only)",
-    "Оберіть виявлений": "Select found",
-    "Виявлені (0)": "Found (0)",
-    "Виявлені": "Found",
-    "Історія": "History",
-    "Підключити": "Connect",
-    "Папка архівів...": "Backup folder...",
-    "Відкрити папку": "Open folder",
-    "Папка дзеркала...": "Mirror folder...",
-    "Статистика": "Statistics",
-    "Журнал операцій": "Operations log",
-    "Аналіз GFS / SHA-256": "GFS / SHA-256 Analysis",
-    "Очистити": "Clear",
-    "ЗАПУСТИТИ БЕКАП": "START BACKUP",
-    "Налаштування": "Settings",
-    "Про програму": "About",
-    "Вихід": "Exit",
-    "Світла тема": "Light theme",
-    "Темна тема": "Dark theme",
-
-    "Готовий до резервного копіювання": "Ready for backup",
-    "Очікування": "Idle",
-    "Відкрити HomeGrid Backup": "Open HomeGrid Backup",
-    "▶ Запустити резервне копіювання": "▶ Start Backup",
-    "пошук...": "scanning...",
-    "Зупинити": "Stop",
-    "Зупинка...": "Stopping...",
-    "Сервер підключено": "Server Connected",
-    "Резервне копіювання...": "Backing up...",
-    "Архівація": "Backup",
-    "Вкажіть окрему папку у хмарі; корінь сховища не допускається.": "Enter a separate cloud folder; the storage root is not allowed.",
-    "Папка у хмарі має бути відносним шляхом без сегментів '.' або '..'.": "Cloud folder must be a relative path without '.' or '..' segments.",
-    "Хмарний сервіс обмежив частоту запитів. Файли залишено в черзі; повторна синхронізація буде автоматичною. Для Google Drive рекомендується власний OAuth Client ID та Secret.": "The cloud provider rate-limited the requests. Files remain queued and sync will retry automatically. For Google Drive, use your own OAuth Client ID and Secret.",
-    "Черга синхронізації: архіви {archives}, звіти {reports}": "Cloud sync queue: archives {archives}, reports {reports}",
-    "Черга хмарної синхронізації порожня.": "Cloud sync queue is empty.",
-    "Повторити синхронізацію": "Retry cloud sync",
-    "Синхронізацію запущено...": "Cloud sync started...",
-    "Синхронізація вже виконується.": "Cloud sync is already running.",
-    "Синхронізацію завершено.": "Cloud sync completed.",
-    "Увімкніть хмарне сховище, щоб повторити синхронізацію.": "Enable cloud storage before retrying sync.",
-    "Спочатку збережіть налаштування хмарного сховища.": "Save the cloud settings before retrying sync.",
-    "Введіть обидва значення: OAuth Client ID та Client Secret.": "Enter both the OAuth Client ID and Client Secret.",
-    "Google OAuth Client ID:": "Google OAuth Client ID:",
-    "Google OAuth Client Secret:": "Google OAuth Client Secret:",
-    "Підключення...": "Connecting...",
-    "Пошук в LAN...": "Scanning LAN...",
-    "Помилка бекапу": "Backup error",
-    "Не знайдено": "Not found",
-    "ОК": "OK",
-    "Видалити": "Delete",
-    "Повна графіка (стандартний режим)": "Full Graphics (standard mode)",
-    "Ультралегкий LITE-режим (швидкий текст)": "Ultra-light LITE mode (fast text)",
-    "Налаштування екрана та шрифту...": "Screen and font settings...",
-    "Налаштування експортовано у JSON": "Settings exported to JSON",
-    "Збережені PIN-коди очищено": "Saved PIN codes cleared",
-    "Увімкнути хмарне дзеркало та звіт": "Enable cloud mirror and report",
-    "Адреса сервера (напр. 192.168.1.246)": "Server address (e.g. 192.168.1.246)",
-    "Пошук по LAN": "Search LAN",
-    "Сховище: завантаження...": "Storage: loading...",
-    "Перевірити SHA-256": "Verify SHA-256",
-    "Запуск перевірки цілісності CRC32 + SHA-256...": "Starting CRC32 + SHA-256 integrity verification...",
-    "☁ Хмарне сховище": "☁ Cloud storage",
-    "Хмарне сховище": "Cloud storage",
-    "Налаштування хмарного сховища...": "Cloud storage settings...",
-    "Відкрити налаштування хмарного сховища": "Open cloud storage settings",
-    "Вибір хмарного сховища:": "Select cloud storage:",
-    "5. Налаштування хмарного сховища": "5. Cloud storage settings",
-    "Сервіс:": "Service:",
-    "Email / ім'я користувача:": "Email / username:",
-    "Пароль:": "Password:",
-    "Для MEGA використовується email і пароль аккаунта.": "MEGA uses your account email and password.",
-    "Для Koofr потрібен пароль додатка, створений в налаштуваннях Koofr.": "Koofr requires an app password generated in Koofr settings.",
-    "Введіть ім'я користувача та пароль.": "Enter a username and password.",
-    "Створення підключення...": "Creating connection...",
-    "Ім'я підключення:": "Connection name:",
-    "Приховати введення": "Hide input",
-    "Архіви всіх пристроїв зберігаються у вибраній папці хмари в backups/; назви містять ID пристрою. Спільний текстовий журнал у корені: HomeGridBackup.log. На всіх пристроях виберіть той самий обліковий запис і папку.": "Archives from all devices are stored in the selected cloud folder under backups/; filenames include the device ID. The shared plain-text log in the root is HomeGridBackup.log. Select the same cloud account and folder on every device.",
-    "Архіви зберігаються у вибраній папці хмари в backups/<ID пристрою>/. Журнал пристрою: operations/<ID пристрою>/<дата>.jsonl.": "Archives are stored in the selected cloud folder under backups/<device ID>/. The device log is operations/<device ID>/<date>.jsonl.",
-    "Підключення створено.": "Connection created.",
-    "Замінити підключення?": "Replace connection?",
-    "Підключення з таким ім'ям уже існує. Замінити його? Файли у хмарі залишаться.": "A connection with this name already exists. Replace it? Files in the cloud will stay.",
-    "Копіювати посилання": "Copy link",
-    "Деталі": "Details",
-    "Готово ✔": "Done ✔",
-    "Увійдіть у браузері та натисніть «Дозволити».": "Sign in in your browser and click Allow.",
-    "Доступ отримано, зберігаю підключення...": "Access granted, saving the connection...",
-    "Посилання скопійовано. Відкрийте його в браузері.": "Link copied. Open it in your browser.",
-    "Помилка підключення. Подробиці у розділі «Деталі».": "Connection failed. See Details.",
-    "Вільно:": "Free:",
-    "ГБ": "GB",
-    "Мало місця!": "Low space!",
-    "Спочатку виберіть підключення.": "Select a connection first.",
-    "Підключення працює.": "Connection is working.",
-    "Видалити підключення?": "Delete connection?",
-    "Буде видалено лише конфігурацію. Файли у хмарі залишаться.": "Only the configuration will be deleted. Cloud files will remain.",
-    "Видалення підключення...": "Deleting connection...",
-    "Підключення видалено.": "Connection deleted.",
-    "Додати та підключити": "Add and connect",
-    "Перевірити": "Test",
-    "Видалити підключення": "Delete connection",
-    "Надіслати": "Send",
-    "Перевірка підключення...": "Testing connection...",
-    "Оберіть хмарний сервіс.": "Choose a cloud provider.",
-    "Підключення з таким ім'ям уже існує.": "A connection with this name already exists.",
-    "Журнал зберігається локально у папці reports поруч з архівами та окремо синхронізується в хмару. Дані розділяються за ID пристрою та містять етапи, кількість файлів і системні версії.": "Reports are stored locally in the reports folder beside the archives and separately synced to the cloud. Data is separated by device ID and includes stage timings, file counts, and system versions.",
-    "Не вказано адресу": "No address entered",
-    "Не перевірено": "Not checked",
-    "Перевірка...": "Checking...",
-    "Підключення до сервера та папки збереження": "Server connection and backup folders",
-    "Адреса:": "Server:",
-    "🕘 Історія": "🕘 History",
-    "🔌 Підключити": "🔌 Connect",
-    "🔍 Автопошук по LAN": "🔍 Auto-scan LAN",
-    "📡 Обрати виявлений (0)": "📡 Select found (0)",
-    "Папка:": "Folder:",
-    "📁 Папка архівів...": "📁 Backup folder...",
-    "📂 Відкрити папку": "📂 Open folder",
-    "Дзеркало:": "Mirror:",
-    "🪞 Папка дзеркала...": "🪞 Mirror folder...",
-    "Увімкнено": "Enabled",
-    "Вимкнено": "Disabled",
-    "Не задано": "Not set",
-    "ЛОКАЛЬНЕ СХОВИЩЕ": "LOCAL STORAGE",
-    "ОСТАННІЙ АРХІВ": "LAST ARCHIVE",
-    "Ще немає створених копій": "No backups created yet",
-    "Невідомо": "Unknown",
-    "📊 Статистика": "📊 Statistics",
-    "📜 Журнал операцій": "📜 Operations log",
-    "🔍 Аналіз GFS / SHA-256": "🔍 GFS / SHA-256 Analysis",
-    "Системний лог": "System log",
-    "🗑 Очистити лог": "🗑 Clear log",
-    "▶ ЗАПУСТИТИ БЕКАП": "▶ START BACKUP",
-    "⚙️ Налаштування": "⚙️ Settings",
-    "ℹ️ Про програму": "ℹ️ About",
-    "✖ Вихід": "✖ Exit",
-    "☀️ Світла тема": "☀️ Light theme",
-    "🌙 Темна тема": "🌙 Dark theme",
-    "Закрити": "Close",
-    "Скасувати": "Cancel",
-    "Підтвердити": "Confirm",
-    "Обрати": "Select",
-    "Так": "Yes",
-    "Ні": "No",
-    "Успішно": "Success",
-    "Помилка": "Error",
-    "Підтвердження виходу": "Confirm Exit",
-    "Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?": "Are you sure you want to close HomeGrid Backup?",
-    "✖ Так, вийти": "✖ Yes, Exit",
-    "Так, вийти": "Yes, Exit",
-    "Перевірити SHA-256 + CRC32": "Verify SHA-256 + CRC32",
-    "Очистити застарілі зараз": "Clean Expired Now",
-    "🗑 Пошкоджених: 0": "🗑 Corrupted: 0",
-    "🗑 Видалити": "🗑 Delete",
-    "ЗБЕРЕГТИ": "KEEP",
-    "ВИДАЛИТИ": "DELETE",
-    "ЗАХИЩЕНО": "PROTECTED",
-    "БИТИЙ!": "CORRUPT!",
-    "Зняти PIN": "Unpin",
-    "🔒 Захист": "🔒 Protected",
-    "ЛОКАЛЬНЕ СХОВИЩЕ:": "LOCAL STORAGE:",
-    "ОСТАННІЙ АРХІВ:": "LAST ARCHIVE:",
-    "Архів готовий": "Archive ready",
-    "ріст стабільний ✔": "steady growth ✔",
-    "Збережена сесія застаріла. Повторний вхід...": "Saved session expired. Re-login...",
-    "Авторизацію підтверджено сервером!": "Authorization confirmed by server!",
-    "Очищення застарілих архівів пропущено.": "Old archive cleanup skipped.",
-    "Режим збереження: очищення застарілих архівів пропущено.": "Keep mode: old archive cleanup skipped.",
-    "Вікно згорнуто у системний трей (програма продовжує роботу).": "Window minimized to system tray (running in background).",
-    "Немає захисту": "No protection",
-    "Зведена аналітика за періодами та станом локального сховища:": "Summary analytics by period and local storage status:",
-    "ЗА ТИЖДЕНЬ": "THIS WEEK",
-    "ЗА МІСЯЦЬ": "THIS MONTH",
-    "СЕР. РОЗМІР": "AVG. SIZE",
-    "ЗАХИСТ SHA-256": "SHA-256 PROTECTION",
-    "УСПІШНІСТЬ": "SUCCESS RATE",
-    "ГЛИБИНА": "DEPTH",
-    "на один архів": "per archive",
-    "натисніть для списку": "click to view list",
-    "усі захищені": "all protected",
-    "останніх запусків": "recent runs",
-    "діапазон копій": "backup span",
-    "Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)": "Quick switch between light and dark themes (more styles in Settings)",
-    "Оберіть режим (Графіка / LITE) або роздільну здатність вікна": "Select mode (Graphics / LITE) or window resolution",
-    "Список серверів, виявлених під час останнього сканування локальної мережі": "List of servers found during the last LAN scan",
-    "Відкрити список архівів, керування мітками KEEP та перевірку цілісності SHA-256": "Open archive list, KEEP tags management, and SHA-256 integrity check",
-    "IP-адреса або URL сервера HomeGrid Monitor (додайте ! в кінці, щоб пропустити перевірку)": "HomeGrid Monitor server IP or URL (append ! at the end to skip host check)",
-    "Відкрити список раніше збережених адрес серверів": "Open previously saved server addresses",
-    "Перевірити зв'язок із вказаним сервером та авторизуватися": "Test connection to the specified server and log in",
-    "Автоматичний пошук серверів HomeGrid Monitor у локальній мережі": "Auto-scan local network for HomeGrid Monitor servers",
-    "Локальна папка для збереження ZIP-архівів та файлів .sha256": "Local folder for saving ZIP archives and .sha256 files",
-    "Обрати іншу папку для збереження резервних копій": "Choose another folder for saving backups",
-    "Відкрити папку з архівами у файловому менеджері": "Open backup folder in file manager",
-    "Додаткова папка для автоматичного дублювання кожного нового бекапу": "Secondary folder for automatic mirroring of every new backup",
-    "Обрати папку для дзеркального копіювання архівів": "Choose folder for mirroring archives",
-    "Увімкнути або вимкнути автоматичне копіювання у дзеркальну папку": "Enable or disable automatic copying to the mirror folder",
-    "Зведена статистика копій за періодами та стан захисту SHA-256": "Summary backup statistics by period and SHA-256 protection status",
-    "Журнал останніх 25 операцій резервного копіювання": "Log of the last 25 backup operations",
-    "Очистити поточні повідомлення у вікні системного логу": "Clear current messages in the system log window",
-    "Запустити створення та перевірку нової резервної копії зараз": "Start creating and verifying a new backup now",
-    "Налаштування глибини GFS, розкладу, трею, мови та теми": "Configure GFS retention, schedule, tray, language, and theme",
-    "Інформація про версію та можливості програми": "Information about application version and features",
-    "Завершити роботу програми та вийти": "Finish work and exit the application",
-    "Історія адрес серверів": "Server Address History",
-    "Оберіть раніше збережену адресу або видаліть зайву:": "Select a saved address or remove an old one:",
-    "Історія адрес порожня.": "Server history is empty.",
-    "Налаштування програми, тем, масштабу, GFS та Планувальника": "Application, Theme, Scale, GFS & Scheduler Settings",
-    " 1. Стратегія збереження файлів (GFS) ": " 1. File Retention Strategy (GFS) ",
-    "Щоденні (дн.):": "Daily (days):",
-    "За сьогодні:": "Today max:",
-    "Тижневі (шт.):": "Weekly (pcs):",
-    "Місячні (шт.):": "Monthly (pcs):",
-    "Річні (архів):": "Yearly (archive):",
-    "🗑️ У Кошик (замість назавжди)": "🗑️ Move to Trash (instead of permanent)",
-    " 2. Системний трей та тихий режим ": " 2. System Tray, Language & Silent Mode ",
-    "📌 Згортати у системний трей при закритті [X]": "📌 Minimize to system tray on close [X]",
-    "🧹 Очищати старі копії у тихому режиме (GFS)": "🧹 Clean old backups in silent mode (GFS)",
-    "🧹 Очищати старі копії у тихому режимі (GFS)": "🧹 Clean old backups in silent mode (GFS)",
-    "Мова / Language:": "Language:",
-    " 3. Автозапуск за розкладом (Планувальник завдань Windows) ": " 3. Scheduled Autostart (Task Scheduler) ",
-    "Час щодня:": "Daily time:",
-    "У фоні через трей (--hidden)": "Background in tray (--hidden)",
-    "З вікном консолі (--silent)": "With console window (--silent)",
-    "Пріоритет (2-9):": "Priority (2-9):",
-    "Запускати пропущене": "Run missed task",
-    "Розбудити ПК зі сну": "Wake PC from sleep",
-    "📅 Додати в Планувальник": "📅 Add to Scheduler",
-    "🗑️ Видалити задачу": "🗑️ Delete Task",
-    "📋 Копіювати --hidden": "📋 Copy --hidden",
-    "📋 Копіювати --silent": "📋 Copy --silent",
-    " 4. Тема (7 стилів), роздільна здатність та шрифт ": " 4. Theme, Resolution & Font ",
-    "Тема:": "Theme:",
-    "Екран:": "Screen:",
-    "Шрифт:": "Font:",
-    " 5. Стиль індикатора прогресу (12 стилів) ": " 5. Progress Bar Style ",
-    " 4. Оформлення, мова та масштаб екрана ": " 4. Theme, Language & Screen Scale ",
-    "Мова інтерфейсу:": "Interface language:",
-    "Тема оформлення:": "Color theme:",
-    "Роздільна здатність:": "Screen resolution:",
-    "Розмір шрифту:": "Font size:",
-    " 5. Стиль індикатора прогресу (14 стилів) ": " 5. Progress Bar Style (14 styles) ",
-    "Стиль смуги:": "Bar style:",
-    "Копій за день:": "Copies per day:",
-    "У Кошик (замість видалення)": "Move to Trash (instead of delete)",
-    "Згортати у трей при закритті": "Minimize to tray on close",
-    "Автоочищення у фоні (GFS)": "Auto-cleanup in background (GFS)",
-    " 1. Кільцева стратегія (останні N архівів) ": " 1. Ring Strategy (Last N Archives) ",
-    "Зберігати останніх архівів (шт.):": "Keep last archives (pcs):",
-    " 2. Трей та тихий режим ": " 2. Tray & Silent Mode ",
-    " 3. Автозапуск за розкладом ": " 3. Scheduled Autostart ",
-    "У фоні (з іконкою в треї)": "Background (with tray icon)",
-    "З вікном консолі": "With console window",
-    "Додати в Планувальник": "Add to Scheduler",
-    "Видалити задачу": "Delete Task",
-    "Додатково ▾": "More ▾",
-    "Копіювати команду фонового запуску": "Copy background run command",
-    "Копіювати команду консольного запуску": "Copy console run command",
-    "Експорт налаштувань (JSON)...": "Export settings (JSON)...",
-    "Імпорт налаштувань (JSON)...": "Import settings (JSON)...",
-    "✓ Налаштування експортовано у JSON": "✓ Settings exported to JSON",
-    "Скинути PIN": "Reset PINs",
-    "Експорт JSON": "Export JSON",
-    "Імпорт JSON": "Import JSON",
-    "Зберегти та закрити": "Save & Close",
-    "Застосувати": "Apply",
-    "  Резервне копіювання та Розклад  ": "  Backup & Scheduler  ",
-    "  Вигляд та Інтерфейс  ": "  Appearance & Interface  ",
-    " 4. Вигляд (Мова, Тема, Екран, Шрифт) ": " 4. Theme, Language & Screen Scale ",
-    "🔑 Скинути PIN": "🔑 Reset PINs",
-    "💾 Зберегти та закрити": "💾 Save & Close",
-    "✅ Застосувати": "✅ Apply",
-    "Аналіз локального сховища (GFS та SHA-256)": "Local Storage Analysis (GFS & SHA-256)",
-    "У папці поки немає ZIP-архівів.": "No ZIP archives in the folder yet.",
-    "Перевірка не запущена": "Verification not started",
-    "🛡️ Перевірити SHA-256 + CRC32": "🛡️ Verify SHA-256 + CRC32",
-    "Буфер:": "Buffer:",
-    "🗑️ Очистити застарілі зараз": "🗑️ Clean Expired Now",
-    "Статистика резервного копіювання": "Backup Statistics",
-    "Зведена аналітика за періодами та структурою локального сховища:": "Summary analytics by period and local storage structure:",
-    "СЬОГОДНІ": "TODAY",
-    "ЗА ТИЖДЕНЬ (7 ДН.)": "LAST 7 DAYS",
-    "ЗА МІСЯЦЬ (30 ДН.)": "LAST 30 DAYS",
-    "ЗА ВЕСЬ ЧАС": "ALL TIME",
-    "ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ": "ARCHIVE CREATION DYNAMICS (LAST 6 MONTHS)",
-    "Журнал останніх операцій архівування": "Recent Backup Operations Log",
-    "Останні 25 операцій створення резервних копій (дата, розмір та підсумок):": "Last 25 backup operations (date, size, and status):",
-    "Журнал операцій поки порожній. Запустіть резервне копіювання.": "Operations log is empty. Run a backup first.",
-    "Дата": "Date",
-    "Статус": "Status",
-    "Файл / Подія": "File / Event",
-    "Розмір": "Size",
-    "Час": "Time",
-    "Деталі операції": "Operation details",
-    "Видалення архіву": "Archive deletion",
-    "Видалити архів та .sha256?": "Delete archive and .sha256?",
-    "Оберіть дію для виявленого сервера в локальній мережі:": "Choose an action for the server found on the local network:",
-    "Репозиторій проєкту:": "Project repository:",
-    "Локальна мережа / LAN": "Local network / LAN",
-    "Інтернет / Зовнішній": "Internet / External",
-    "Резервне копіювання успішно завершено": "Backup completed successfully",
-    "🔌 Підключити та бекап": "🔌 Connect & backup",
-    "⭐ В Історію": "⭐ Add to History",
-    "Останні 25 операцій створення резервних копій (подвійний клік по рядку — деталі):": "Last 25 backup operations (double-click a row for details):",
-    "Резервне копіювання та Розклад": "Backup & Scheduler",
-    "Вигляд та Інтерфейс": "Appearance & Interface",
-    "Значок системного трею запущено; вікно приховано.": "System tray icon started; window hidden.",
-    "Запуск трею не підтверджено; вікно згорнуто на панель задач.": "Tray startup was not confirmed; the window was minimized to the taskbar.",
-    "Не вдалося створити значок системного трею.": "Failed to create the system tray icon.",
-    "Не вдалося запустити значок системного трею.": "Failed to start the system tray icon.",
-    "Не вдалося перевірити запуск значка системного трею.": "Could not verify that the system tray icon started.",
-    "Хмара та звіт": "Cloud & Report",
-    " 5. Хмарне дзеркало та звіт операцій ": " 5. Cloud Mirror & Operation Report ",
-    "Увімкнути хмарне дзеркало та звіт операцій": "Enable cloud mirror and operation report",
-    "Папка у хмарі:": "Cloud folder:",
-    "Архіви та журнали розділяються за випадковим ID пристрою. Хмарні ZIP-копії повторюють GFS після очищення; журнали мають секундні часові мітки.": "Archives and reports are separated by a random device ID. Cloud ZIP copies follow GFS after cleanup; reports use second-level timestamps.",
-    "ID пристрою:": "Device ID:",
-    "Оновити список": "Refresh list",
-    "Адресу не вказано. Запуск автопошуку в LAN...": "No address entered. Starting LAN auto-scan...",
-    "Активні мережеві адаптери LAN не знайдено!": "No active LAN network adapters found!",
-    "Автоматичне налаштування теми": "Automatic theme setup",
-    "Вікно згорнуто у Dock (програма продовжує роботу).": "Window minimized to Dock (app keeps running).",
-    "Системний трей недоступний у середовищі WSL — робота продовжується без іконки в треї.": "System tray unavailable in WSL — running without tray icon.",
-    "Режим трею (для тесту)": "Tray mode (for testing)",
-    "Авто (рекомендовано)": "Auto (recommended)",
-    "Після зміни режиму перезапустіть застосунок. Результат дивіться в журналі: рядок [TRAY MODE] і «Значок системного трею активовано».": "Restart the app after changing the mode. Check the log for: [TRAY MODE] and «System tray icon activated».",
-    "⚙ Налаштування": "⚙ Settings",
-    "ℹ Про програму": "ℹ About",
-    "📊 Локально": "📊 Local Stats",
-    "📋 Журнал": "📋 Journal",
-    "Системний трей недоступний (потрібне розширення AppIndicator у GNOME).": "System tray unavailable (AppIndicator extension for GNOME required).",
-    "Помилка резервного копіювання": "Backup error",
-    "Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).": "Graphical server (DISPLAY/WSLg) unavailable — console mode (--cli) enabled automatically.",
-    "Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.": "Backup folder on Windows drive (/mnt/): POSIX permissions not applied, I/O speed is lower.",
-    "Помилка мережі": "Network error",
     # patch-id: pcloud-only-simple-ui-2.27
-    "Завдання Linux не знайдено або вже видалено.": "Linux task not found or already deleted.",
     # patch-id: center-storage-notepad-2.40
     # patch-id: settings-all-tabs-homegrid-2.46
     # patch-id: settings-two-pane-sidebar-2.47
-    "5. Налаштування pCloud": "5. pCloud Settings",
     # patch-id: settings-grouped-sidebar-clean-2.48
-    "ПРОГРАМА ТА КОПІЇ": "APP & BACKUPS",
-    "Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.": "Downloading and verifying in temporary local folder first, then moving to destination.",
-    "Сховища:": "Storages:",
-    "СИСТЕМА ТА ХМАРА": "SYSTEM & CLOUD",
-    "Зберігання та GFS": "Retention & GFS",
-    "Розклад та запуск": "Schedule & Startup",
-    "Хмара pCloud": "pCloud Storage",
-    "Інтерфейс": "Interface",
-    "Налаштування pCloud": "pCloud Settings",
-    "Кільцева стратегія (останні N архівів)": "Ring Strategy (Last N Archives)",
-    "Трей та тихий режим": "Tray & Silent Mode",
-    "Автозапуск за розкладом": "Scheduled Autostart",
-    "Оформлення, мова та масштаб екрана": "Theme, Language & Screen Scale",
     # patch-id: settings-logical-sections-2.49
-    "Безпека та перенесення налаштувань": "Security & Config Transfer",
     # patch-id: settings-polish-labels-cloud-grid-2.50
-    "Системний трей та безпека": "System Tray & Security",
-    "Системний трей, профіль та PIN": "System Tray, Profile & PIN",
-    "Зберегти налаштування": "Save Settings",
     # patch-id: settings-fifth-tray-tab-2.51
-    "Відновити налаштування": "Restore Settings",
     # patch-id: pcloud-retention-count-size-2.52
-    "Трей та безпека": "Tray & Security",
-    "Зберігати останніх архівів у хмарі (0 = без обмеження):": "Keep last cloud archives (0 = unlimited):",
     # patch-id: pcloud-disable-and-freespace-2.57
-    "Максимальний розмір папки у хмарі, ГБ (0 = без обмеження):": "Max cloud folder size, GB (0 = unlimited):",
-    "Контроль вільного місця у хмарі (автоочищення):": "Auto-fit backups to free cloud space:",
-    "Резервне копіювання": "Backup & Retention",
-    "Розклад автозапуску": "Scheduled Autostart",
-    "Інтерфейс і вигляд": "Interface & Appearance",
-    "1. Кільцева стратегія (останні N архівів)": "1. Ring Strategy (Last N Archives)",
-    "2. Трей та тихий режим": "2. Tray & Silent Mode",
-    "3. Автозапуск за розкладом": "3. Scheduled Autostart",
-    "4. Оформлення, мова та масштаб екрана": "4. Theme, Language & Screen Scale",
-    "Журнал операцій": "Operations Log",
-    "Статистика pCloud": "pCloud Stats",
-    "Джерело:": "Source:",
-    "Копії:": "Copies:",
-    "Дзеркало": "Mirror",
-    "Мережа": "Network",
-    "● онлайн": "● online",
-    "● офлайн": "● offline",
-    "● увімкнено": "● enabled",
-    "● вимкнено": "● disabled",
-    "Обрати мережеву папку": "Select network folder",
-    "Налаштування pCloud": "pCloud settings",
-    "Автопошук LAN": "LAN Auto-scan",
-    "Локально": "Local Stats",
-    "Журнал": "Journal",
-    "Перевірка SHA": "Verify SHA",
-    "не підключено": "not connected",
-    "в черзі": "queued",
-    "Обрані:": "Favorites:",
-    "+ Додати": "+ Add",
-    "Папка у хмарі pCloud (напр. HomeGridBackup)": "Cloud folder in pCloud (e.g. HomeGridBackup)",
-    "Історія адрес та автопошук у LAN": "Address history and LAN auto-scan",
-    "Папка файлів протоколів (backup.log та звіти)": "Protocol files folder (backup.log & reports)",
-    "Як папка архівів": "Same as archives folder",
-    "Порожньо = зберігати поруч із ZIP-архівами (у папці «Архіви»).": "Empty = store alongside ZIP archives (in Archives folder).",
-    "ДЗЕРКАЛО:": "MIRROR:",
-    "МЕРЕЖА:": "NETWORK:",
-    "оновлення...": "updating...",
-    "недоступно": "unavailable",
-    "Авто (pCloud → Мережа при наявності)": "Auto (pCloud → Network if available)",
-    "Тільки pCloud": "pCloud only",
-    "Тільки мережева папка (Мережа)": "Network folder only (Network)",
-    "Обидва (pCloud + Мережа)": "Both (pCloud + Network)",
-    "Протоколи для рейтингу швидкості (між ОС):": "Speed ranking logs storage (cross-OS):",
-    "Підключення та папки": "Connection & Folders",
-    "Сховище та аналітика": "Storage & Analytics",
-    "Сервер:": "Server:",
-    "Архіви:": "Archives:",
-    "ЛОКАЛЬНО:": "LOCAL:",
-    "ОСТАННІЙ:": "LAST:",
-    "↗ Відкрити": "↗ Open",
-    "Увімкнути синхронізацію з pCloud": "Enable pCloud sync",
-    "Зберігати архів у pCloud": "Save archive to pCloud",
-    "Зберігати журнал у pCloud": "Save log to pCloud",
-    "Авторизація pCloud": "Authorize pCloud",
-    "Перевірити вільне місце": "Check free space",
-    "pCloud підключено.": "pCloud connected.",
-    "pCloud ще не авторизовано. Натисніть «Авторизація pCloud».": "pCloud is not authorized yet. Click «Authorize pCloud».",
-    "Оберіть хоча б один пункт: зберігати архів або журнал.": "Select at least one option: save archive or save log.",
-    "Підключення pCloud уже існує. Виконати повторну авторизацію?": "pCloud connection already exists. Re-authorize?",
-     "Активовано X11-меню трею (Tkinter) для сумісності зі середовищем без AppIndicator.": "X11 tray menu (Tkinter) enabled for environments without AppIndicator.",
-}
-
-
-EN_SUBSTR = (
-    ("Очікування мережі (", "Waiting for network ("),
-    ("Втрачено зв'язок із ", "Lost connection to "),
-    (" під час збірки (HTTP ", " during build (HTTP "),
-        ("Увага (активна тільки мережева папка): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.", "Warning (network folder only): downloading and verifying in local SSD temp folder first, then moving to destination."),
-    ("Увага (папка призначення в хмарному / мережевому сховищі): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.", "Warning (destination is in cloud / network storage): downloading and verifying in local SSD temp folder first, then moving to destination."),
-    ("Перенесення перевіреного архіву у папку призначення...", "Moving verified archive to destination folder..."),
-    ("Архів та .sha256 перенесено у місце призначення:", "Archive and .sha256 moved to destination:"),
-    ("Активовано системний трей", "System tray activated"),
-    ("ID пристрою:", "Device ID:"),
-    ("Оновлено:", "Updated:"),
-    ("Архівів:", "Archives:"),
-    ("адрес...", "addresses..."),
-    ("без відповіді, перевірка з'єднання", "no response, checking connection"),
-    ("TCP відкрито, API не відповів", "TCP is open, API did not respond"),
-    ("Перевірка сайту та HGM", "Checking host and HGM"),
-    ("Сканування завершено. Всього знайдено серверів:", "Scan complete. Servers found:"),
-    ("серверів у мережі", "servers on the network"),
-    ("Ротація GFS:", "GFS rotation:"),
-    ("Попередження: не вдалося синхронізувати хмарне дзеркало GFS:", "Warning: failed to sync cloud GFS mirror:"),
-    ("Попередження: не вдалося записати хмарний звіт:", "Warning: failed to save cloud report:"),
-    ("Попередження: не вдалося передати хмарний звіт:", "Warning: failed to upload cloud report:"),
-    ("Попередження: не вдалося синхронізувати хмарні архіви:", "Warning: failed to sync cloud archives:"),
-    ("Увімкнути хмарне дзеркало та звіт операцій", "Enable cloud mirror and operation report"),
-    ("Перевірку завершено:", "Verification complete:"),
-    ("Резервне копіювання...", "Backing up..."),
-    ("Усі ", "All "),
-    ("Пошкоджених:", "Corrupted:"),
-    ("Видалити пошкоджені", "Delete corrupted"),
-    ("Архіви без файлу .sha256:", "Archives without .sha256 file:"),
-    ("… та ще ", "… and "),
-    ("Резервну копію створено:", "Backup created:"),
-    ("Обрати виявлений", "Select found"),
-    ("Виявлені (", "Found ("),
-    ("1980-ті", "1980s"), ("1970-ті", "1970s"), ("1960-ті", "1960s"),
-    ("Обрано виявлений у мережі сервер:", "Selected discovered LAN server:"),
-    ("Папку збереження змінено на:", "Backup folder changed to:"),
-    ("Папку збереження встановлено:", "Backup folder set to:"),
-    ("Папка резервних копій недоступна; використовується внутрішнє сховище Android:", "Backup folder is unavailable; using Android app storage:"),
-    ("Папку дзеркального копіювання увімкнено:", "Mirror backup folder enabled:"),
-    ("Попередження: не вдалося скопіювати у дзеркальну папку", "Warning: failed to copy to mirror folder"),
-    ("Сервер скинув завдання", "Server reset the job"),
-    ("Час збірки на сервері вичерпано", "Server build timeout reached"),
-    ("перервав збірку архіву:", "aborted archive build:"),
-    ("збережено у «Історія».", "saved to History."),
-    ("Видалити назавжди з диска", "Permanently delete from disk"),
-    ("Перемістити у Кошик", "Move to Recycle Bin"),
-    ("застарілих копій", "expired backups"),
-    ("Зупинено! ", "Stopped! "),
-    ("фірмовий синій", "signature blue"), ("глянцеві смуги", "glossy stripes"),
-    ("зелені блоки", "green blocks"), ("ч/б штрих", "b/w stripe"),
-    ("Термінал мейнфрейму CRT", "Mainframe CRT terminal"), ("Телетайп / Перфострічка", "Teletype / Punch tape"),
-    ("Нетбук", "Netbook"), ("Усі ", "All "), ("Швидкість:", "Speed:"),
-    ("Адресу збережено без перевірки:", "Address saved without check:"),
-    ("Завдання не знайдено або вже видалено", "Task not found or already deleted"),
-    ("Помилка Планувальника:", "Scheduler error:"), ("Помилка завантаження після", "Download failed after"),
-    ("Мережева помилка під час входу:", "Network error during login:"),
-    ("Успішно підключено до", "Successfully connected to"),
-    ("Виконати резервне копіювання зараз?", "Run backup now?"),
-    ("Пошкоджений файл в архіві:", "Corrupted file in archive:"),
-    ("Перевірка архівів (буфер", "Verifying archives (buffer"),
-    ("Помилка перевірки:", "Verification error:"),
-    ("Видалено пошкоджених архівів:", "Corrupted archives deleted:"),
-    ("Скопійовано у буфер:", "Copied to clipboard:"),
-    ("створено на", "created at"),
-    ("видалено з Планувальника.", "removed from Task Scheduler."),
-    ("Неоновий кібер-градієнт", "Neon cyber gradient"),
-    ("Бурштиново-жовтий градієнт", "Amber-yellow gradient"),
-    ("Смарагдовий градієнт", "Emerald gradient"),
-    ("Сучасний плоский синій", "Modern flat blue"),
-    ("Дуже дрібний", "Extra small"), ("Дрібний", "Small"), ("Стандартний", "Standard"),
-    ("Середній", "Medium"), ("Великий", "Large"), ("Дуже великий", "Extra large"),
-    ("Підвищений", "Increased"), ("Крупний", "Big"), ("Дуже крупний", "Extra big"),
-    ("Суперкрупний", "Super big"), ("Гігантський", "Giant"), ("Максимальний", "Maximum"),
-    ("Графіка", "Graphics"),
-    ("Готовий до резервного копіювання", "Ready for backup"),
-    (" від ", " from "),
-    ("(від ", "(from "),
-    ("Систему запущено", "System started"), ("сховище:", "storage:"), ("Каталог:", "Dir:"),
-    ("ОС та залізо:", "OS & Hardware:"), ("Перевірку сайту/порту пропущено для", "Host/port check skipped for"),
-    ("Перевірка сайту та сервера HGM...", "Checking HGM host and server..."),
-    ("Перевірка сесії та авторизація...", "Checking session and auth..."),
-    ("Запит на підготовку бекапу...", "Requesting backup preparation..."),
-    ("Підготовка на сервері", "Preparing on server"), ("Копіювання бази та файлів", "Copying DB & files"),
-    ("Перевірка файлів", "Checking files"), ("Обробка на сервері", "Processing on server"), ("Стиснення ZIP-архіву", "Packing ZIP"),
-    ("Архів готовий (75%). Завантаження...", "Archive ready (75%). Downloading..."),
-    ("Завантаження ZIP-архіву з", "Downloading ZIP archive from"), ("Завантаження", "Downloading"),
-    ("Швидкість:", "Speed:"), ("Архів завантажено:", "Archive downloaded:"),
-    ("Цілісність перевірено", "Integrity verified"), ("Цілісність 100% підтверджена", "Integrity 100% verified"),
-    ("файлів", "files"), ("файл(ів)", "file(s)"), ("Збережено", "Saved"),
-    ("Мережеву копію збережено у:", "Network copy saved to:"), ("Папку мережі змінено на:", "Network folder changed to:"), ("Попередження: не вдалося скопіювати у мережеву папку", "Warning: failed to copy to network folder"), ("Попередження: не вдалося оновити мережевий журнал швидкості:", "Warning: failed to update network speed journal:"), ("Дзеркальну копію збережено у:", "Mirror copy saved to:"),
-    ("Налаштування та ключі захищено збережено.", "Settings and keys securely saved."),
-    ("Налаштування програми, теми, шрифту та стратегії GFS застосовано.", "Application, theme, font, and GFS settings applied."),
-    ("Ротація бекапів за обраною стратегією...", "Running GFS backup rotation..."),
-    ("Переміщено у Кошик:", "Moved to Recycle Bin:"), ("Видалено з диска назавжди:", "Deleted permanently:"),
-    ("Готово! Архів збережено", "Done! Archive saved"), ("УСПІХ! Резервне копіювання завершено за", "SUCCESS! Backup completed in"),
-    ("ПОМИЛКА:", "ERROR:"), ("Помилка:", "Error:"), ("Сканування підмереж:", "Scanning subnets:"),
-    ("Сканування", "Scanning"), ("Автоматично обрано сервер:", "Auto-selected server:"),
-    ("Знайдено сервер:", "Server found:"), ("Знайдено кілька серверів", "Multiple servers found"), ("Знайдено:", "Found:"), ("Знайдено ", "Found "), ("ГОТОВО |", "DONE |"), ("ОНЛАЙН |", "ONLINE |"), ("Перезапуск збірки", "Restarting build"), ("Очікування мережі:", "Waiting for network:"), ("Збій завантаження", "Download failed"), ("повтор ", "retry "), ("Повтор ", "Retry "), ("через ", "in "), ("Підключено до HomeGrid Monitor:", "Connected to HomeGrid Monitor:"),
-    ("Активну сесію підтверджено.", "Active session confirmed."), ("Авторизація успішна!", "Authorization successful!"),
-    ("Збірка архіву на сервері", "Building archive on server"), ("Етап сервера", "Server stage"),
-    ("Перевірка CRC32", "Verifying CRC32"), ("Розрахунок SHA-256:", "Calculating SHA-256:"),
-    ("справних", "valid"), ("без .sha256:", "no .sha256:"), ("пошкоджених:", "corrupted:"),
-    ("Час:", "Time:"), ("буфер", "buffer"), ("Завершено за", "Completed in"),
-    ("архівів", "archives"), ("Вільно:", "Free:"), ("Без .sha256", "No .sha256"),
-    ("знайдено на диску", "found on disk"), ("Структура GFS:", "GFS Structure:"),
-    ("Щоденних:", "Daily:"), ("Тижневих", "Weekly"), ("Місячних", "Monthly"),
-    ("Середній розмір архіву:", "Average archive size:"), ("Захист SHA-256:", "SHA-256 protection:"),
-    ("Успішність запусків:", "Success rate:"), ("Глибина архіву:", "Archive depth:"),
-    ("дн.", "days"), ("шт.", "pcs"), ("Всього:", "Total:"), ("Залишиться:", "Keep:"),
-    ("Застарілих:", "Expired:"), ("[ВИДАЛИТИ]", "[DELETE]"), ("Версія", "Version"), ("оновлено:", "updated:"),
-    ("Січень", "January"), ("Лютий", "February"), ("Березень", "March"), ("Квітень", "April"),
-    ("Травень", "May"), ("Червень", "June"), ("Липень", "July"), ("Серпень", "August"),
-    ("Вересень", "September"), ("Жовтень", "October"), ("Листопад", "November"), ("Грудень", "December"),
-    ("МБ/с", "MB/s"), ("КБ/с", "KB/s"), ("МБ", "MB"), ("КБ", "KB"), ("ГБ", "GB"), ("мс", "ms"),
-    ("Дата та час:", "Date & time:"),
-    ("Статус:", "Status:"),
-    ("Розмір:", "Size:"),
-    ("Деталі / Файл:", "Details / File:"),
-    ("Тривалість:", "Duration:"),
-    ("Файл архіву:", "Archive file:"),
-    ("Джерело (сервер):", "Source (server):"),
-    ("Час запуску:", "Start time:"),
-    ("Завершено:", "Finished:"),
-    ("Підготовка та аналіз на сервері:", "Preparation & analysis on server:"),
-    ("Збір та копіювання даних на сервері:", "Data collection & copying on server:"),
-    ("Стиснення та пакування ZIP на сервері:", "ZIP packing on server:"),
-    ("Перевірка файлів на сервері:", "File check on server:"),
-    ("Перевірка архіву CRC32 (програма):", "CRC32 archive check (app):"),
-    ("Розрахунок та звірка SHA-256:", "SHA-256 calculation & check:"),
-    ("Дзеркальне копіювання:", "Mirror copy:"),
-    ("Скачування по мережі (", "Network download ("),
-    ("Видалено пошкоджений архів:", "Corrupted archive deleted:"),
-    ("Видалено з диска назавжди", "Deleted permanently from disk"),
-    ("Переміщено у Кошик", "Moved to Recycle Bin"),
-    ("Сервер не повернув cookie сесії.", "Server returned no session cookie."),
-    ("УВАГА! Контрольна сума SHA-256 не збігається", "WARNING! SHA-256 checksum mismatch"),
-    ("SHA-256 не збігається з контрольним хешем сервера", "SHA-256 does not match server checksum"),
-    ("Звіт про резервне копіювання", "Backup report"),
-    ("Помилка читання ZIP:", "ZIP read error:"),
-    ("Помилка перевірки SHA-256:", "SHA-256 check error:"),
-    ("Помилка розблокування редактора:", "Editor unlock error:"),
-    ("Помилка запису на диск:", "Disk write error:"),
-    ("Помилка повторної підготовки:", "Re-preparation error:"),
-    ("Сервер не створив завдання експорту:", "Server did not create export job:"),
-    ("Сервер не створив нове завдання експорту:", "Server did not create new export job:"),
-    ("Сервер повернув некоректну відповідь під час повторного запуску.", "Server returned invalid response during restart."),
-    ("Пошкоджений CRC32 у файлі:", "Corrupted CRC32 in file:"),
-    ("невідома помилка сервера", "unknown server error"),
-    ("Помилка schtasks.exe:", "schtasks.exe error:"),
-    ("Збій створення завдання:", "Task creation failed:"),
-    ("Помилка видалення завдання:", "Task deletion error:"),
-    ("Помилка створення LaunchAgent:", "LaunchAgent creation error:"),
-    ("Помилка видалення LaunchAgent:", "LaunchAgent deletion error:"),
-    ("Помилка запису crontab:", "crontab write error:"),
-    ("ICMP Ping до", "ICMP Ping to"),
-    ("Сайт/домен '", "Site/domain '"),
-    ("' не знайдено (помилка DNS).", "' not found (DNS error)."),
-    ("' існує, але порт", "' exists, but port"),
-    ("закритий або недоступний.", "is closed or unreachable."),
-    ("' доступний, але це НЕ сервер HomeGrid Monitor!", "' is reachable, but it is NOT a HomeGrid Monitor server!"),
-    ("Хост '", "Host '"),
-    ("Сервер HGM онлайн", "HGM server online"),
-    ("Сервер http", "Server http"),
-    ("Сервер ", "Server "),
-    ("Архів готовий", "Archive ready"),
-    ("Обробка", "Processing"),
-    ("Застарілих GFS:", "Expired:"),
-    ("Трей: не встановлено pystray і Pillow", "Tray: pystray and Pillow not installed"),
-    ("Немає графічної сесії (DISPLAY не задано) — трей вимкнено", "No graphical session (DISPLAY not set) — tray disabled"),
-    ("Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель", "XFCE tray: install xfce4-statusnotifier-plugin and add «Status Notifier» to the panel"),
-    ("Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support", "GNOME tray: install the AppIndicator and KStatusNotifierItem Support extension"),
-    ("Трей KDE: перевірте, що увімкнено віджет «Системний лоток»", "KDE tray: check that the «System Tray» widget is enabled"),
-    ("Панель не підтримує трей (потрібен StatusNotifier або XEmbed)", "Panel does not support tray (StatusNotifier or XEmbed required)"),
-    ("Трей вимкнено (--no-tray або в налаштуваннях).", "Tray disabled (--no-tray or in settings)."),
-    ("Вікно згорнуто в панель задач (трей вимкнено).", "Window minimized to taskbar (tray disabled)."),
-    ("Системний трей недоступний", "System tray unavailable"),
-    ("Помилка підготовки (порожня відповідь сервера, HTTP ", "Preparation error (empty server response, HTTP "),
-    ("Сервер повернув некоректну відповідь замість JSON", "Server returned invalid response instead of JSON"),
-    ("перестав відповідати під час збірки", "stopped responding during build"),
-    ("Сайт ", "Site "),
-    ("повернув HTML замість статусу JSON", "returned HTML instead of JSON status"),
-    ("повідомив про помилку під час створення архіву!", "reported an error while creating archive!"),
-    (" спроб: ", " attempts: "),
-    ("завантажено лише ", "downloaded only "),
-    (" із ", " of "),
-    ("обрив потоку", "stream interrupted"),
-    ("SHA-256 файлу на носії не збігається зі завантаженим потоком!", "SHA-256 of file on disk does not match the downloaded stream!"),
-    ("але файл .sha256 відсутній", "but .sha256 file is missing"),
-    ("Робота в WSL (дистрибутив:", "Running in WSL (distro:"),
-    (", режим: ", ", mode: "),
-)
-
-UK_EXACT = {v: k for k, v in EN_EXACT.items()}
-UK_EXACT["Черга синхронізації: архіви {archives}, звіти {reports}"] = "Черга синхронізації: архіви {archives}, звіти {reports}"
-
-_SUBSTR_CACHE = {}
-
-
+_x='Expired:'
+_w='Speed:'
+_v='Швидкість:'
+_u='Archives:'
+_t='Scheduled Autostart'
+_s='Device ID:'
+_r='Enable cloud mirror and operation report'
+_q=' 4. Theme, Language & Screen Scale '
+_p='🧹 Clean old backups in silent mode (GFS)'
+_o='Archive ready'
+_n='Server:'
+_m='Backup error'
+_l='Backing up...'
+_k='Ready for backup'
+_j='Select found'
+_i='Replace connection?'
+_h='Delete connection?'
+_g='December'
+_f='November'
+_e='October'
+_d='September'
+_c='August'
+_b='February'
+_a='January'
+_Z='Налаштування pCloud'
+_Y='ID пристрою:'
+_X='Увімкнути хмарне дзеркало та звіт операцій'
+_W='Архів готовий'
+_V='Вільно:'
+_U='Google OAuth Client Secret:'
+_T='Google OAuth Client ID:'
+_S='Резервне копіювання...'
+_R='Готовий до резервного копіювання'
+_Q='Журнал операцій'
+_P="Підключення з таким ім'ям уже існує. Замінити його? Файли у хмарі залишаться."
+_O='Замінити підключення?'
+_N='Видалити підключення?'
+_M='Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?'
+_L='Грудень'
+_K='Листопад'
+_J='Жовтень'
+_I='Вересень'
+_H='Серпень'
+_G='Липень'
+_F='Червень'
+_E='Травень'
+_D='Квітень'
+_C='Березень'
+_B='Січень'
+_A='Черга синхронізації: архіви {archives}, звіти {reports}'
+import re
+from functools import lru_cache
+EN_EXACT={_B:_a,'Лютий':_b,_C:'March',_D:'April',_E:'May',_F:'June',_G:'July',_H:_c,_I:_d,_J:_e,_K:_f,_L:_g,'Файл не знайдено':'File not found','Порожній ZIP-архів':'Empty ZIP archive','Перевірку перервано':'Verification aborted','папка порожня':'folder is empty','Перевірка захисту SHA-256':'SHA-256 Protection Check','1 день':'1 day','Трей недоступний. Вікно згорнуто в панель задач (програма продовжує роботу).':'Tray unavailable. Window minimized to taskbar (running in background).','HomeGrid Backup: помилка':'HomeGrid Backup: Error','Автопошук':'Auto-scan','Виявлені сервери в мережі':'Discovered Servers on Network','Сервер не знайдено':'Server not found','Збережено (!)':'Saved (!)','Очищення старих бекапів':'Old Backups Cleanup','Збережені PIN-коди та токен сесії очищено (Keyring / .env).':'Saved PIN codes and session token cleared (Keyring / .env).','Сервер повідомив про помилку під час створення архіву!':'Server reported an error while creating archive!','Введіть IP-адресу або домен сайту перед підключенням!':'Enter server IP or domain before connecting!',_M:'Are you sure you want to stop HomeGrid Backup and exit the application?',_N:_h,_O:_i,_P:'A connection with this name already exists. Replace it? Files in the cloud will remain.','Сервер збережено':'Server saved','Підключення успішне':'Connection successful','Не є сервером HGM':'Not an HGM server','Сайт недоступний':'Host unreachable','ZIP-архів порожній!':'ZIP archive is empty!','Збережений LOGIN PIN відхилено сервером.':'Saved LOGIN PIN rejected by server.','Збережений EDITOR PIN відхилено.':'Saved EDITOR PIN rejected.','Авторизація HomeGrid':'HomeGrid Authorization','Введіть LOGIN PIN:':'Enter LOGIN PIN:','Права редактора':'Editor Rights','Для експорту потрібен EDITOR PIN:':'EDITOR PIN is required for export:','Невірний LOGIN PIN!':'Invalid LOGIN PIN!','Вхід скасовано (не введено LOGIN PIN).':'Login cancelled (LOGIN PIN not entered).','Експорт скасовано (не введено EDITOR PIN).':'Export cancelled (EDITOR PIN not entered).','Сервери HomeGrid Monitor у мережі не знайдено.':'No HomeGrid Monitor servers found on the network.','Оберіть папку':'Select folder','Запуск...':'Starting...','✨ Повна графіка (стандартний режим)':'✨ Full Graphics (standard mode)','⚡ Ультралегкий LITE-режим (швидкий текст)':'⚡ Ultra-light LITE mode (fast text)','⚙️ Налаштування екрана та шрифту...':'⚙️ Screen and font settings...','✓ Збережені PIN-коди очищено':'✓ Saved PIN codes cleared','Авто (під монітор і DPI)':'Auto (by monitor and DPI)','Авто (за розміром вікна)':'Auto (by window size)','Цифровий лічильник (тільки відсотки)':'Digital counter (percentages only)','Оберіть виявлений':_j,'Виявлені (0)':'Found (0)','Виявлені':'Found','Історія':'History','Підключити':'Connect','Папка архівів...':'Backup folder...','Відкрити папку':'Open folder','Папка дзеркала...':'Mirror folder...','Статистика':'Statistics',_Q:'Operations log','Аналіз GFS / SHA-256':'GFS / SHA-256 Analysis','Очистити':'Clear','ЗАПУСТИТИ БЕКАП':'START BACKUP','Налаштування':'Settings','Про програму':'About','Вихід':'Exit','Світла тема':'Light theme','Темна тема':'Dark theme',_R:_k,'Очікування':'Idle','Відкрити HomeGrid Backup':'Open HomeGrid Backup','▶ Запустити резервне копіювання':'▶ Start Backup','пошук...':'scanning...','Зупинити':'Stop','Зупинка...':'Stopping...','Сервер підключено':'Server Connected',_S:_l,'Архівація':'Backup','Вкажіть окрему папку у хмарі; корінь сховища не допускається.':'Enter a separate cloud folder; the storage root is not allowed.',"Папка у хмарі має бути відносним шляхом без сегментів '.' або '..'.":"Cloud folder must be a relative path without '.' or '..' segments.",'Хмарний сервіс обмежив частоту запитів. Файли залишено в черзі; повторна синхронізація буде автоматичною. Для Google Drive рекомендується власний OAuth Client ID та Secret.':'The cloud provider rate-limited the requests. Files remain queued and sync will retry automatically. For Google Drive, use your own OAuth Client ID and Secret.',_A:'Cloud sync queue: archives {archives}, reports {reports}','Черга хмарної синхронізації порожня.':'Cloud sync queue is empty.','Повторити синхронізацію':'Retry cloud sync','Синхронізацію запущено...':'Cloud sync started...','Синхронізація вже виконується.':'Cloud sync is already running.','Синхронізацію завершено.':'Cloud sync completed.','Увімкніть хмарне сховище, щоб повторити синхронізацію.':'Enable cloud storage before retrying sync.','Спочатку збережіть налаштування хмарного сховища.':'Save the cloud settings before retrying sync.','Введіть обидва значення: OAuth Client ID та Client Secret.':'Enter both the OAuth Client ID and Client Secret.',_T:_T,_U:_U,'Підключення...':'Connecting...','Пошук в LAN...':'Scanning LAN...','Помилка бекапу':_m,'Не знайдено':'Not found','ОК':'OK','Видалити':'Delete','Повна графіка (стандартний режим)':'Full Graphics (standard mode)','Ультралегкий LITE-режим (швидкий текст)':'Ultra-light LITE mode (fast text)','Налаштування екрана та шрифту...':'Screen and font settings...','Налаштування експортовано у JSON':'Settings exported to JSON','Збережені PIN-коди очищено':'Saved PIN codes cleared','Увімкнути хмарне дзеркало та звіт':'Enable cloud mirror and report','Адреса сервера (напр. 192.168.1.246)':'Server address (e.g. 192.168.1.246)','Пошук по LAN':'Search LAN','Сховище: завантаження...':'Storage: loading...','Перевірити SHA-256':'Verify SHA-256','Запуск перевірки цілісності CRC32 + SHA-256...':'Starting CRC32 + SHA-256 integrity verification...','☁ Хмарне сховище':'☁ Cloud storage','Хмарне сховище':'Cloud storage','Налаштування хмарного сховища...':'Cloud storage settings...','Відкрити налаштування хмарного сховища':'Open cloud storage settings','Вибір хмарного сховища:':'Select cloud storage:','5. Налаштування хмарного сховища':'5. Cloud storage settings','Сервіс:':'Service:',"Email / ім'я користувача:":'Email / username:','Пароль:':'Password:','Для MEGA використовується email і пароль аккаунта.':'MEGA uses your account email and password.','Для Koofr потрібен пароль додатка, створений в налаштуваннях Koofr.':'Koofr requires an app password generated in Koofr settings.',"Введіть ім'я користувача та пароль.":'Enter a username and password.','Створення підключення...':'Creating connection...',"Ім'я підключення:":'Connection name:','Приховати введення':'Hide input','Архіви всіх пристроїв зберігаються у вибраній папці хмари в backups/; назви містять ID пристрою. Спільний текстовий журнал у корені: HomeGridBackup.log. На всіх пристроях виберіть той самий обліковий запис і папку.':'Archives from all devices are stored in the selected cloud folder under backups/; filenames include the device ID. The shared plain-text log in the root is HomeGridBackup.log. Select the same cloud account and folder on every device.','Архіви зберігаються у вибраній папці хмари в backups/<ID пристрою>/. Журнал пристрою: operations/<ID пристрою>/<дата>.jsonl.':'Archives are stored in the selected cloud folder under backups/<device ID>/. The device log is operations/<device ID>/<date>.jsonl.','Підключення створено.':'Connection created.',_O:_i,_P:'A connection with this name already exists. Replace it? Files in the cloud will stay.','Копіювати посилання':'Copy link','Деталі':'Details','Готово ✔':'Done ✔','Увійдіть у браузері та натисніть «Дозволити».':'Sign in in your browser and click Allow.','Доступ отримано, зберігаю підключення...':'Access granted, saving the connection...','Посилання скопійовано. Відкрийте його в браузері.':'Link copied. Open it in your browser.','Помилка підключення. Подробиці у розділі «Деталі».':'Connection failed. See Details.',_V:'Free:','ГБ':'GB','Мало місця!':'Low space!','Спочатку виберіть підключення.':'Select a connection first.','Підключення працює.':'Connection is working.',_N:_h,'Буде видалено лише конфігурацію. Файли у хмарі залишаться.':'Only the configuration will be deleted. Cloud files will remain.','Видалення підключення...':'Deleting connection...','Підключення видалено.':'Connection deleted.','Додати та підключити':'Add and connect','Перевірити':'Test','Видалити підключення':'Delete connection','Надіслати':'Send','Перевірка підключення...':'Testing connection...','Оберіть хмарний сервіс.':'Choose a cloud provider.',"Підключення з таким ім'ям уже існує.":'A connection with this name already exists.','Журнал зберігається локально у папці reports поруч з архівами та окремо синхронізується в хмару. Дані розділяються за ID пристрою та містять етапи, кількість файлів і системні версії.':'Reports are stored locally in the reports folder beside the archives and separately synced to the cloud. Data is separated by device ID and includes stage timings, file counts, and system versions.','Не вказано адресу':'No address entered','Не перевірено':'Not checked','Перевірка...':'Checking...','Підключення до сервера та папки збереження':'Server connection and backup folders','Адреса:':_n,'🕘 Історія':'🕘 History','🔌 Підключити':'🔌 Connect','🔍 Автопошук по LAN':'🔍 Auto-scan LAN','📡 Обрати виявлений (0)':'📡 Select found (0)','Папка:':'Folder:','📁 Папка архівів...':'📁 Backup folder...','📂 Відкрити папку':'📂 Open folder','Дзеркало:':'Mirror:','🪞 Папка дзеркала...':'🪞 Mirror folder...','Увімкнено':'Enabled','Вимкнено':'Disabled','Не задано':'Not set','ЛОКАЛЬНЕ СХОВИЩЕ':'LOCAL STORAGE','ОСТАННІЙ АРХІВ':'LAST ARCHIVE','Ще немає створених копій':'No backups created yet','Невідомо':'Unknown','📊 Статистика':'📊 Statistics','📜 Журнал операцій':'📜 Operations log','🔍 Аналіз GFS / SHA-256':'🔍 GFS / SHA-256 Analysis','Системний лог':'System log','🗑 Очистити лог':'🗑 Clear log','▶ ЗАПУСТИТИ БЕКАП':'▶ START BACKUP','⚙️ Налаштування':'⚙️ Settings','ℹ️ Про програму':'ℹ️ About','✖ Вихід':'✖ Exit','☀️ Світла тема':'☀️ Light theme','🌙 Темна тема':'🌙 Dark theme','Закрити':'Close','Скасувати':'Cancel','Підтвердити':'Confirm','Обрати':'Select','Так':'Yes','Ні':'No','Успішно':'Success','Помилка':'Error','Підтвердження виходу':'Confirm Exit',_M:'Are you sure you want to close HomeGrid Backup?','✖ Так, вийти':'✖ Yes, Exit','Так, вийти':'Yes, Exit','Перевірити SHA-256 + CRC32':'Verify SHA-256 + CRC32','Очистити застарілі зараз':'Clean Expired Now','🗑 Пошкоджених: 0':'🗑 Corrupted: 0','🗑 Видалити':'🗑 Delete','ЗБЕРЕГТИ':'KEEP','ВИДАЛИТИ':'DELETE','ЗАХИЩЕНО':'PROTECTED','БИТИЙ!':'CORRUPT!','Зняти PIN':'Unpin','🔒 Захист':'🔒 Protected','ЛОКАЛЬНЕ СХОВИЩЕ:':'LOCAL STORAGE:','ОСТАННІЙ АРХІВ:':'LAST ARCHIVE:',_W:_o,'ріст стабільний ✔':'steady growth ✔','Збережена сесія застаріла. Повторний вхід...':'Saved session expired. Re-login...','Авторизацію підтверджено сервером!':'Authorization confirmed by server!','Очищення застарілих архівів пропущено.':'Old archive cleanup skipped.','Режим збереження: очищення застарілих архівів пропущено.':'Keep mode: old archive cleanup skipped.','Вікно згорнуто у системний трей (програма продовжує роботу).':'Window minimized to system tray (running in background).','Немає захисту':'No protection','Зведена аналітика за періодами та станом локального сховища:':'Summary analytics by period and local storage status:','ЗА ТИЖДЕНЬ':'THIS WEEK','ЗА МІСЯЦЬ':'THIS MONTH','СЕР. РОЗМІР':'AVG. SIZE','ЗАХИСТ SHA-256':'SHA-256 PROTECTION','УСПІШНІСТЬ':'SUCCESS RATE','ГЛИБИНА':'DEPTH','на один архів':'per archive','натисніть для списку':'click to view list','усі захищені':'all protected','останніх запусків':'recent runs','діапазон копій':'backup span','Швидке перемикання між світлою та темною темою (інші стилі доступні у Налаштуваннях)':'Quick switch between light and dark themes (more styles in Settings)','Оберіть режим (Графіка / LITE) або роздільну здатність вікна':'Select mode (Graphics / LITE) or window resolution','Список серверів, виявлених під час останнього сканування локальної мережі':'List of servers found during the last LAN scan','Відкрити список архівів, керування мітками KEEP та перевірку цілісності SHA-256':'Open archive list, KEEP tags management, and SHA-256 integrity check','IP-адреса або URL сервера HomeGrid Monitor (додайте ! в кінці, щоб пропустити перевірку)':'HomeGrid Monitor server IP or URL (append ! at the end to skip host check)','Відкрити список раніше збережених адрес серверів':'Open previously saved server addresses',"Перевірити зв'язок із вказаним сервером та авторизуватися":'Test connection to the specified server and log in','Автоматичний пошук серверів HomeGrid Monitor у локальній мережі':'Auto-scan local network for HomeGrid Monitor servers','Локальна папка для збереження ZIP-архівів та файлів .sha256':'Local folder for saving ZIP archives and .sha256 files','Обрати іншу папку для збереження резервних копій':'Choose another folder for saving backups','Відкрити папку з архівами у файловому менеджері':'Open backup folder in file manager','Додаткова папка для автоматичного дублювання кожного нового бекапу':'Secondary folder for automatic mirroring of every new backup','Обрати папку для дзеркального копіювання архівів':'Choose folder for mirroring archives','Увімкнути або вимкнути автоматичне копіювання у дзеркальну папку':'Enable or disable automatic copying to the mirror folder','Зведена статистика копій за періодами та стан захисту SHA-256':'Summary backup statistics by period and SHA-256 protection status','Журнал останніх 25 операцій резервного копіювання':'Log of the last 25 backup operations','Очистити поточні повідомлення у вікні системного логу':'Clear current messages in the system log window','Запустити створення та перевірку нової резервної копії зараз':'Start creating and verifying a new backup now','Налаштування глибини GFS, розкладу, трею, мови та теми':'Configure GFS retention, schedule, tray, language, and theme','Інформація про версію та можливості програми':'Information about application version and features','Завершити роботу програми та вийти':'Finish work and exit the application','Історія адрес серверів':'Server Address History','Оберіть раніше збережену адресу або видаліть зайву:':'Select a saved address or remove an old one:','Історія адрес порожня.':'Server history is empty.','Налаштування програми, тем, масштабу, GFS та Планувальника':'Application, Theme, Scale, GFS & Scheduler Settings',' 1. Стратегія збереження файлів (GFS) ':' 1. File Retention Strategy (GFS) ','Щоденні (дн.):':'Daily (days):','За сьогодні:':'Today max:','Тижневі (шт.):':'Weekly (pcs):','Місячні (шт.):':'Monthly (pcs):','Річні (архів):':'Yearly (archive):','🗑️ У Кошик (замість назавжди)':'🗑️ Move to Trash (instead of permanent)',' 2. Системний трей та тихий режим ':' 2. System Tray, Language & Silent Mode ','📌 Згортати у системний трей при закритті [X]':'📌 Minimize to system tray on close [X]','🧹 Очищати старі копії у тихому режиме (GFS)':_p,'🧹 Очищати старі копії у тихому режимі (GFS)':_p,'Мова / Language:':'Language:',' 3. Автозапуск за розкладом (Планувальник завдань Windows) ':' 3. Scheduled Autostart (Task Scheduler) ','Час щодня:':'Daily time:','У фоні через трей (--hidden)':'Background in tray (--hidden)','З вікном консолі (--silent)':'With console window (--silent)','Пріоритет (2-9):':'Priority (2-9):','Запускати пропущене':'Run missed task','Розбудити ПК зі сну':'Wake PC from sleep','📅 Додати в Планувальник':'📅 Add to Scheduler','🗑️ Видалити задачу':'🗑️ Delete Task','📋 Копіювати --hidden':'📋 Copy --hidden','📋 Копіювати --silent':'📋 Copy --silent',' 4. Тема (7 стилів), роздільна здатність та шрифт ':' 4. Theme, Resolution & Font ','Тема:':'Theme:','Екран:':'Screen:','Шрифт:':'Font:',' 5. Стиль індикатора прогресу (12 стилів) ':' 5. Progress Bar Style ',' 4. Оформлення, мова та масштаб екрана ':_q,'Мова інтерфейсу:':'Interface language:','Тема оформлення:':'Color theme:','Роздільна здатність:':'Screen resolution:','Розмір шрифту:':'Font size:',' 5. Стиль індикатора прогресу (14 стилів) ':' 5. Progress Bar Style (14 styles) ','Стиль смуги:':'Bar style:','Копій за день:':'Copies per day:','У Кошик (замість видалення)':'Move to Trash (instead of delete)','Згортати у трей при закритті':'Minimize to tray on close','Автоочищення у фоні (GFS)':'Auto-cleanup in background (GFS)',' 1. Кільцева стратегія (останні N архівів) ':' 1. Ring Strategy (Last N Archives) ','Зберігати останніх архівів (шт.):':'Keep last archives (pcs):',' 2. Трей та тихий режим ':' 2. Tray & Silent Mode ',' 3. Автозапуск за розкладом ':' 3. Scheduled Autostart ','У фоні (з іконкою в треї)':'Background (with tray icon)','З вікном консолі':'With console window','Додати в Планувальник':'Add to Scheduler','Видалити задачу':'Delete Task','Додатково ▾':'More ▾','Копіювати команду фонового запуску':'Copy background run command','Копіювати команду консольного запуску':'Copy console run command','Експорт налаштувань (JSON)...':'Export settings (JSON)...','Імпорт налаштувань (JSON)...':'Import settings (JSON)...','✓ Налаштування експортовано у JSON':'✓ Settings exported to JSON','Скинути PIN':'Reset PINs','Експорт JSON':'Export JSON','Імпорт JSON':'Import JSON','Зберегти та закрити':'Save & Close','Застосувати':'Apply','  Резервне копіювання та Розклад  ':'  Backup & Scheduler  ','  Вигляд та Інтерфейс  ':'  Appearance & Interface  ',' 4. Вигляд (Мова, Тема, Екран, Шрифт) ':_q,'🔑 Скинути PIN':'🔑 Reset PINs','💾 Зберегти та закрити':'💾 Save & Close','✅ Застосувати':'✅ Apply','Аналіз локального сховища (GFS та SHA-256)':'Local Storage Analysis (GFS & SHA-256)','У папці поки немає ZIP-архівів.':'No ZIP archives in the folder yet.','Перевірка не запущена':'Verification not started','🛡️ Перевірити SHA-256 + CRC32':'🛡️ Verify SHA-256 + CRC32','Буфер:':'Buffer:','🗑️ Очистити застарілі зараз':'🗑️ Clean Expired Now','Статистика резервного копіювання':'Backup Statistics','Зведена аналітика за періодами та структурою локального сховища:':'Summary analytics by period and local storage structure:','СЬОГОДНІ':'TODAY','ЗА ТИЖДЕНЬ (7 ДН.)':'LAST 7 DAYS','ЗА МІСЯЦЬ (30 ДН.)':'LAST 30 DAYS','ЗА ВЕСЬ ЧАС':'ALL TIME','ДИНАМІКА СТВОРЕННЯ АРХІВІВ ЗА ОСТАННІ 6 МІСЯЦІВ':'ARCHIVE CREATION DYNAMICS (LAST 6 MONTHS)','Журнал останніх операцій архівування':'Recent Backup Operations Log','Останні 25 операцій створення резервних копій (дата, розмір та підсумок):':'Last 25 backup operations (date, size, and status):','Журнал операцій поки порожній. Запустіть резервне копіювання.':'Operations log is empty. Run a backup first.','Дата':'Date','Статус':'Status','Файл / Подія':'File / Event','Розмір':'Size','Час':'Time','Деталі операції':'Operation details','Видалення архіву':'Archive deletion','Видалити архів та .sha256?':'Delete archive and .sha256?','Оберіть дію для виявленого сервера в локальній мережі:':'Choose an action for the server found on the local network:','Репозиторій проєкту:':'Project repository:','Локальна мережа / LAN':'Local network / LAN','Інтернет / Зовнішній':'Internet / External','Резервне копіювання успішно завершено':'Backup completed successfully','🔌 Підключити та бекап':'🔌 Connect & backup','⭐ В Історію':'⭐ Add to History','Останні 25 операцій створення резервних копій (подвійний клік по рядку — деталі):':'Last 25 backup operations (double-click a row for details):','Резервне копіювання та Розклад':'Backup & Scheduler','Вигляд та Інтерфейс':'Appearance & Interface','Значок системного трею запущено; вікно приховано.':'System tray icon started; window hidden.','Запуск трею не підтверджено; вікно згорнуто на панель задач.':'Tray startup was not confirmed; the window was minimized to the taskbar.','Не вдалося створити значок системного трею.':'Failed to create the system tray icon.','Не вдалося запустити значок системного трею.':'Failed to start the system tray icon.','Не вдалося перевірити запуск значка системного трею.':'Could not verify that the system tray icon started.','Хмара та звіт':'Cloud & Report',' 5. Хмарне дзеркало та звіт операцій ':' 5. Cloud Mirror & Operation Report ',_X:_r,'Папка у хмарі:':'Cloud folder:','Архіви та журнали розділяються за випадковим ID пристрою. Хмарні ZIP-копії повторюють GFS після очищення; журнали мають секундні часові мітки.':'Archives and reports are separated by a random device ID. Cloud ZIP copies follow GFS after cleanup; reports use second-level timestamps.',_Y:_s,'Оновити список':'Refresh list','Адресу не вказано. Запуск автопошуку в LAN...':'No address entered. Starting LAN auto-scan...','Активні мережеві адаптери LAN не знайдено!':'No active LAN network adapters found!','Автоматичне налаштування теми':'Automatic theme setup','Вікно згорнуто у Dock (програма продовжує роботу).':'Window minimized to Dock (app keeps running).','Системний трей недоступний у середовищі WSL — робота продовжується без іконки в треї.':'System tray unavailable in WSL — running without tray icon.','Режим трею (для тесту)':'Tray mode (for testing)','Авто (рекомендовано)':'Auto (recommended)','Після зміни режиму перезапустіть застосунок. Результат дивіться в журналі: рядок [TRAY MODE] і «Значок системного трею активовано».':'Restart the app after changing the mode. Check the log for: [TRAY MODE] and «System tray icon activated».','⚙ Налаштування':'⚙ Settings','ℹ Про програму':'ℹ About','📊 Локально':'📊 Local Stats','📋 Журнал':'📋 Journal','Системний трей недоступний (потрібне розширення AppIndicator у GNOME).':'System tray unavailable (AppIndicator extension for GNOME required).','Помилка резервного копіювання':_m,'Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).':'Graphical server (DISPLAY/WSLg) unavailable — console mode (--cli) enabled automatically.','Папка архівів на диску Windows (/mnt/): права POSIX не застосовуються, швидкість I/O нижча.':'Backup folder on Windows drive (/mnt/): POSIX permissions not applied, I/O speed is lower.','Помилка мережі':'Network error','Завдання Linux не знайдено або вже видалено.':'Linux task not found or already deleted.','5. Налаштування pCloud':'5. pCloud Settings','ПРОГРАМА ТА КОПІЇ':'APP & BACKUPS','Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.':'Downloading and verifying in temporary local folder first, then moving to destination.','Сховища:':'Storages:','СИСТЕМА ТА ХМАРА':'SYSTEM & CLOUD','Зберігання та GFS':'Retention & GFS','Розклад та запуск':'Schedule & Startup','Хмара pCloud':'pCloud Storage','Інтерфейс':'Interface',_Z:'pCloud Settings','Кільцева стратегія (останні N архівів)':'Ring Strategy (Last N Archives)','Трей та тихий режим':'Tray & Silent Mode','Автозапуск за розкладом':_t,'Оформлення, мова та масштаб екрана':'Theme, Language & Screen Scale','Безпека та перенесення налаштувань':'Security & Config Transfer','Системний трей та безпека':'System Tray & Security','Системний трей, профіль та PIN':'System Tray, Profile & PIN','Зберегти налаштування':'Save Settings','Відновити налаштування':'Restore Settings','Трей та безпека':'Tray & Security','Зберігати останніх архівів у хмарі (0 = без обмеження):':'Keep last cloud archives (0 = unlimited):','Максимальний розмір папки у хмарі, ГБ (0 = без обмеження):':'Max cloud folder size, GB (0 = unlimited):','Контроль вільного місця у хмарі (автоочищення):':'Auto-fit backups to free cloud space:','Резервне копіювання':'Backup & Retention','Розклад автозапуску':_t,'Інтерфейс і вигляд':'Interface & Appearance','1. Кільцева стратегія (останні N архівів)':'1. Ring Strategy (Last N Archives)','2. Трей та тихий режим':'2. Tray & Silent Mode','3. Автозапуск за розкладом':'3. Scheduled Autostart','4. Оформлення, мова та масштаб екрана':'4. Theme, Language & Screen Scale',_Q:'Operations Log','Статистика pCloud':'pCloud Stats','Джерело:':'Source:','Копії:':'Copies:','Дзеркало':'Mirror','Мережа':'Network','● онлайн':'● online','● офлайн':'● offline','● увімкнено':'● enabled','● вимкнено':'● disabled','Обрати мережеву папку':'Select network folder',_Z:'pCloud settings','Автопошук LAN':'LAN Auto-scan','Локально':'Local Stats','Журнал':'Journal','Перевірка SHA':'Verify SHA','не підключено':'not connected','в черзі':'queued','Обрані:':'Favorites:','+ Додати':'+ Add','Папка у хмарі pCloud (напр. HomeGridBackup)':'Cloud folder in pCloud (e.g. HomeGridBackup)','Історія адрес та автопошук у LAN':'Address history and LAN auto-scan','Папка файлів протоколів (backup.log та звіти)':'Protocol files folder (backup.log & reports)','Як папка архівів':'Same as archives folder','Порожньо = зберігати поруч із ZIP-архівами (у папці «Архіви»).':'Empty = store alongside ZIP archives (in Archives folder).','ДЗЕРКАЛО:':'MIRROR:','МЕРЕЖА:':'NETWORK:','оновлення...':'updating...','недоступно':'unavailable','Авто (pCloud → Мережа при наявності)':'Auto (pCloud → Network if available)','Тільки pCloud':'pCloud only','Тільки мережева папка (Мережа)':'Network folder only (Network)','Обидва (pCloud + Мережа)':'Both (pCloud + Network)','Протоколи для рейтингу швидкості (між ОС):':'Speed ranking logs storage (cross-OS):','Підключення та папки':'Connection & Folders','Сховище та аналітика':'Storage & Analytics','Сервер:':_n,'Архіви:':_u,'ЛОКАЛЬНО:':'LOCAL:','ОСТАННІЙ:':'LAST:','↗ Відкрити':'↗ Open','Увімкнути синхронізацію з pCloud':'Enable pCloud sync','Зберігати архів у pCloud':'Save archive to pCloud','Зберігати журнал у pCloud':'Save log to pCloud','Авторизація pCloud':'Authorize pCloud','Перевірити вільне місце':'Check free space','pCloud підключено.':'pCloud connected.','pCloud ще не авторизовано. Натисніть «Авторизація pCloud».':'pCloud is not authorized yet. Click «Authorize pCloud».','Оберіть хоча б один пункт: зберігати архів або журнал.':'Select at least one option: save archive or save log.','Підключення pCloud уже існує. Виконати повторну авторизацію?':'pCloud connection already exists. Re-authorize?','Активовано X11-меню трею (Tkinter) для сумісності зі середовищем без AppIndicator.':'X11 tray menu (Tkinter) enabled for environments without AppIndicator.'}
+EN_SUBSTR=('Очікування мережі (','Waiting for network ('),("Втрачено зв'язок із ",'Lost connection to '),(' під час збірки (HTTP ',' during build (HTTP '),('Увага (активна тільки мережева папка): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.','Warning (network folder only): downloading and verifying in local SSD temp folder first, then moving to destination.'),('Увага (папка призначення в хмарному / мережевому сховищі): спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у місце призначення.','Warning (destination is in cloud / network storage): downloading and verifying in local SSD temp folder first, then moving to destination.'),('Перенесення перевіреного архіву у папку призначення...','Moving verified archive to destination folder...'),('Архів та .sha256 перенесено у місце призначення:','Archive and .sha256 moved to destination:'),('Активовано системний трей','System tray activated'),(_Y,_s),('Оновлено:','Updated:'),('Архівів:',_u),('адрес...','addresses...'),("без відповіді, перевірка з'єднання",'no response, checking connection'),('TCP відкрито, API не відповів','TCP is open, API did not respond'),('Перевірка сайту та HGM','Checking host and HGM'),('Сканування завершено. Всього знайдено серверів:','Scan complete. Servers found:'),('серверів у мережі','servers on the network'),('Ротація GFS:','GFS rotation:'),('Попередження: не вдалося синхронізувати хмарне дзеркало GFS:','Warning: failed to sync cloud GFS mirror:'),('Попередження: не вдалося записати хмарний звіт:','Warning: failed to save cloud report:'),('Попередження: не вдалося передати хмарний звіт:','Warning: failed to upload cloud report:'),('Попередження: не вдалося синхронізувати хмарні архіви:','Warning: failed to sync cloud archives:'),(_X,_r),('Перевірку завершено:','Verification complete:'),(_S,_l),('Усі ','All '),('Пошкоджених:','Corrupted:'),('Видалити пошкоджені','Delete corrupted'),('Архіви без файлу .sha256:','Archives without .sha256 file:'),('… та ще ','… and '),('Резервну копію створено:','Backup created:'),('Обрати виявлений',_j),('Виявлені (','Found ('),('1980-ті','1980s'),('1970-ті','1970s'),('1960-ті','1960s'),('Обрано виявлений у мережі сервер:','Selected discovered LAN server:'),('Папку збереження змінено на:','Backup folder changed to:'),('Папку збереження встановлено:','Backup folder set to:'),('Папка резервних копій недоступна; використовується внутрішнє сховище Android:','Backup folder is unavailable; using Android app storage:'),('Папку дзеркального копіювання увімкнено:','Mirror backup folder enabled:'),('Попередження: не вдалося скопіювати у дзеркальну папку','Warning: failed to copy to mirror folder'),('Сервер скинув завдання','Server reset the job'),('Час збірки на сервері вичерпано','Server build timeout reached'),('перервав збірку архіву:','aborted archive build:'),('збережено у «Історія».','saved to History.'),('Видалити назавжди з диска','Permanently delete from disk'),('Перемістити у Кошик','Move to Recycle Bin'),('застарілих копій','expired backups'),('Зупинено! ','Stopped! '),('фірмовий синій','signature blue'),('глянцеві смуги','glossy stripes'),('зелені блоки','green blocks'),('ч/б штрих','b/w stripe'),('Термінал мейнфрейму CRT','Mainframe CRT terminal'),('Телетайп / Перфострічка','Teletype / Punch tape'),('Нетбук','Netbook'),('Усі ','All '),(_v,_w),('Адресу збережено без перевірки:','Address saved without check:'),('Завдання не знайдено або вже видалено','Task not found or already deleted'),('Помилка Планувальника:','Scheduler error:'),('Помилка завантаження після','Download failed after'),('Мережева помилка під час входу:','Network error during login:'),('Успішно підключено до','Successfully connected to'),('Виконати резервне копіювання зараз?','Run backup now?'),('Пошкоджений файл в архіві:','Corrupted file in archive:'),('Перевірка архівів (буфер','Verifying archives (buffer'),('Помилка перевірки:','Verification error:'),('Видалено пошкоджених архівів:','Corrupted archives deleted:'),('Скопійовано у буфер:','Copied to clipboard:'),('створено на','created at'),('видалено з Планувальника.','removed from Task Scheduler.'),('Неоновий кібер-градієнт','Neon cyber gradient'),('Бурштиново-жовтий градієнт','Amber-yellow gradient'),('Смарагдовий градієнт','Emerald gradient'),('Сучасний плоский синій','Modern flat blue'),('Дуже дрібний','Extra small'),('Дрібний','Small'),('Стандартний','Standard'),('Середній','Medium'),('Великий','Large'),('Дуже великий','Extra large'),('Підвищений','Increased'),('Крупний','Big'),('Дуже крупний','Extra big'),('Суперкрупний','Super big'),('Гігантський','Giant'),('Максимальний','Maximum'),('Графіка','Graphics'),(_R,_k),(' від ',' from '),('(від ','(from '),('Систему запущено','System started'),('сховище:','storage:'),('Каталог:','Dir:'),('ОС та залізо:','OS & Hardware:'),('Перевірку сайту/порту пропущено для','Host/port check skipped for'),('Перевірка сайту та сервера HGM...','Checking HGM host and server...'),('Перевірка сесії та авторизація...','Checking session and auth...'),('Запит на підготовку бекапу...','Requesting backup preparation...'),('Підготовка на сервері','Preparing on server'),('Копіювання бази та файлів','Copying DB & files'),('Перевірка файлів','Checking files'),('Обробка на сервері','Processing on server'),('Стиснення ZIP-архіву','Packing ZIP'),('Архів готовий (75%). Завантаження...','Archive ready (75%). Downloading...'),('Завантаження ZIP-архіву з','Downloading ZIP archive from'),('Завантаження','Downloading'),(_v,_w),('Архів завантажено:','Archive downloaded:'),('Цілісність перевірено','Integrity verified'),('Цілісність 100% підтверджена','Integrity 100% verified'),('файлів','files'),('файл(ів)','file(s)'),('Збережено','Saved'),('Мережеву копію збережено у:','Network copy saved to:'),('Папку мережі змінено на:','Network folder changed to:'),('Попередження: не вдалося скопіювати у мережеву папку','Warning: failed to copy to network folder'),('Попередження: не вдалося оновити мережевий журнал швидкості:','Warning: failed to update network speed journal:'),('Дзеркальну копію збережено у:','Mirror copy saved to:'),('Налаштування та ключі захищено збережено.','Settings and keys securely saved.'),('Налаштування програми, теми, шрифту та стратегії GFS застосовано.','Application, theme, font, and GFS settings applied.'),('Ротація бекапів за обраною стратегією...','Running GFS backup rotation...'),('Переміщено у Кошик:','Moved to Recycle Bin:'),('Видалено з диска назавжди:','Deleted permanently:'),('Готово! Архів збережено','Done! Archive saved'),('УСПІХ! Резервне копіювання завершено за','SUCCESS! Backup completed in'),('ПОМИЛКА:','ERROR:'),('Помилка:','Error:'),('Сканування підмереж:','Scanning subnets:'),('Сканування','Scanning'),('Автоматично обрано сервер:','Auto-selected server:'),('Знайдено сервер:','Server found:'),('Знайдено кілька серверів','Multiple servers found'),('Знайдено:','Found:'),('Знайдено ','Found '),('ГОТОВО |','DONE |'),('ОНЛАЙН |','ONLINE |'),('Перезапуск збірки','Restarting build'),('Очікування мережі:','Waiting for network:'),('Збій завантаження','Download failed'),('повтор ','retry '),('Повтор ','Retry '),('через ','in '),('Підключено до HomeGrid Monitor:','Connected to HomeGrid Monitor:'),('Активну сесію підтверджено.','Active session confirmed.'),('Авторизація успішна!','Authorization successful!'),('Збірка архіву на сервері','Building archive on server'),('Етап сервера','Server stage'),('Перевірка CRC32','Verifying CRC32'),('Розрахунок SHA-256:','Calculating SHA-256:'),('справних','valid'),('без .sha256:','no .sha256:'),('пошкоджених:','corrupted:'),('Час:','Time:'),('буфер','buffer'),('Завершено за','Completed in'),('архівів','archives'),(_V,'Free:'),('Без .sha256','No .sha256'),('знайдено на диску','found on disk'),('Структура GFS:','GFS Structure:'),('Щоденних:','Daily:'),('Тижневих','Weekly'),('Місячних','Monthly'),('Середній розмір архіву:','Average archive size:'),('Захист SHA-256:','SHA-256 protection:'),('Успішність запусків:','Success rate:'),('Глибина архіву:','Archive depth:'),('дн.','days'),('шт.','pcs'),('Всього:','Total:'),('Залишиться:','Keep:'),('Застарілих:',_x),('[ВИДАЛИТИ]','[DELETE]'),('Версія','Version'),('оновлено:','updated:'),(_B,_a),('Лютий',_b),(_C,'March'),(_D,'April'),(_E,'May'),(_F,'June'),(_G,'July'),(_H,_c),(_I,_d),(_J,_e),(_K,_f),(_L,_g),('МБ/с','MB/s'),('КБ/с','KB/s'),('МБ','MB'),('КБ','KB'),('ГБ','GB'),('мс','ms'),('Дата та час:','Date & time:'),('Статус:','Status:'),('Розмір:','Size:'),('Деталі / Файл:','Details / File:'),('Тривалість:','Duration:'),('Файл архіву:','Archive file:'),('Джерело (сервер):','Source (server):'),('Час запуску:','Start time:'),('Завершено:','Finished:'),('Підготовка та аналіз на сервері:','Preparation & analysis on server:'),('Збір та копіювання даних на сервері:','Data collection & copying on server:'),('Стиснення та пакування ZIP на сервері:','ZIP packing on server:'),('Перевірка файлів на сервері:','File check on server:'),('Перевірка архіву CRC32 (програма):','CRC32 archive check (app):'),('Розрахунок та звірка SHA-256:','SHA-256 calculation & check:'),('Дзеркальне копіювання:','Mirror copy:'),('Скачування по мережі (','Network download ('),('Видалено пошкоджений архів:','Corrupted archive deleted:'),('Видалено з диска назавжди','Deleted permanently from disk'),('Переміщено у Кошик','Moved to Recycle Bin'),('Сервер не повернув cookie сесії.','Server returned no session cookie.'),('УВАГА! Контрольна сума SHA-256 не збігається','WARNING! SHA-256 checksum mismatch'),('SHA-256 не збігається з контрольним хешем сервера','SHA-256 does not match server checksum'),('Звіт про резервне копіювання','Backup report'),('Помилка читання ZIP:','ZIP read error:'),('Помилка перевірки SHA-256:','SHA-256 check error:'),('Помилка розблокування редактора:','Editor unlock error:'),('Помилка запису на диск:','Disk write error:'),('Помилка повторної підготовки:','Re-preparation error:'),('Сервер не створив завдання експорту:','Server did not create export job:'),('Сервер не створив нове завдання експорту:','Server did not create new export job:'),('Сервер повернув некоректну відповідь під час повторного запуску.','Server returned invalid response during restart.'),('Пошкоджений CRC32 у файлі:','Corrupted CRC32 in file:'),('невідома помилка сервера','unknown server error'),('Помилка schtasks.exe:','schtasks.exe error:'),('Збій створення завдання:','Task creation failed:'),('Помилка видалення завдання:','Task deletion error:'),('Помилка створення LaunchAgent:','LaunchAgent creation error:'),('Помилка видалення LaunchAgent:','LaunchAgent deletion error:'),('Помилка запису crontab:','crontab write error:'),('ICMP Ping до','ICMP Ping to'),("Сайт/домен '","Site/domain '"),("' не знайдено (помилка DNS).","' not found (DNS error)."),("' існує, але порт","' exists, but port"),('закритий або недоступний.','is closed or unreachable.'),("' доступний, але це НЕ сервер HomeGrid Monitor!","' is reachable, but it is NOT a HomeGrid Monitor server!"),("Хост '","Host '"),('Сервер HGM онлайн','HGM server online'),('Сервер http','Server http'),('Сервер ','Server '),(_W,_o),('Обробка','Processing'),('Застарілих GFS:',_x),('Трей: не встановлено pystray і Pillow','Tray: pystray and Pillow not installed'),('Немає графічної сесії (DISPLAY не задано) — трей вимкнено','No graphical session (DISPLAY not set) — tray disabled'),('Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель','XFCE tray: install xfce4-statusnotifier-plugin and add «Status Notifier» to the panel'),('Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support','GNOME tray: install the AppIndicator and KStatusNotifierItem Support extension'),('Трей KDE: перевірте, що увімкнено віджет «Системний лоток»','KDE tray: check that the «System Tray» widget is enabled'),('Панель не підтримує трей (потрібен StatusNotifier або XEmbed)','Panel does not support tray (StatusNotifier or XEmbed required)'),('Трей вимкнено (--no-tray або в налаштуваннях).','Tray disabled (--no-tray or in settings).'),('Вікно згорнуто в панель задач (трей вимкнено).','Window minimized to taskbar (tray disabled).'),('Системний трей недоступний','System tray unavailable'),('Помилка підготовки (порожня відповідь сервера, HTTP ','Preparation error (empty server response, HTTP '),('Сервер повернув некоректну відповідь замість JSON','Server returned invalid response instead of JSON'),('перестав відповідати під час збірки','stopped responding during build'),('Сайт ','Site '),('повернув HTML замість статусу JSON','returned HTML instead of JSON status'),('повідомив про помилку під час створення архіву!','reported an error while creating archive!'),(' спроб: ',' attempts: '),('завантажено лише ','downloaded only '),(' із ',' of '),('обрив потоку','stream interrupted'),('SHA-256 файлу на носії не збігається зі завантаженим потоком!','SHA-256 of file on disk does not match the downloaded stream!'),('але файл .sha256 відсутній','but .sha256 file is missing'),('Робота в WSL (дистрибутив:','Running in WSL (distro:'),(', режим: ',', mode: ')
+UK_EXACT={B:A for(A,B)in EN_EXACT.items()}
+UK_EXACT[_A]=_A
+_SUBSTR_CACHE={}
 def _get_substr_engine(lang):
-    eng = _SUBSTR_CACHE.get(lang)
-    if eng is not None:
-        return eng
-    if lang == "uk":
-        pairs = sorted(((en, uk) for uk, en in EN_SUBSTR if len(en) >= 3), key=lambda x: len(x[0]), reverse=True)
-    else:
-        pairs = sorted(EN_SUBSTR, key=lambda x: len(x[0]), reverse=True)
-    mapping = dict(pairs)
-    pattern = re.compile("|".join(re.escape(k) for k, _ in pairs)) if pairs else None
-    eng = (pattern, mapping)
-    _SUBSTR_CACHE[lang] = eng
-    return eng
-
-
+	C=lang;A=_SUBSTR_CACHE.get(C)
+	if A is not None:return A
+	if C=='uk':B=sorted(((A,B)for(B,A)in EN_SUBSTR if len(A)>=3),key=lambda x:len(x[0]),reverse=True)
+	else:B=sorted(EN_SUBSTR,key=lambda x:len(x[0]),reverse=True)
+	D=dict(B);E=re.compile('|'.join(re.escape(A)for(A,B)in B))if B else None;A=E,D;_SUBSTR_CACHE[C]=A;return A
 def _clean_linux_emoji(txt):
-    import sys
-
-    if not sys.platform.startswith("linux"):
-        return txt
-    return re.sub(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]+\s*", "", txt)
-
-
+	import sys
+	if not sys.platform.startswith('linux'):return txt
+	return re.sub('[\\U0001F300-\\U0001FAFF\\u2600-\\u27BF\\uFE0F]+\\s*','',txt)
 @lru_cache(maxsize=2048)
-def _tr_cached(raw_s, lang):
-    s = _clean_linux_emoji(raw_s)
-    if lang == "uk":
-        if s in UK_EXACT:
-            return UK_EXACT[s]
-        pat, mp = _get_substr_engine("uk")
-        return pat.sub(lambda m: mp[m.group(0)], s) if pat else s
-    if s in EN_EXACT:
-        return EN_EXACT[s]
-    pat, mp = _get_substr_engine("en")
-    if pat:
-        s = pat.sub(lambda m: mp[m.group(0)], s)
-    s = re.sub(r"(\d+)\s*\u0445\u0432\s*([\d.]+)\s*\u0441", r"\1m \2s", s)
-    s = re.sub(r"(?<=\d)\s*\u0441(?=\b|\)|\.)", " s", s)
-    s = re.sub(r"\b\u0437\u0430\s+(?=\d)", "in ", s)
-    s = re.sub(r"\b\u0456\u0437\s+(?=\d)", "of ", s)
-    s = re.sub(r"\b\u043e\s+(?=\d{2}:\d{2})", "at ", s)
-    return s
-
-
-def tr(text, lang="en"):
-    if not text:
-        return text
-    return _tr_cached(str(text), lang)
-
-
-def apply_widget_i18n(widget, lang="en"):
-    try:
-        if "text" in widget.keys():
-            raw_cur = widget.cget("text")
-            cur = str(raw_cur) if raw_cur is not None else ""
-            if cur.strip():
-                core_s = cur.strip()
-                t_core = tr(core_s, lang)
-                if t_core != core_s:
-                    lead = cur[:len(cur) - len(cur.lstrip())]
-                    trail = cur[len(cur.rstrip()):]
-                    widget.configure(text=f"{lead}{t_core}{trail}")
-                else:
-                    t_val = tr(cur, lang)
-                    if t_val != cur:
-                        widget.configure(text=t_val)
-    except Exception:
-        pass
-    try:
-        for ch in widget.winfo_children():
-            apply_widget_i18n(ch, lang)
-    except Exception:
-        pass
+def _tr_cached(raw_s,lang):
+	A=_clean_linux_emoji(raw_s)
+	if lang=='uk':
+		if A in UK_EXACT:return UK_EXACT[A]
+		B,C=_get_substr_engine('uk');return B.sub(lambda m:C[m.group(0)],A)if B else A
+	if A in EN_EXACT:return EN_EXACT[A]
+	B,C=_get_substr_engine('en')
+	if B:A=B.sub(lambda m:C[m.group(0)],A)
+	A=re.sub('(\\d+)\\s*\\u0445\\u0432\\s*([\\d.]+)\\s*\\u0441','\\1m \\2s',A);A=re.sub('(?<=\\d)\\s*\\u0441(?=\\b|\\)|\\.)',' s',A);A=re.sub('\\b\\u0437\\u0430\\s+(?=\\d)','in ',A);A=re.sub('\\b\\u0456\\u0437\\s+(?=\\d)','of ',A);A=re.sub('\\b\\u043e\\s+(?=\\d{2}:\\d{2})','at ',A);return A
+def tr(text,lang='en'):
+	A=text
+	if not A:return A
+	return _tr_cached(str(A),lang)
+def apply_widget_i18n(widget,lang='en'):
+	H='text';C=lang;B=widget
+	try:
+		if H in B.keys():
+			D=B.cget(H);A=str(D)if D is not None else''
+			if A.strip():
+				E=A.strip();F=tr(E,C)
+				if F!=E:I=A[:len(A)-len(A.lstrip())];J=A[len(A.rstrip()):];B.configure(text=f"{I}{F}{J}")
+				else:
+					G=tr(A,C)
+					if G!=A:B.configure(text=G)
+	except Exception:0
+	try:
+		for K in B.winfo_children():apply_widget_i18n(K,C)
+	except Exception:0
