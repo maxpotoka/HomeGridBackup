@@ -138,7 +138,7 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 				if _spd_v <= 0 and float(A.get(_R) or 0) > 0 and float(A.get(_S) or 0) > 0:
 					_spd_v = round(float(A[_R]) / float(A[_S]), 2)
 				_os_v = ('%s %s' % (A.get(_L, ''), str(A.get(_M, '')).partition('-').__getitem__(0))).strip()
-				push_backup_speed(F.state, _os_v, A.get('net_adapter_label') or A.get('net_adapter_type') or 'Backup', A.get('net_scope') or 'LAN', A.get(_R, 0), A.get(_S, 0), _spd_v, SCRIPT_VER, float(A.get('srv_speed_mbps') or 0))
+				push_backup_speed(F.state, _os_v, A.get('net_adapter_label') or A.get('net_adapter_type') or 'Backup', A.get('net_scope') or 'LAN', A.get(_R, 0), A.get(_S, 0), _spd_v, SCRIPT_VER, float(A.get('srv_speed_mbps') or 0), int(A.get('net_link_mbps') or 0))
 		except Exception:
 			pass
 		if len(P)>50:
@@ -281,3 +281,61 @@ def fetch_global_d1_speed_stats(engine):
 	    return {'ops': ops, 'devices': devs}
 	except Exception:
 		return dict(ops=[],devices=[])
+
+
+def _med(v):
+    import statistics as _st
+    x = [float(i) for i in v if float(i or 0) > 0]
+    return round(_st.median(x), 1) if x else 0.0
+
+def _grp_lbl(sc, ad, lk):
+    s = 'Internet' if str(sc).lower() == 'internet' else 'LAN'
+    a = str(ad or '').strip()
+    if a.lower() in ('', 'backup', 'bench'):
+        a = 'Ethernet' if s == 'LAN' else 'WAN'
+    m = int(lk or 0)
+    l = f'{round(m/1000.,1):g} Gbps' if m >= 1000 else (f'{m} Mbps' if m > 0 else '')
+    return f'{s}, {a} {l}'.strip() if l else f'{s}, {a}'
+
+def build_three_section_stats(engine, refresh=True):
+    from core.speed_bench import _anon_id, fetch_global_stats
+    st = getattr(engine, 'state', {}) or {}
+    aid = _anon_id(st)
+    ops = fetch_cloud_speed_stats(engine, refresh=False).get('ops', [])
+    d1 = [r for r in fetch_global_stats('ALL') if str(r.get('anon_id') or '') != aid]
+    def_srv = str(st.get('server') or '').replace('http://', '').replace('https://', '').strip().rstrip('/')
+    srv_my = {}
+    for o in ops:
+        sv = float(o.get('srv_speed_mbps') or 0)
+        tm = float(o.get('server_duration_sec') or o.get('server_packing_sec') or 0)
+        rw = float(o.get('srv_raw_mb') or 0)
+        if rw > 0 and tm > 0:
+            sv = round(rw / tm, 2)
+        if sv <= 0 or (rw <= 0 and sv < 10):
+            continue
+        h = str(o.get('srv_norm') or '').strip()
+        if not h or h == 'Server':
+            h = def_srv or 'HomeGrid Server'
+        srv_my.setdefault(h, []).append(sv)
+    d1_srv = [float(r.get('srv_mbs') or 0) for r in d1 if r.get('kind') != 'bench' and float(r.get('srv_mbs') or 0) >= 10]
+    srv_rows = [{'name': h, 'my': _med(v), 'd1': _med(d1_srv), 'n_my': len(v), 'n_d1': len(d1_srv)} for h, v in srv_my.items()]
+    if not srv_rows and d1_srv:
+        srv_rows.append({'name': 'D1 Servers', 'my': 0.0, 'd1': _med(d1_srv), 'n_my': 0, 'n_d1': len(d1_srv)})
+    net_my, net_sz = {}, {}
+    for o in ops:
+        sp, sz = float(o.get('spd_f') or 0), float(o.get('mb_f') or 0)
+        if sp <= 0 or o.get('spd_approx'):
+            continue
+        g = _grp_lbl(o.get('scope_norm'), o.get('net_adapter_type') or o.get('net_adapter_label'), o.get('net_link_mbps'))
+        net_my.setdefault(g, []).append(sp)
+        if sz > 0:
+            net_sz.setdefault(g, []).append(sz)
+    net_rows = []
+    for g, v in net_my.items():
+        rsz = _med(net_sz.get(g, []))
+        dm = [float(r.get('spd_mbs') or 0) for r in d1 if r.get('kind') != 'bench' and float(r.get('spd_mbs') or 0) > 0 and _grp_lbl(r.get('scope'), r.get('adapter'), r.get('link_mbps')) == g and (rsz <= 0 or float(r.get('size_mb') or 0) <= 0 or abs(float(r.get('size_mb')) - rsz) / rsz <= 0.2)]
+        net_rows.append({'group': g, 'my': _med(v), 'd1': _med(dm), 'n_my': len(v), 'n_d1': len(dm)})
+    d1_b = [r for r in d1 if r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0]
+    my_b = [r for r in fetch_global_stats('ALL') if str(r.get('anon_id') or '') == aid and (r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0)]
+    hw_rows = [{'metric': m, 'my': _med([x.get(k) for x in my_b]), 'd1': _med([x.get(k) for x in d1_b]), 'n_my': len([x for x in my_b if float(x.get(k) or 0) > 0]), 'n_d1': len([x for x in d1_b if float(x.get(k) or 0) > 0])} for k, m in (('cpu_mbs', 'CPU (CRC32)'), ('sha_mbs', 'SHA-256'), ('disk_w_mbs', 'Disk Write'), ('disk_r_mbs', 'Disk Read'))]
+    return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows}

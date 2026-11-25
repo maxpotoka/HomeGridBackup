@@ -425,133 +425,86 @@ class DialogsMixin:
 			_refresh()
 		btn_verify=tk.Button(bf,text=M,command=_verify,bg=p[_A],fg=p[_Q],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_verify.pack(side=_J,padx=(0,6));tk.Label(bf,text='Буфер:',bg=p[_G],fg=p[_O],font=(fam,fs)).pack(side=_J,padx=(4,4));cb_buf=ttk.Combobox(bf,textvariable=v_buf,values=list(buf_options.keys()),width=7,state=_e,font=(fam,fs));cb_buf.pack(side=_J,padx=(0,8));btn_del_bad=tk.Button(bf,text=L,command=_clean_corrupted,state=F,bg=p[_A],fg=p[_O],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_del_bad.pack(side=_J,padx=4);btn_clean_exp=tk.Button(bf,text='Очистити застарілі зараз',command=_clean,bg=p[_b],fg=p[I],disabledforeground=p[_O],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_clean_exp.pack(side=_J,padx=4);tk.Button(bf,text=_w,command=dlg.destroy,bg=p[_A],fg=p[_D],font=(fam,fs),padx=bpx,pady=bpy,cursor=_R).pack(side=_K);_refresh();apply_widget_i18n(dlg,self.engine.state.get(_F,_E));self._fit_dialog(dlg)
 	def open_cloud_stats_modal(self):
-		O='archive';N='nspd';M='spd';L='dev';K='HGBC.Treeview';J='spd_f';I='dev_label';H='arc';G='All systems';F='Усі системи';E='label';D='devs';C='dur_f';B='rows';A='ops';import threading;fs,k,lang,fam=self.metrics[_k],self.metrics[_a],self.engine.state.get(_F,_E),self._ui_fam();_rw=max(620,self.root.winfo_width());_rh=max(420,self.root.winfo_height());dlg,p,_=self._make_dialog('⚡ Статистика швидкості роботи'if lang==_B else'⚡ Work Speed Statistics',min(1080,int((_rw-12)/max(.5,k))),min(640,int((_rh-12)/max(.5,k))));dlg.maxsize(_rw,_rh);bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=14,pady=(4,10));tk.Button(bf,text=_w if lang==_B else'Close',command=dlg.destroy,bg=p[_A],fg=p[_D],font=(fam,fs,_I),padx=18,pady=5,cursor=_R).pack(side=_K);top_bar=tk.Frame(dlg,bg=p[_G]);top_bar.pack(fill=_C,padx=14,pady=(8,4));v_dev=tk.StringVar(value=F if lang==_B else G);v_mode=tk.StringVar(value='LOCAL');mode_f=tk.Frame(top_bar,bg=p[_G]);mode_f.pack(side=_J,padx=(0,8));mode_btns={}
-		def _set_mode(md):
-			v_mode.set(md)
-			v_dev.set(F if lang==_B else G)
-			v_scope.set('ALL')
-			for ks,bs in scope_btns.items():bs.configure(bg=p[_y]if ks=='ALL'else p[_A],fg=_l if ks=='ALL'else p[_D])
-			for km,bw in mode_btns.items():bw.configure(bg=p[_U]if km==md else p[_A],fg=p[_v]if km==md else p[_D])
-			if md=='SRV':scope_f.pack_forget()
-			elif not scope_f.winfo_ismapped():scope_f.pack(side=_J,padx=(0,8),after=cb_dev)
-			_load(_H)
-		for mk,mt in(('LOCAL','💻 Мої пристрої'if lang==_B else'💻 My Devices'),('SRV','🖥 Швидкість сервера'if lang==_B else'🖥 Server Speed'),('D1','🌐 Глобальний D1'if lang==_B else'🌐 Global D1')):
-			bm=tk.Button(mode_f,text=mt,command=lambda m=mk:_set_mode(m),bg=p[_U]if mk=='LOCAL'else p[_A],fg=p[_v]if mk=='LOCAL'else p[_D],font=(fam,max(8,fs-1),_I),padx=9,pady=2,cursor=_R);bm.pack(side=_J,padx=2);mode_btns[mk]=bm
-		cb_dev=ttk.Combobox(top_bar,textvariable=v_dev,state=_e,width=18,font=(fam,fs));cb_dev.pack(side=_J,padx=(0,8));v_scope=tk.StringVar(value='ALL');scope_f=tk.Frame(top_bar,bg=p[_G]);scope_f.pack(side=_J,padx=(0,8));scope_btns={}
-		def _set_sc(sc):
-			v_scope.set(sc)
-			for k_s,b_w in scope_btns.items():b_w.configure(bg=p[_y]if k_s==sc else p[_A],fg=_l if k_s==sc else p[_D])
-			_render()
-		for sc_k,sc_t in(('ALL','Усі'if lang==_B else'All'),('LAN','LAN'),('Internet','Інтернет'if lang==_B else'Internet')):
-			b_sc=tk.Button(scope_f,text=sc_t,command=lambda s=sc_k:_set_sc(s),bg=p[_y]if sc_k=='ALL'else p[_A],fg=_l if sc_k=='ALL'else p[_D],font=(fam,max(8,fs-1),_I),padx=9,pady=2,cursor=_R);b_sc.pack(side=_J,padx=2);scope_btns[sc_k]=b_sc
-		lbl_st=tk.Label(top_bar,text='',bg=p[_G],fg=p[_O],font=(fam,max(8,fs-1)));lbl_st.pack(side=_K);route_row=tk.Frame(dlg,bg=p[_G]);route_row.pack(fill=_C,padx=14,pady=(0,2));lbl_route=tk.Label(route_row,text='',bg=p[_G],fg=p[_Q],anchor=_L,justify=_J,wraplength=max(320,int(_rw-210)),font=(fam,max(8,fs-1),_I));lbl_route.pack(side=_J,fill=_C,expand=_H);cards_f=tk.Frame(dlg,bg=p[_G]);cards_f.pack(fill=_C,padx=14,pady=4)
-		for ci in range(4):cards_f.columnconfigure(ci,weight=1)
-		caps=('ПРИСТРОЇВ','СЕР. ЧАС','ШВИДШИЙ / ПОВІЛЬНИЙ','СЕР. ШВИДКІСТЬ')if lang==_B else('SYSTEMS','AVG. TIME','FASTEST / SLOWEST','AVG. SPEED (ALL)');c_vals=[]
-		for(idx,cap)in enumerate(caps):cf=tk.Frame(cards_f,bg=p[_A],bd=1,relief=_Y,padx=8,pady=5);cf.grid(row=0,column=idx,sticky='nsew',padx=(0 if idx==0 else 6,0));tk.Label(cf,text=cap,bg=p[_A],fg=p[_O],font=(fam,max(7,fs-3),_I)).pack(anchor=_L);vl=tk.Label(cf,text=_X,bg=p[_A],fg=p[_Q],font=(fam,fs,_I));vl.pack(anchor=_L);c_vals.append(vl)
-		v_cnt,v_avg_t,v_minmax,v_avg_s=c_vals;chart_f=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=10,pady=6);chart_f.pack(fill=_W,expand=_H,padx=14,pady=4);lbl_chart_t=tk.Label(chart_f,text='ЧИСТА ШВИДКІСТЬ ЗАВАНТАЖЕННЯ (МБ/с та час):'if lang==_B else'NET DOWNLOAD SPEED (MB/s & time):',bg=p[_A],fg=p[_O],font=(fam,max(7,fs-3),_I));lbl_chart_t.pack(anchor=_L);cv=tk.Canvas(chart_f,height=int(260*k),bg=p[_f],highlightthickness=1,highlightbackground=p[_P]);cv.pack(fill=_W,expand=_H,pady=(4,0));wrap=tk.Frame(dlg,bg=p[_G]);wrap.pack(fill=_C,expand=_S,padx=14,pady=(2,2));st_tv=ttk.Style()
-		try:st_tv.theme_use('clam')
-		except Exception:0
-		st_tv.configure(K,background=p[_f],foreground=p[_D],fieldbackground=p[_f],rowheight=max(24,int((fs+14)*k)),font=(fam,max(8,fs-1)));st_tv.configure('HGBC.Treeview.Heading',background=p[_A],foreground=p[_Q],font=(fam,max(8,fs-1),_I));tree=ttk.Treeview(wrap,columns=(_x,L,'net_a',H,'mb','dur',M,N),show='headings',height=4,style=K)
-		for(cid,h_t,wc,anc)in((_x,'Дата'if lang==_B else'Date',124,_g),(L,'ОС / Система'if lang==_B else'OS / System',165,_L),('net_a','Адаптер'if lang==_B else'Adapter',100,_L),(H,'Архів'if lang==_B else'Archive',170,_L),('mb','Розмір'if lang==_B else'Size',84,_i),('dur','Час'if lang==_B else'Time',88,_g),(M,'Лок. МБ/с'if lang==_B else'Loc MB/s',82,_i),(N,'Мер. МБ/с'if lang==_B else'Net MB/s',82,_i)):tree.heading(cid,text=h_t);tree.column(cid,width=int(wc*k),minwidth=55,anchor=anc,stretch=cid==H)
-		vsb=ttk.Scrollbar(wrap,orient=_z,command=tree.yview);tree.configure(yscrollcommand=vsb.set);vsb.pack(side=_K,fill=_o);tree.pack(side=_J,fill=_W,expand=_H);state_box={A:[],D:[],B:{},'srv_ops':[]}
-		def _draw_bars(_e=_M):
-			B='avg_net_spd';A='avg_spd';cv.delete(_A0);devs=state_box[D];w,h=max(300,cv.winfo_width()),max(170,cv.winfo_height())
-			if not devs:cv.create_text(w//2,h//2,text=('...'if lbl_st.cget(_D).endswith('...')else('Немає даних'if lang==_B else'No data')),fill=p[_O],font=(fam,fs));return
-			is_d1=v_mode.get()=='D1';is_srv_m=v_mode.get()=='SRV';lbl_chart_t.configure(text=('ШВИДКІСТЬ СТИСНЕННЯ ТА ЗБІРКИ НА СЕРВЕРІ (МБ/с та час):'if is_srv_m else'ЧИСТА ШВИДКІСТЬ ЗАВАНТАЖЕННЯ (МБ/с та час):')if lang==_B else('SERVER COMPRESSION & PACKING SPEED (MB/s & time):'if is_srv_m else'NET DOWNLOAD SPEED (MB/s & time):'));is_srv_m=v_mode.get()=='SRV'
-			leg=[('Мережа'if lang==_B else'Network','#10b981'),('Кеш/CPU'if lang==_B else'Cache/CPU','#38bdf8'),('Запис диска'if lang==_B else'Disk Write','#f59e0b'),('Читання диска'if lang==_B else'Disk Read','#a855f7')]if is_d1 else[('Лідер'if lang==_B else'Fastest','#10b981'),('Мій сервер'if lang==_B else'My Server','#38bdf8'),('Інші сервери'if lang==_B else'Other Servers','#f59e0b')]if is_srv_m else[('Лідер'if lang==_B else'Fastest','#10b981'),('Цей ПК'if lang==_B else'This PC','#38bdf8'),('Інші ПК'if lang==_B else'Other PC','#3b82f6')]
-			lx=int(14*k)
-			for(lt,lc)in leg:cv.create_rectangle(lx,int(8*k),lx+int(11*k),int(19*k),fill=lc,outline='');lx+=int(15*k);tid=cv.create_text(lx,int(13*k),text=lt,anchor='w',fill=p[_D],font=(fam,max(7,fs-2),_I));bb=cv.bbox(tid);lx=(bb[2] if bb else lx+50)+int(14*k)
-			vals=[d[A]for d in devs]+([d.get(m,0)for d in devs for m in('avg_cpu','avg_disk_w','avg_disk_r')]if is_d1 else[])+[.1]
-			max_s=max(vals);pad_x,top_y,bot_y=int(42*k),int(56*k),h-int(46*k)
-			for g_i in range(1,5):gy=bot_y-int((bot_y-top_y)*g_i/4);cv.create_line(pad_x-8,gy,w-pad_x+12,gy,fill=p[_P],dash=(2,4))
-			slot=(w-pad_x*2)/len(devs);dx,dy=int(7*k),int(5*k);cv.create_line(pad_x-8,bot_y,w-pad_x+12,bot_y,fill=p[_P],width=2)
-			for(i,d)in enumerate(devs):
-				cx=pad_x+slot*(i+.5)
-				if is_d1:
-					bars=[(d[A],'#10b981','#059669','#34d399'),(float(d.get('avg_cpu')or 0),'#38bdf8','#0284c7','#7dd3fc'),(float(d.get('avg_disk_w')or 0),'#f59e0b','#d97706','#fbbf24'),(float(d.get('avg_disk_r')or 0),'#a855f7','#7e22ce','#c084fc')]
-					bars=[b for b in bars if b[0]>0]or[(d[A],'#10b981','#059669','#34d399')]
-					sbw=min(34,max(14,(slot*.72)/len(bars)));tot_w=sbw*len(bars)+4*(len(bars)-1);sx=cx-tot_w/2
-					for(bi,(val,cf,cs,ct))in enumerate(bars):
-						x1=sx+bi*(sbw+4);x2=x1+sbw;bh=max(int(10*k),int((bot_y-top_y)*val/max_s));y1=bot_y-bh
-						cv.create_polygon(x2,y1,x2+dx,y1-dy,x2+dx,bot_y-dy,x2,bot_y,fill=cs,outline='');cv.create_polygon(x1,y1,x1+dx,y1-dy,x2+dx,y1-dy,x2,y1,fill=ct,outline='');cv.create_rectangle(x1,y1,x2,bot_y,fill=cf,outline='')
-						cv.create_text((x1+x2)/2+dx//2,y1-dy-int(9*k),text=f'{round(val,1)}',fill=ct,font=(fam,max(7,fs-2),_I))
-				else:
-					bw=min(68,max(28,slot*.44));x1,x2=cx-bw/2,cx+bw/2;bh=max(int(12*k),int((bot_y-top_y)*d[A]/max_s));y1=bot_y-bh
-					c_f,c_s,c_t=('#10b981','#059669','#34d399')if i==0 else('#f59e0b','#d97706','#fbbf24')if d.get('is_d1_srv')else('#f59e0b','#d97706','#fbbf24')if d.get('is_d1_srv')else('#38bdf8','#0284c7','#7dd3fc')if d['is_own']else('#3b82f6','#1d4ed8','#93c5fd')
-					cv.create_polygon(x2,bot_y,x2+dx+5,bot_y-dy+3,x2+dx+5,y1-dy+5,x2,y1+3,fill='#05080f',outline='');cv.create_polygon(x2,y1,x2+dx,y1-dy,x2+dx,bot_y-dy,x2,bot_y,fill=c_s,outline='');cv.create_polygon(x1,y1,x1+dx,y1-dy,x2+dx,y1-dy,x2,y1,fill=c_t,outline='');cv.create_rectangle(x1,y1,x2,bot_y,fill=c_f,outline='');cv.create_line(x1+1,y1+1,x2-1,y1+1,fill='#e0f2fe');unit=_AB if lang==_B else _AC;dur_part=f" • {format_duration(d['avg_dur'],lang).partition(_s).__getitem__(0)}"if float(d.get('avg_dur')or 0)>0 else'';net_part=f' | Net: {d[B]}'if d.get(B,0)>0 else'';cv.create_text(cx+dx//2,y1-dy-int(11*k),text=f'{d[A]} {unit}{net_part}{dur_part}',fill=p[_D],font=(fam,max(8,fs-1),_I))
-				lbl_d=d[E]if len(d[E])<=22 else d[E][:19]+'...';nl=d.get('net_lbl','');cv.create_text(cx,bot_y+int(13*k),text=lbl_d,fill=p[_U]if i==0 else p[_O],font=(fam,max(8,fs-1),_I if i==0 else _A2));(nl and nl!=_X and cv.create_text(cx,bot_y+int(29*k),text=nl,fill=p[_Q],font=(fam,max(7,fs-2),_I)))
-		def _render():
-			E='net_spd_f'
-			for rid in tree.get_children():tree.delete(rid)
-			state_box[B].clear();all_lbl=F if lang==_B else G;sel=v_dev.get();sc_sel=v_scope.get()
-			_src_ops=state_box.get('srv_ops',[])if v_mode.get()=='SRV'else state_box[A];ops=[o for o in _src_ops if(sel==all_lbl or o[I]==sel)and(sc_sel=='ALL'or o.get('scope_norm','LAN')==sc_sel)]
-			by_d={}
-			for o in ops:by_d.setdefault(o[_AF],[]).append(o)
-			c_own=str(self.engine.state.get(_AF)or'');cur_devs=[]
-			for d_id,p_list in by_d.items():
-				ex_l=[x for x in p_list if not x.get('spd_approx')and x[J]>0];smp=(ex_l or p_list)[:5];ad=round(sum(x[C]for x in smp)/len(smp),1);tot_m=sum(float(x.get('mb_f')or 0)for x in smp);tot_dl=0 if v_mode.get()=='SRV'else sum(float(x.get('download_duration_sec')or 0)for x in smp);asp=round(tot_m/tot_dl,2)if tot_dl>0 else round(sum(x[J]for x in smp)/len(smp),2);eff=tot_m/max(sum(float(x[C]or 0)for x in smp),0.1);nq=[x for x in smp if x.get(E,0)>0]
-				cur_devs.append({_AF:d_id,'label':p_list[0][I],'is_own':d_id==c_own or str(d_id).startswith('srv_'),'is_d1_srv':bool(p_list[0].get('is_d1_srv')),'avg_dur':ad,'avg_spd':asp,'eff_spd':eff,'avg_cpu':max((float(x.get('avg_cpu')or 0)for x in p_list),default=_T),'avg_disk_w':max((float(x.get('avg_disk_w')or 0)for x in p_list),default=_T),'avg_disk_r':max((float(x.get('avg_disk_r')or 0)for x in p_list),default=_T),'avg_net_spd':round(sum(x[E]for x in nq)/len(nq),1)if nq else _T,'net_lbl':p_list[0].get('net_lbl',_X)})
-			cur_devs.sort(key=lambda d:(-(0.5*d['avg_spd']+0.3*max(d.get('avg_disk_w',0),d.get('avg_disk_r',0))+0.2*d.get('avg_cpu',0)),d['avg_dur']));state_box[D]=cur_devs;v_cnt.configure(text=f"{len(cur_devs)}");sample=[]
-			for d in cur_devs:ex_d=[x for x in by_d[d[_AF]]if not x.get('spd_approx')];sample.extend((ex_d or by_d[d[_AF]])[:5])
-			if ops:
-				lo=ops[0];r_os=lo[I].lstrip('* ');r_ad=lo.get('net_lbl',_X);r_sc=lo.get('scope_norm','LAN');r_sh=lo.get('srv_host')or self.engine.state.get(_A3,'');r_est=lo.get('srv_conn_est','');r_tail=f"{r_sc} • {r_est}"if r_est else r_sc
-				bn_s=''
-				if self.engine.state.get('show_bottleneck',_H)and float(lo.get(C)or 0)>0:
-					b_parts=[(float(lo.get('server_duration_sec')or 0),'збірка на сервері'if lang==_B else'server build','HGM CPU/disk'),(float(lo.get('download_duration_sec')or 0),'завантаження'if lang==_B else'download','network/buffer'),(float(lo.get('crc_duration_sec')or 0)+float(lo.get('sha256_duration_sec')or 0),'перевірка хешів'if lang==_B else'hash verify','local disk/CPU'),(float(lo.get('net_duration_sec')or 0),'мережева папка'if lang==_B else'network copy','LAN/SMB')]
-					b_top=max(b_parts,key=lambda x:x[0])
-					if b_top[0]>0:
-						pct_b=min(99,int(round(b_top[0]/float(lo[C])*100)))
-						bn_s=f"  •  {'Вузьке місце'if lang==_B else'Bottleneck'}: {b_top[1]} ({pct_b}%) [{b_top[2]}]"
-				lbl_route.configure(text=f"{'Підключення'if lang==_B else'Connection'}: {r_os} ({r_ad}) → {r_sh} [{r_tail}]{bn_s}")
-			else:lbl_route.configure(text='')
-			if sample:_ts=[x[C]for x in sample if float(x.get(C)or 0)>0];v_avg_t.configure(text=format_duration(sum(_ts)/len(_ts),lang).partition(_s).__getitem__(0)if _ts else _X);v_minmax.configure(text=f"{format_duration(min(_ts),lang).partition(_s).__getitem__(0)} / {format_duration(max(_ts),lang).partition(_s).__getitem__(0)}"if _ts else _X);v_avg_s.configure(text=f"{round(sum(x[J]for x in sample)/len(sample),2)} {_AB if lang==_B else _AC}")
-			else:
-				for v in(v_avg_t,v_minmax,v_avg_s):v.configure(text=_X)
-			for(idx,o)in enumerate(ops[:100]):ts_s=str(o.get('timestamp')or'')[:16].replace('T',' ');iid=f"c_{idx}";state_box[B][iid]=o;tree.insert('','end',iid=iid,values=(ts_s,o[I],o.get('net_lbl')or _X,o.get(O)or _X,f"{o['mb_f']} {'МБ'if lang==_B else'MB'}",(format_duration(o[C],lang).partition(_s).__getitem__(0)if float(o.get(C)or 0)>0 else _X),f"{'~'if o.get('spd_approx')else''}{o[J]}",f"{o[E]}"if o.get(E,0)>0 else _X))
-			_draw_bars()
-		def _on_dbl(_e=_M):
-			s=tree.selection()
-			if not s:return
-			sid=next(iter(s))
-			if sid not in state_box[B]:return
-			o=state_box[B][sid];lines=[f"{o[I]}  •  {o.get(O,'')}",f"{'Загальний час'if lang==_B else'Total time'}: {format_duration(o[C],lang)}  •  {'Швидкість'if lang==_B else'Speed'}: {o[J]} {_AB if lang==_B else _AC}"];_anm=str(o.get('net_adapter_name')or'').strip();_albl=str(o.get('net_lbl')or'').strip();_asc=str(o.get('scope_norm')or'').strip();_aest=str(o.get('srv_conn_est')or'').strip()
-			if _anm or(_albl and _albl!=_X):lines.append(f"{'Адаптер'if lang==_B else'Adapter'}: [{_asc}] {_albl} ({_anm}) {_aest}".strip())
-			for(k_s,n_s)in(('server_duration_sec','Server'),('download_duration_sec','Download'),('crc_duration_sec','CRC32'),('sha256_duration_sec','SHA-256'),('net_duration_sec','Network'if lang!=_B else'Мережа'),('mirror_duration_sec','Mirror')):
-				if float(o.get(k_s)or 0)>0:lines.append(f"• {n_s}: {format_duration(float(o[k_s]),lang).partition(_s).__getitem__(0)}")
-			self._show_engine_modal({_j:_AN,_AD:'Деталі швидкості'if lang==_B else'Speed Details',_D:chr(10).join(lines)})
+		import threading
+		fs, k, lang, fam = self.metrics[_k], self.metrics[_a], self.engine.state.get(_F, _E), self._ui_fam()
+		_rw, _rh = max(640, self.root.winfo_width()), max(460, self.root.winfo_height())
+		dlg, p, _ = self._make_dialog('⚡ Статистика швидкості роботи' if lang == _B else '⚡ Work Speed Statistics', min(1040, int((_rw - 12) / max(.5, k))), min(680, int((_rh - 12) / max(.5, k))))
+		dlg.maxsize(_rw, _rh)
+		bf = tk.Frame(dlg, bg=p[_G])
+		bf.pack(side=_Z, fill=_C, padx=14, pady=(4, 10))
+		tk.Button(bf, text=_w if lang == _B else 'Close', command=dlg.destroy, bg=p[_A], fg=p[_D], font=(fam, fs, _I), padx=18, pady=5, cursor=_R).pack(side=_K)
+		top_bar = tk.Frame(dlg, bg=p[_G])
+		top_bar.pack(fill=_C, padx=14, pady=(8, 4))
+		lbl_st = tk.Label(top_bar, text='', bg=p[_G], fg=p[_O], font=(fam, max(8, fs - 1)))
+		lbl_st.pack(side=_K)
+		def _fmt_v(val, n):
+			u = _AB if lang == _B else _AC
+			low = 'мало даних' if lang == _B else 'low data'
+			if n <= 0 or float(val or 0) <= 0:
+				return _X
+			return f"{val} {u}" + (f" ({low})" if n < 3 else "")
+		st_tv = ttk.Style()
+		try:
+			st_tv.theme_use('clam')
+		except Exception:
+			pass
+		st_tv.configure('HGB3.Treeview', background=p[_f], foreground=p[_D], fieldbackground=p[_f], rowheight=max(26, int((fs + 16) * k)), font=(fam, fs))
+		st_tv.configure('HGB3.Treeview.Heading', background=p[_A], foreground=p[_Q], font=(fam, max(8, fs - 1), _I))
+		def _mk_sec(title_uk, title_en, col1_uk, col1_en, h_rows):
+			box = tk.Frame(dlg, bg=p[_A], bd=1, relief=_Y, padx=10, pady=6)
+			box.pack(fill=_W, expand=_H, padx=14, pady=4)
+			tk.Label(box, text=title_uk if lang == _B else title_en, bg=p[_A], fg=p[_Q], font=(fam, fs, _I)).pack(anchor=_L, pady=(0, 4))
+			tv = ttk.Treeview(box, columns=('c1', 'my', 'd1', 'n'), show='headings', height=h_rows, style='HGB3.Treeview')
+			heads = (('c1', col1_uk if lang == _B else col1_en, 260, _L), ('my', 'Мої (медіана)' if lang == _B else 'Mine (median)', 185, _g), ('d1', 'Чужі D1 (медіана)' if lang == _B else 'Others D1 (median)', 185, _g), ('n', 'n (мої / D1)' if lang == _B else 'n (mine / D1)', 110, _g))
+			for cid, ht, wc, anc in heads:
+				tv.heading(cid, text=ht)
+				tv.column(cid, width=int(wc * k), minwidth=80, anchor=anc, stretch=(cid == 'c1'))
+			tv.tag_configure('own', background='#132a3a', foreground='#38bdf8')
+			tv.pack(fill=_W, expand=_H)
+			return tv
+		tv_srv = _mk_sec('1. СЕРВЕР (швидкість збірки на HGM)', '1. SERVER (HGM build speed)', 'Сервер', 'Server', 2)
+		tv_net = _mk_sec('2. МЕРЕЖА (чисте скачування архіву, ±20% розмір)', '2. NETWORK (pure download, ±20% size)', "Тип зв'язку", 'Connection', 3)
+		tv_hw = _mk_sec('3. ЗАЛІЗО (тест ПК / диска)', '3. HARDWARE (PC / disk benchmark)', 'Метрика', 'Metric', 4)
 		def _load(refresh=_H):
-			lbl_st.configure(text=('Оновлення...'if lang==_B else'Refreshing...')if refresh else'Читання кешу...'if lang==_B else'Loading cache...',fg=p[_Q])
-			def _w():
-				try:from core.cloud import fetch_cloud_speed_stats,fetch_global_d1_speed_stats;res=(fetch_global_d1_speed_stats(self.engine)if v_mode.get()=='D1'else fetch_cloud_speed_stats(self.engine,refresh=refresh));err=''
-				except Exception as ex:res,err=_M,str(ex)
+			lbl_st.configure(text='Оновлення...' if lang == _B else 'Refreshing...', fg=p[_Q])
+			def _w_fn():
+				try:
+					from core.cloud import build_three_section_stats
+					res, err = build_three_section_stats(self.engine, refresh=refresh), ''
+				except Exception as ex:
+					res, err = None, str(ex)
 				def _u():
-					B='devices'
-					if not dlg.winfo_exists():return
-					if err:lbl_st.configure(text=err,fg=p[_V]);return
-					_dl=res.get('servers',res[B])if v_mode.get()=='SRV'else res[B];state_box[A],state_box[D],state_box['srv_ops']=res[A],_dl,res.get('srv_ops',[]);all_lbl=F if lang==_B else G;cb_dev.configure(values=[all_lbl]+[d[E]for d in _dl])
-					if v_dev.get()not in cb_dev['values']:v_dev.set(all_lbl)
-					lbl_st.configure(text=(f"Оновлено ✔ ({len(res[A])})"if lang==_B else f"Updated ✔ ({len(res[A])})")if refresh else'Cache'if lang!=_B else'Кеш',fg=p[_U]);_render()
-				self.root.after(0,_u)
-			threading.Thread(target=_w,daemon=_H).start()
-		cb_dev.bind(_AR,lambda _e:_render());tree.bind(_AU,_on_dbl);cv.bind(_d,_draw_bars);
-		_st_tip={'w':_M,'t':''}
-		def _hide_st_tip(_e=_M):
-			w_t=_st_tip['w'];_st_tip['w']=_M;_st_tip['t']=''
-			if w_t is not _M:
-				try:w_t.destroy()
-				except Exception:0
-		def _show_st_tip(ev):
-			rid=tree.identify_row(ev.y)
-			if not rid or rid not in state_box[B]:_hide_st_tip();return
-			o=state_box[B][rid];pts=[f"{o[I]}  •  {o.get(O,'')}"]
-			for(ks,ns)in(('server_duration_sec','Server'),('download_duration_sec','Download'),('crc_duration_sec','CRC32'),('sha256_duration_sec','SHA-256'),('net_duration_sec','Net'),('mirror_duration_sec','Mirror')):
-				if float(o.get(ks)or 0)>0:pts.append(f"{ns}: {format_duration(float(o[ks]),lang).partition(_s).__getitem__(0)}")
-			txt=pts[0]+('\n'+' | '.join(pts[1:])if len(pts)>1 else'')
-			if txt==_st_tip['t']and _st_tip['w']is not _M:return
-			_hide_st_tip();tp=tk.Toplevel(dlg);tp.wm_overrideredirect(_H);tk.Label(tp,text=txt,bg=p[_A],fg=p[_D],bd=1,relief=_Y,justify=_J,font=(fam,max(8,fs-1)),padx=8,pady=5).pack();tp.update_idletasks();tp.geometry(f"+{min(ev.x_root+12,max(4,self.metrics[_t]-tp.winfo_reqwidth()-6))}+{min(ev.y_root+16,max(4,self.metrics[_u]-tp.winfo_reqheight()-6))}");_st_tip.update({'w':tp,'t':txt})
-		tree.bind('<Motion>',_show_st_tip);tree.bind('<Leave>',_hide_st_tip);dlg.bind(_AP,lambda e:_hide_st_tip()if e.widget is dlg else _M);tk.Button(top_bar,text='🔄 Оновити'if lang==_B else'🔄 Refresh',command=lambda:_load(_H),bg=p[_A],fg=p[_Q],font=(fam,fs),padx=10,pady=2,cursor=_R).pack(side=_J,padx=(0,6))
-		def _open_bpop():from core.speed_bench import open_compact_bench_popup as _ocbp;_ocbp(dlg,self.engine.state,p,fs,fam,lambda:self.engine.state.get(_p,''),on_done=lambda:_set_mode('D1'))
-		tk.Button(route_row,text='⚡ Тест ПК/Диска'if lang==_B else'⚡ PC/Disk Test',command=_open_bpop,bg=p[_A],fg=p[_b],font=(fam,max(8,fs-1),_I),padx=10,pady=2,cursor=_R).pack(side=_K,padx=(8,0),before=lbl_route);_load(_S);dlg.after(30,lambda:dlg.winfo_exists()and _load(_H))
+					if not dlg.winfo_exists():
+						return
+					if err:
+						lbl_st.configure(text=err, fg=p[_V])
+						return
+					for tv in (tv_srv, tv_net, tv_hw):
+						for rid in tv.get_children():
+							tv.delete(rid)
+					for r in res.get('server', []):
+						tags = ('own',) if r.get('n_my', 0) > 0 else ()
+						tv_srv.insert('', 'end', values=(r['name'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
+					for r in res.get('network', []):
+						tags = ('own',) if r.get('n_my', 0) > 0 else ()
+						tv_net.insert('', 'end', values=(r['group'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
+					for r in res.get('hardware', []):
+						tags = ('own',) if r.get('n_my', 0) > 0 else ()
+						tv_hw.insert('', 'end', values=(r['metric'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
+					_d1_e = getattr(__import__('core.speed_bench', fromlist=['_LAST_D1_ERR']), '_LAST_D1_ERR', '')
+					if _d1_e:
+						lbl_st.configure(text=f"D1: {_d1_e}", fg=p[_V])
+					else:
+						lbl_st.configure(text='Оновлено ✔' if lang == _B else 'Updated ✔', fg=p[_U])
+				self.root.after(0, _u)
+			threading.Thread(target=_w_fn, daemon=_H).start()
+		tk.Button(top_bar, text='🔄 Оновити' if lang == _B else '🔄 Refresh', command=lambda: _load(_H), bg=p[_A], fg=p[_Q], font=(fam, fs), padx=10, pady=2, cursor=_R).pack(side=_J, padx=(0, 8))
+		def _open_bpop():
+			from core.speed_bench import open_compact_bench_popup as _ocbp
+			_ocbp(dlg, self.engine.state, p, fs, fam, lambda: self.engine.state.get(_p, ''), on_done=lambda: _load(_H))
+		tk.Button(top_bar, text='⚡ Тест ПК/Диска' if lang == _B else '⚡ PC/Disk Test', command=_open_bpop, bg=p[_A], fg=p[_b], font=(fam, fs, _I), padx=10, pady=2, cursor=_R).pack(side=_J)
+		_load(_S)
+		dlg.after(40, lambda: dlg.winfo_exists() and _load(_H))
 	def open_stats_modal(self):
 		F='dur_cnt';E='total_dur_sec';D='avg_dur_sec';C='month_cnt';B='week_cnt';A='today_cnt';fs=self.metrics[_k];lng_c=self.engine.state.get(_F,_E);dlg,p,_=self._make_dialog('Статистика резервного копіювання',820,690);st=self.engine.get_detailed_stats()if hasattr(self.engine,'get_detailed_stats')else{};tk.Button(dlg,text=tr(_w,lng_c),command=dlg.destroy,bg=p[_A],fg=p[_D],font=(self._ui_fam(),fs,_I),padx=int(24*self.metrics[_a]),pady=int(6*self.metrics[_a])).pack(side=_Z,anchor=_i,padx=16,pady=(6,12));tk.Label(dlg,text=tr('Зведена аналітика за періодами та станом локального сховища:',lng_c),bg=p[_G],fg=p[_O],font=(self._ui_fam(),fs)).pack(anchor=_L,padx=14,pady=(10,6));grid_f=tk.Frame(dlg,bg=p[_G]);grid_f.pack(fill=_C,padx=14,pady=4)
 		for c_i in range(4):grid_f.columnconfigure(c_i,weight=1)
