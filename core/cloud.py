@@ -221,60 +221,63 @@ def fetch_cloud_speed_stats(engine,refresh=_G):
 	return{'ops':I,'devices':O,'servers':SRV,'srv_ops':srv_ops}
 
 def fetch_global_d1_speed_stats(engine):
-    from core.speed_bench import fetch_global_stats
-    rows = fetch_global_stats()
-    def _os_key(val):
-        pts = str(val or '').strip().split()
-        if len(pts) >= 2 and pts[0] == 'Linux':
-            return 'Linux ' + '.'.join(pts[1].split('.')[:2])
-        return ' '.join(pts[:2]) if len(pts) >= 2 else (pts[0] if pts else '')
-    bench_map = {}
-    for x in rows:
-        if str(x.get('adapter') or '').strip().lower() == 'bench':
-            k_os = _os_key(x.get('os_label'))
-            if k_os:
-                bench_map[k_os] = x
-    ops, devs, seen_os = [], [], set()
-    for idx, r in enumerate(rows):
-        ad = str(r.get('adapter') or '').strip()
-        if ad.lower() == 'bench':
-            continue
-        os_l = str(r.get('os_label') or 'OS').replace("['", '').replace("']", '').strip()
-        k_os = _os_key(os_l)
-        seen_os.add(k_os)
-        bm = bench_map.get(k_os, {})
-        sc = str(r.get('scope') or 'LAN').strip()
-        cnt = int(r.get('tests') or 0)
-        usr = int(r.get('users') or 1)
-        aspd = float(r.get('avg_spd') or 0); asrv = float(r.get('avg_srv') or 0)
-        mspd = float(r.get('max_spd') or aspd)
-        acpu = round(float(r.get('avg_cpu') or bm.get('avg_cpu') or 0), 1)
-        adw = round(float(r.get('avg_disk_w') or bm.get('avg_disk_w') or 0), 1)
-        adr = round(float(r.get('avg_disk_r') or bm.get('avg_disk_r') or 0), 1)
-        if aspd <= 0 and acpu <= 0 and adw <= 0 and adr <= 0:
-            continue
-        short_os = os_l.replace('Pro for Workstations', 'Pro').replace('Home 22H2', 'Home').replace('Ultimate', '').strip()
-        hw_t = str(r.get('hw_tag') or bm.get('hw_tag') or '').strip()
-        hw_sfx = f' • {hw_t}' if hw_t else ''
-        did = f"d1_{idx}_{os_l}_{sc}"
-        is_net = (sc == 'Internet')
-        raw_dur = float(r.get('dur_sec') or 0); est_dur = round(raw_dur if raw_dur > 0 else (100.0 / max(0.1, aspd) if aspd > 0 else 0.0), 1)
-        ops.append({'device_id': did, 'dev_label': f"{short_os} ({usr} PC){hw_sfx}", 'net_lbl': f"{sc} ({cnt}x)", 'scope_norm': sc, 'archive': f"Avg: {aspd} MB/s • Max: {mspd} MB/s", 'mb_f': round(float(r.get('size_mb') or 100.0), 1), 'dur_f': est_dur, 'spd_f': round(aspd, 2), 'net_spd_f': round(aspd, 2) if is_net else 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} tests"})
-        devs.append({'device_id': did, 'label': short_os, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': est_dur, 'min_dur': est_dur, 'avg_net_spd': round(aspd, 2) if is_net else 0.0, 'avg_spd': round(aspd, 2), 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"{sc} • {cnt}x"})
-    for k_os, bm in bench_map.items():
-        if k_os in seen_os:
-            continue
-        os_l = str(bm.get('os_label') or k_os).strip()
-        hw_t = str(bm.get('hw_tag') or '').strip()
-        hw_sfx = f' • {hw_t}' if hw_t else ''
-        cnt = int(bm.get('tests') or 1)
-        acpu = round(float(bm.get('avg_cpu') or 0), 1)
-        adw = round(float(bm.get('avg_disk_w') or 0), 1)
-        adr = round(float(bm.get('avg_disk_r') or 0), 1)
-        if acpu <= 0 and adw <= 0 and adr <= 0:
-            continue
-        did = f"d1_bench_{os_l}"
-        ops.append({'device_id': did, 'dev_label': f"{os_l}{hw_sfx}", 'net_lbl': f"Bench ({cnt}x)", 'scope_norm': 'LAN', 'archive': f"CPU: {acpu} • W: {adw} • R: {adr} MB/s", 'mb_f': 32.0, 'dur_f': 0.0, 'spd_f': round(max(acpu, adw, adr), 2), 'net_spd_f': 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} bench"})
-        devs.append({'device_id': did, 'label': os_l, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': 0.0, 'min_dur': 0.0, 'avg_net_spd': 0.0, 'avg_spd': round(max(acpu, adw, adr), 2), 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"Bench • {cnt}x"})
-    devs.sort(key=lambda d: -(0.5 * d['avg_spd'] + 0.3 * max(d['avg_disk_w'], d['avg_disk_r']) + 0.2 * d['avg_cpu']))
-    return {'ops': ops, 'devices': devs}
+	try:
+	    from core.speed_bench import fetch_global_stats
+	    rows = fetch_global_stats()
+	    def _os_key(val):
+	        pts = str(val or '').strip().split()
+	        if len(pts) >= 2 and pts[0] == 'Linux':
+	            return 'Linux ' + '.'.join(pts[1].split('.')[:2])
+	        return ' '.join(pts[:2]) if len(pts) >= 2 else (pts[0] if pts else '')
+	    bench_map = {}
+	    for x in rows:
+	        if str(x.get('adapter') or '').strip().lower() == 'bench':
+	            k_os = _os_key(x.get('os_label'))
+	            if k_os:
+	                bench_map[k_os] = x
+	    ops, devs, seen_os = [], [], set()
+	    for idx, r in enumerate(rows):
+	        ad = str(r.get('adapter') or '').strip()
+	        if ad.lower() == 'bench':
+	            continue
+	        os_l = str(r.get('os_label') or 'OS').replace("['", '').replace("']", '').strip()
+	        k_os = _os_key(os_l)
+	        seen_os.add(k_os)
+	        bm = bench_map.get(k_os, {})
+	        sc = str(r.get('scope') or 'LAN').strip()
+	        cnt = int(r.get('tests') or 0)
+	        usr = int(r.get('users') or 1)
+	        aspd = float(r.get('avg_spd') or 0); asrv = float(r.get('avg_srv') or 0)
+	        mspd = float(r.get('max_spd') or aspd)
+	        acpu = round(float(r.get('avg_cpu') or bm.get('avg_cpu') or 0), 1)
+	        adw = round(float(r.get('avg_disk_w') or bm.get('avg_disk_w') or 0), 1)
+	        adr = round(float(r.get('avg_disk_r') or bm.get('avg_disk_r') or 0), 1)
+	        if aspd <= 0 and acpu <= 0 and adw <= 0 and adr <= 0:
+	            continue
+	        short_os = os_l.replace('Pro for Workstations', 'Pro').replace('Home 22H2', 'Home').replace('Ultimate', '').strip()
+	        hw_t = str(r.get('hw_tag') or bm.get('hw_tag') or '').strip()
+	        hw_sfx = f' • {hw_t}' if hw_t else ''
+	        did = f"d1_{idx}_{os_l}_{sc}"
+	        is_net = (sc == 'Internet')
+	        raw_dur = float(r.get('dur_sec') or 0); est_dur = round(raw_dur if raw_dur > 0 else (100.0 / max(0.1, aspd) if aspd > 0 else 0.0), 1)
+	        ops.append({'device_id': did, 'dev_label': f"{short_os} ({usr} PC){hw_sfx}", 'net_lbl': f"{sc} ({cnt}x)", 'scope_norm': sc, 'archive': f"Avg: {aspd} MB/s • Max: {mspd} MB/s", 'mb_f': round(float(r.get('size_mb') or 100.0), 1), 'dur_f': est_dur, 'spd_f': round(aspd, 2), 'net_spd_f': round(aspd, 2) if is_net else 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} tests"})
+	        devs.append({'device_id': did, 'label': short_os, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': est_dur, 'min_dur': est_dur, 'avg_net_spd': round(aspd, 2) if is_net else 0.0, 'avg_spd': round(aspd, 2), 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"{sc} • {cnt}x"})
+	    for k_os, bm in bench_map.items():
+	        if k_os in seen_os:
+	            continue
+	        os_l = str(bm.get('os_label') or k_os).strip()
+	        hw_t = str(bm.get('hw_tag') or '').strip()
+	        hw_sfx = f' • {hw_t}' if hw_t else ''
+	        cnt = int(bm.get('tests') or 1)
+	        acpu = round(float(bm.get('avg_cpu') or 0), 1)
+	        adw = round(float(bm.get('avg_disk_w') or 0), 1)
+	        adr = round(float(bm.get('avg_disk_r') or 0), 1)
+	        if acpu <= 0 and adw <= 0 and adr <= 0:
+	            continue
+	        did = f"d1_bench_{os_l}"
+	        ops.append({'device_id': did, 'dev_label': f"{os_l}{hw_sfx}", 'net_lbl': f"Bench ({cnt}x)", 'scope_norm': 'LAN', 'archive': f"CPU: {acpu} • W: {adw} • R: {adr} MB/s", 'mb_f': 32.0, 'dur_f': 0.0, 'spd_f': round(max(acpu, adw, adr), 2), 'net_spd_f': 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} bench"})
+	        devs.append({'device_id': did, 'label': os_l, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': 0.0, 'min_dur': 0.0, 'avg_net_spd': 0.0, 'avg_spd': round(max(acpu, adw, adr), 2), 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"Bench • {cnt}x"})
+	    devs.sort(key=lambda d: -(0.5 * d['avg_spd'] + 0.3 * max(d['avg_disk_w'], d['avg_disk_r']) + 0.2 * d['avg_cpu']))
+	    return {'ops': ops, 'devices': devs}
+	except Exception:
+		return dict(ops=[],devices=[])

@@ -316,7 +316,7 @@ def record_server_history(state,srv_url):
 	if not B:return
 	C=[A for A in A.get(_F)or[]if isinstance(A,str)and A.strip()and A.strip().rstrip('/')!=B];C.insert(0,B);A[_F]=C[:15]
 def load_state():
-	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_A,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
+	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_B,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
 	if E:
 		try:
 			with open(E,'r',encoding=_C)as P:A=json.load(P)
