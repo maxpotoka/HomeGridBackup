@@ -1,3 +1,5 @@
+# patch-id: bump-ver-3.42
+# patch-id: bump-ver-3.41
 # patch-id: cfg-disable-net-copy-3.40
 # patch-id: bump-ver-3.39
 # patch-id: cfg-force-tarzst-3.38
@@ -45,7 +47,7 @@
 # patch-id: single-pass-verify-speed-2.75
 # patch-id: fix-linux-tray-menu-2.76
 # patch-id: bump-version-3.05
-# [ФАЙЛ: core/config.py (v2.70 | 25.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.72 | 25.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # patch-id: pcloud-only-simple-ui-2.27
 # patch-id: fix-pcloud-vars-2.28
 # patch-id: fix-pcloud-nameerror-2.29
@@ -155,8 +157,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.40'
-BUILD_DATE='26.11.2026 03:30'
+SCRIPT_VER='3.42'
+BUILD_DATE='26.11.2026 04:15'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
