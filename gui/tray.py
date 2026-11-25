@@ -99,7 +99,7 @@ def _detect_linux_tray_backend():
 	if C or not os.environ.get(_G)and not os.environ.get(_T):return''
 	if not getattr(sys,'frozen',_C):
 		for A in('/usr/lib/x86_64-linux-gnu/girepository-1.0','/usr/lib/i386-linux-gnu/girepository-1.0','/usr/lib/aarch64-linux-gnu/girepository-1.0','/usr/lib/girepository-1.0'):
-			if os.path.isdir(A)and A not in os.environ.get(B,''):os.environ[B]=f"{A}:{os.environ.get(B,"")}".rstrip(':')
+			if os.path.isdir(A)and A not in os.environ.get(B,''):os.environ[B]=f"{A}:{os.environ.get(B,'')}".rstrip(':')
 	D=_clean_sys_env()
 	if _has_sni_watcher(D):return _L if _has_appindicator_gi()else _M
 	if _has_x11_tray_manager():return _N if _has_gtk_gi()else _I
@@ -174,13 +174,13 @@ def _tray_backend_available():return HAS_TRAY and(not os.sys.platform.startswith
 def _tray_status_text(engine,language,elapsed_sec=0):
 	C=language;B=engine;A=elapsed_sec;from core.i18n import tr
 	if not B.is_running:return tr('Готовий до резервного копіювання',C)
-	G=int(B.progress);A=max(0,int(A));D,H=divmod(A,3600);E,F=divmod(H,60);I=f"{D}:{E:02d}:{F:02d}"if D else f"{E}:{F:02d}";return f"{tr("Архівація",C)} · {I} · {G}%"
+	G=int(B.progress);A=max(0,int(A));D,H=divmod(A,3600);E,F=divmod(H,60);I=f"{D}:{E:02d}:{F:02d}"if D else f"{E}:{F:02d}";return f"{tr('Архівація',C)} · {I} · {G}%"
 def _tray_problem():
 	import sys
 	if not HAS_TRAY:return'Трей: не встановлено pystray і Pillow'
 	if sys.platform.startswith(_F)and not _LNX_TRAY_BE:
 		if not os.environ.get(_G)and not os.environ.get(_T):return'Немає графічної сесії (DISPLAY не задано) — трей вимкнено'
-		A=f"{os.environ.get(_W,"")} {os.environ.get(_X,"")}".upper()
+		A=f"{os.environ.get(_W,'')} {os.environ.get(_X,'')}".upper()
 		if'XFCE'in A:return'Трей XFCE: встановіть xfce4-statusnotifier-plugin і додайте «Status Notifier» на панель'
 		if'GNOME'in A or'UNITY'in A:return'Трей GNOME: встановіть розширення AppIndicator and KStatusNotifierItem Support'
 		if'KDE'in A or'PLASMA'in A:return'Трей KDE: перевірте, що увімкнено віджет «Системний лоток»'
@@ -194,7 +194,7 @@ def _start_tray_thread(engine):
 				_LNX_TRAY_PROBED=_B;A.tray_ready_event=threading.Event()
 				def J():
 					C='PYSTRAY_BACKEND';global _LNX_TRAY_BE;B=_requested_tray_backend(A)
-					if B:_LNX_TRAY_BE=''if B==_E else B;A.log(f"[TRAY MODE] вибрано вручну: {B}. {TRAY_MODE_HINTS.get(B,"")} Після зміни режиму перезапустіть застосунок.",_D)
+					if B:_LNX_TRAY_BE=''if B==_E else B;A.log(f"[TRAY MODE] вибрано вручну: {B}. {TRAY_MODE_HINTS.get(B,'')} Після зміни режиму перезапустіть застосунок.",_D)
 					else:_LNX_TRAY_BE=_detect_linux_tray_backend()
 					A.log(_linux_tray_diag_line(),_D)
 					if _LNX_TRAY_BE==_M:

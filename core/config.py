@@ -203,7 +203,7 @@ _SYSINFO_CACHE={_r:'','time':.0}
 def get_fast_sysinfo():
 	W='/proc/cpuinfo';V='/etc/os-release';U='Windows 10';K='getprop';L=time.monotonic()
 	if _SYSINFO_CACHE[_r]and L-_SYSINFO_CACHE['time']<3e1:return _SYSINFO_CACHE[_r]
-	import struct as M;X='64-bit'if os.environ.get('PROCESSOR_ARCHITEW6432')or'64'in platform.machine()or M.calcsize('P')==8 else'32-bit';Y=f"{M.calcsize("P")*8}-bit";A='';B=f"{platform.system()} {platform.release()}"
+	import struct as M;X='64-bit'if os.environ.get('PROCESSOR_ARCHITEW6432')or'64'in platform.machine()or M.calcsize('P')==8 else'32-bit';Y=f"{M.calcsize('P')*8}-bit";A='';B=f"{platform.system()} {platform.release()}"
 	if os.name==_p:
 		try:
 			import winreg as C
@@ -239,8 +239,8 @@ def get_fast_sysinfo():
 				with open(W,'r',encoding=_C)as f:
 					for D in f:
 						if D.lower().startswith('model name')and':'in D:A=D.split(':',1)[1].strip();break
-			g=(os.environ.get('XDG_CURRENT_DESKTOP')or os.environ.get('DESKTOP_SESSION')or'').strip();h=(os.environ.get('XDG_SESSION_TYPE')or('x11'if os.environ.get('DISPLAY')else'')).strip().upper();S=[A for A in(g,h,f"Linux {platform.release().split("-")[0]}")if A]
-			if S:B=f"{B} ({", ".join(S)})"
+			g=(os.environ.get('XDG_CURRENT_DESKTOP')or os.environ.get('DESKTOP_SESSION')or'').strip();h=(os.environ.get('XDG_SESSION_TYPE')or('x11'if os.environ.get('DISPLAY')else'')).strip().upper();S=[A for A in(g,h,f"Linux {platform.release().split('-')[0]}")if A]
+			if S:B=f"{B} ({', '.join(S)})"
 		except Exception:0
 	if not A:A=(platform.processor()or os.environ.get('PROCESSOR_IDENTIFIER')or platform.machine()or'Unknown CPU').strip()
 	A=re.sub('\\s+',' ',A).replace('(R)','').replace('(TM)','').replace('CPU ','').strip()
@@ -260,7 +260,7 @@ def _read_env_secrets():
 		except Exception:0
 	return B
 def _write_env_secrets(state):
-	A=state;_ensure_secure_dir();B=ENV_FILE+'.tmp';C=['# HomeGrid Backup — захищені токени та PIN-коди',f"CLIENT_TOKEN={A.get(_x,"")}",f"SESSION_TOKEN={A.get(_y,"")}",f"LOGIN_PIN={A.get(_z,"")}",f"EDITOR_PIN={A.get(_A0,"")}"]
+	A=state;_ensure_secure_dir();B=ENV_FILE+'.tmp';C=['# HomeGrid Backup — захищені токени та PIN-коди',f"CLIENT_TOKEN={A.get(_x,'')}",f"SESSION_TOKEN={A.get(_y,'')}",f"LOGIN_PIN={A.get(_z,'')}",f"EDITOR_PIN={A.get(_A0,'')}"]
 	with open(B,'w',encoding=_C)as D:D.write('\n'.join(C)+'\n')
 	if os.name!=_p:
 		try:os.chmod(B,384)

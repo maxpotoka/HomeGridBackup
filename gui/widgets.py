@@ -120,8 +120,8 @@ class StyledProgressBar(tk.Canvas):
 			if A.indet:
 				L=A._phase%(LITE_CHARS-4);G=['-']*LITE_CHARS
 				for M in range(4):G[L+M]='#'
-				H=f"[{"".join(G)}] {tr("пошук...",A.lang)}"
-			else:I=int(round(A.pct/1e2*LITE_CHARS));H=f"[{"#"*I}{"-"*(LITE_CHARS-I)}] {A.pct:3d}%"
+				H=f"[{''.join(G)}] {tr('пошук...',A.lang)}"
+			else:I=int(round(A.pct/1e2*LITE_CHARS));H=f"[{'#'*I}{'-'*(LITE_CHARS-I)}] {A.pct:3d}%"
 			A.itemconfigure(A._text,text=H);return
 		C,N=A._cw,A._ch
 		if A.indet:E=max(40,int(C*.28));B=int(A._phase/39.*(C+E)-E);D=B+E

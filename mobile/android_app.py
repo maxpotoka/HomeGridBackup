@@ -39,7 +39,7 @@ class HomeGridAndroidApp(App):
 		if not A.engine.is_running:A._sync_url();threading.Thread(target=run_backup_task,args=(A.engine,A.inp_srv.text,_C,_C,_C),daemon=_B).start()
 	def on_verify(A,*C):
 		if A.engine.is_running:return
-		def B():C='err_cnt';A.engine.log('Запуск перевірки цілісності CRC32 + SHA-256...','info');B=verify_all_archives(A.engine.state);A.engine.log(f"Перевірку завершено: справних {B["ok_cnt"]}, без .sha256: {B["warn_cnt"]}, пошкоджених: {B[C]}",'ok'if B[C]==0 else'err')
+		def B():C='err_cnt';A.engine.log('Запуск перевірки цілісності CRC32 + SHA-256...','info');B=verify_all_archives(A.engine.state);A.engine.log(f"Перевірку завершено: справних {B['ok_cnt']}, без .sha256: {B['warn_cnt']}, пошкоджених: {B[C]}",'ok'if B[C]==0 else'err')
 		threading.Thread(target=B,daemon=_B).start()
 	def _open_modal(A,m):
 		K='type'
@@ -58,6 +58,6 @@ class HomeGridAndroidApp(App):
 		B=(A.engine.state.get(_F)or'').strip()
 		if B and not A.inp_srv.focus and A.inp_srv.text!=B:A.inp_srv.text=B
 		E,F,D=A.engine.get_storage_stats();G=f" | Вільно: {D} ГБ"if D>=0 else'';A.lbl_disk.text=A._tr(f"Архівів: {E} шт. ({F} МБ){G}");A.lbl_stage.text=A._tr(f"{A.engine.stage} ({A.engine.progress}%)");A.pbar.value=A.engine.progress;A.btn_start.disabled=A.engine.is_running;C=A.engine.logs
-		if len(C)!=A.last_log_len:A.last_log_len=len(C);A.lbl_log.text='\n'.join(f"[{A["ts"]}] {A["msg"]}"for A in C[-60:])
+		if len(C)!=A.last_log_len:A.last_log_len=len(C);A.lbl_log.text='\n'.join(f"[{A['ts']}] {A['msg']}"for A in C[-60:])
 		if A.engine.modal and A.engine.modal.get('id')!=A.last_modal_id:A.last_modal_id=A.engine.modal['id'];A._open_modal(A.engine.modal)
 def run_android_ui(engine):HomeGridAndroidApp(engine).run()

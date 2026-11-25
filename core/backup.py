@@ -178,7 +178,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 		B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare",A.state,_L,_a,timeout=15.)
 	if not D or not D.strip():raise RuntimeError(f"Помилка підготовки (порожня відповідь сервера, HTTP {L}): {V}")
 	try:l=json.loads(D)
-	except Exception:m=re.sub('\\s+',' ',re.sub(_p,' ',D)).strip()[:120];raise RuntimeError(f"Сервер повернув некоректну відповідь замість JSON (HTTP {L}): {m or"порожньо"}")
+	except Exception:m=re.sub('\\s+',' ',re.sub(_p,' ',D)).strip()[:120];raise RuntimeError(f"Сервер повернув некоректну відповідь замість JSON (HTTP {L}): {m or'порожньо'}")
 	Y=l.get(_q)
 	if not Y:raise RuntimeError(f"Сервер не створив завдання експорту: {D[:160]}")
 	n=f"{E}:{F}"if F not in(80,443)else E;return C,n,Y
@@ -342,7 +342,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		W=max(.05,time.time()-b)
 		if H>0:A2=j/1048576./W if j>0 and W>.25 else _C;AT=f", {A2:.1f} МБ/с"if A2>.05 else'';A3=f" ({j/1048576:.1f}/{H/1048576:.1f} МБ{AT})"
 		else:A3=''
-		A4=A.state.get(_R,_S);A5=f"{W:.1f} {"с"if A4=="uk"else"s"}"if W<60 else format_duration(W,A4).partition(' (').__getitem__(0)
+		A4=A.state.get(_R,_S);A5=f"{W:.1f} {'с'if A4=='uk'else's'}"if W<60 else format_duration(W,A4).partition(' (').__getitem__(0)
 		if F==_c:A.set_progress(_D,f"[{C}] {pretty_phase(F)} ({A5})...")
 		elif F!=R and D.get(R)is not _A:AU=f": {A1}%"if A1>0 else f" ({A5})";A.set_progress(_D,f"[{C}] {pretty_phase(F)}{AU}{A3}")
 		if F==R or D.get(R)is _A:

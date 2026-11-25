@@ -41,10 +41,10 @@ if not is_compiled_app()and not IS_ANDROID:
 		try:__import__(_mod)
 		except ImportError:_missing_pkgs.append(_pkg)
 	if _missing_pkgs:
-		print(f"[HomeGrid Backup] Устанавливаю недостающие пакеты: {", ".join(_missing_pkgs)} ...",flush=_A)
+		print(f"[HomeGrid Backup] Устанавливаю недостающие пакеты: {', '.join(_missing_pkgs)} ...",flush=_A)
 		try:
 			_res=subprocess.run([sys.executable,'-m','pip','install','--user']+_missing_pkgs,timeout=300)
-			if _res.returncode!=0:print(f"[HomeGrid Backup] Ошибка установки (код {_res.returncode}). Установите вручную: pip install {" ".join(_missing_pkgs)}",flush=_A)
+			if _res.returncode!=0:print(f"[HomeGrid Backup] Ошибка установки (код {_res.returncode}). Установите вручную: pip install {' '.join(_missing_pkgs)}",flush=_A)
 		except Exception as _e:print(f"[HomeGrid Backup] Не удалось установить пакеты: {_e}",flush=_A)
 from core.backup import run_backup_task
 from core.config import CLI_MODE,GUI_MODE,HIDDEN_MODE,NO_CLEAN,SILENT_MODE

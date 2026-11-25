@@ -119,7 +119,7 @@ from gui.styles import THEMES,UI_SCALE_LABELS,ToolTip,_calc_screen_metrics,fix_m
 from gui.widgets import HomeGridToggle,StyledProgressBar
 class HomeGridApp(DialogsMixin):
 	def __init__(A,root,engine):
-		I='<<Cut>>';H='<<Copy>>';G='<<Paste>>';F='break';E='Entry';A.root=root;A.root.withdraw();A.engine=engine;A.metrics=_calc_screen_metrics(root,A.engine.state.get(_h,_i),A.engine.state.get(_m,0));A.last_log_len=0;A._last_log_item=_B;A.last_modal_id=_B;A.hw_notice_shown=_F;A._srv_typing_timer=_B;A._resize_timer=_B;A._last_live_wh=0,0;A._ignore_resize_until=time.time()+1.;A.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})");B=A.metrics;A.root.geometry(f"{B[_n]}x{B[_o]}+{B["pos_x"]}+{B["pos_y"]}");A.root.minsize(min(620,B[_n]),min(420,B[_o]));import sys as C,tkinter.font as D;J=set(D.families(A.root))if C.platform.startswith(_d)else set();A._base_fam=_AD if C.platform==_X else next((A for A in('Ubuntu',_AE,_AF,_AG)if A in J),'Sans')if C.platform.startswith(_d)else _A4;A._mono_fam='Menlo'if C.platform==_X else _AH if C.platform.startswith(_d)else _A5;A.F_MAIN=D.Font(root=A.root,family=A._base_fam,size=B[_L]);A.F_BOLD=D.Font(root=A.root,family=A._base_fam,size=B[_L],weight=_C);A.F_SUB=D.Font(root=A.root,family=A._base_fam,size=max(8,B[_L]-1));A.F_CAP=D.Font(root=A.root,family=A._base_fam,size=max(8,B[_L]-2),weight=_C);A.F_TITLE=D.Font(root=A.root,family=A._base_fam,size=B[_L]+4,weight=_C);A._watch_pending=_B;A.root.protocol('WM_DELETE_WINDOW',A.on_window_close);A.var_srv=tk.StringVar(value=A.engine.state.get(_v,''));A.var_dir=tk.StringVar(value=A.engine.state.get(_R,''));A.var_net_dir=tk.StringVar(value=A.engine.state.get(_j,''));A.var_cloud_path=tk.StringVar(value=A.engine.state.get(_p,_w));A.var_net=tk.StringVar(value='Не перевірено');A.var_disk=tk.StringVar(value='0 архівів (0 МБ)');A.var_last_bkp=tk.StringVar(value='Перевірка...');A.var_last_bkp_sub=tk.StringVar(value='');A.var_strat=tk.StringVar(value='');A.var_stage=tk.StringVar(value=A.engine.stage);A.var_pct=tk.StringVar(value='0%')
+		I='<<Cut>>';H='<<Copy>>';G='<<Paste>>';F='break';E='Entry';A.root=root;A.root.withdraw();A.engine=engine;A.metrics=_calc_screen_metrics(root,A.engine.state.get(_h,_i),A.engine.state.get(_m,0));A.last_log_len=0;A._last_log_item=_B;A.last_modal_id=_B;A.hw_notice_shown=_F;A._srv_typing_timer=_B;A._resize_timer=_B;A._last_live_wh=0,0;A._ignore_resize_until=time.time()+1.;A.root.title(f"HomeGrid Backup v{SCRIPT_VER} (від {BUILD_DATE})");B=A.metrics;A.root.geometry(f"{B[_n]}x{B[_o]}+{B['pos_x']}+{B['pos_y']}");A.root.minsize(min(620,B[_n]),min(420,B[_o]));import sys as C,tkinter.font as D;J=set(D.families(A.root))if C.platform.startswith(_d)else set();A._base_fam=_AD if C.platform==_X else next((A for A in('Ubuntu',_AE,_AF,_AG)if A in J),'Sans')if C.platform.startswith(_d)else _A4;A._mono_fam='Menlo'if C.platform==_X else _AH if C.platform.startswith(_d)else _A5;A.F_MAIN=D.Font(root=A.root,family=A._base_fam,size=B[_L]);A.F_BOLD=D.Font(root=A.root,family=A._base_fam,size=B[_L],weight=_C);A.F_SUB=D.Font(root=A.root,family=A._base_fam,size=max(8,B[_L]-1));A.F_CAP=D.Font(root=A.root,family=A._base_fam,size=max(8,B[_L]-2),weight=_C);A.F_TITLE=D.Font(root=A.root,family=A._base_fam,size=B[_L]+4,weight=_C);A._watch_pending=_B;A.root.protocol('WM_DELETE_WINDOW',A.on_window_close);A.var_srv=tk.StringVar(value=A.engine.state.get(_v,''));A.var_dir=tk.StringVar(value=A.engine.state.get(_R,''));A.var_net_dir=tk.StringVar(value=A.engine.state.get(_j,''));A.var_cloud_path=tk.StringVar(value=A.engine.state.get(_p,_w));A.var_net=tk.StringVar(value='Не перевірено');A.var_disk=tk.StringVar(value='0 архівів (0 МБ)');A.var_last_bkp=tk.StringVar(value='Перевірка...');A.var_last_bkp_sub=tk.StringVar(value='');A.var_strat=tk.StringVar(value='');A.var_stage=tk.StringVar(value=A.engine.stage);A.var_pct=tk.StringVar(value='0%')
 		if C.platform==_X:A.root.bind_class(E,'<Command-v>',lambda e:e.widget.event_generate(G));A.root.bind_class(E,'<Command-c>',lambda e:e.widget.event_generate(H));A.root.bind_class(E,'<Command-x>',lambda e:e.widget.event_generate(I));A.root.bind_class(E,'<Command-a>',lambda e:(e.widget.select_range(0,_M),F)[1])
 		elif C.platform.startswith(_d):
 			def K(e):
@@ -234,7 +234,7 @@ class HomeGridApp(DialogsMixin):
 			try:
 				if A.root.state()=='zoomed':A.root.state(_Y)
 			except Exception:0
-			A.root.minsize(min(620,E[_n]),min(420,E[_o]));A.root.geometry(f"{E[_n]}x{E[_o]}+{E["pos_x"]}+{E["pos_y"]}")
+			A.root.minsize(min(620,E[_n]),min(420,E[_o]));A.root.geometry(f"{E[_n]}x{E[_o]}+{E['pos_x']}+{E['pos_y']}")
 		B=A._get_palette();C=E[_L];A.root._cur_font_sz=C;I,J=E['btn_px'],E['btn_py'];R,S=E['pad_x'],E['pad_y'];K=bool(A.engine.state.get(_a,_F));Z=A.engine.state.get(_r,_Z);import sys
 		if sys.platform==_X:D='Menlo'if K else _AD
 		elif sys.platform.startswith(_d):import tkinter.font as a;T=set(a.families(A.root))if not hasattr(A,'_lnx_f')else A._lnx_f;A._lnx_f=T;D=_AH if K else next((A for A in('Ubuntu',_AE,_AF,_AG)if A in T),'Sans')
@@ -272,7 +272,7 @@ class HomeGridApp(DialogsMixin):
 		if hasattr(A,'btn_refresh_cld'):A.btn_refresh_cld.configure(bg=B[_N],fg=B[_P],highlightbackground=B[_O],font=G)
 		if hasattr(A,'btn_pick_lan'):A.btn_pick_lan.configure(bg=B[_N],fg=B[_K],disabledforeground=H,font=F,padx=I,pady=J)
 		if hasattr(A,'btn_theme'):h=_AN if Z==_Z else'🌙 Темна тема';A.btn_theme.configure(text=h,bg=B[_N],fg=B[_H],activebackground=B[_O],activeforeground=B[_H],relief=_A0,bd=1,font=G,padx=8,pady=2)
-		Y=f"{E["outer_w"]}×{E["outer_h"]}";i=f"LITE ({Y}) ▾"if K else f"Графіка ({Y}) ▾";A.btn_mode.configure(text=i,bg=B[_A],fg=B[_I],relief='flat',bd=0,disabledforeground=H,font=G,padx=6,pady=2);A.btn_scan.configure(fg=B[_P],font=F);A._render_fav_servers();A._update_mirror_btn()
+		Y=f"{E['outer_w']}×{E['outer_h']}";i=f"LITE ({Y}) ▾"if K else f"Графіка ({Y}) ▾";A.btn_mode.configure(text=i,bg=B[_A],fg=B[_I],relief='flat',bd=0,disabledforeground=H,font=G,padx=6,pady=2);A.btn_scan.configure(fg=B[_P],font=F);A._render_fav_servers();A._update_mirror_btn()
 		try:
 			if Q:A._ignore_resize_until=time.time()+.5
 			A.root.update_idletasks();A.root.minsize(620,420)
@@ -472,7 +472,7 @@ class HomeGridApp(DialogsMixin):
 							if not I.winfo_ismapped():I.pack(anchor=_s,pady=1,before=A.stat_btns)
 							if E is _B:S.set(tr('оновлення...',C));R.configure(fg=B[_I])
 							elif not E.get(_Q):AA=tr(E.get(A2)or'недоступно',C);S.set(AA);R.configure(fg=B[_b]if E.get(A2)else B[_T])
-							else:AB=f" — Вільно: {E[_AA]} ГБ"if E.get(_AA,-1)>=0 else'';AC=f" ({tr("в черзі",C)})"if E.get(A3)else'';S.set(tr(f"{E["count"]} архівів ({E["mb"]} МБ){AB}",C)+AC);R.configure(fg=B[_b]if E.get(A3)else B[_K]if K==_g else B[_P])
+							else:AB=f" — Вільно: {E[_AA]} ГБ"if E.get(_AA,-1)>=0 else'';AC=f" ({tr('в черзі',C)})"if E.get(A3)else'';S.set(tr(f"{E['count']} архівів ({E['mb']} МБ){AB}",C)+AC);R.configure(fg=B[_b]if E.get(A3)else B[_K]if K==_g else B[_P])
 			if hasattr(A,'lbl_srv_badge'):
 				T=getattr(A.engine,'diag_net','')or'';U=getattr(A.engine,'diag_ping','')or'';AD_L=getattr(A.engine,'diag_adapter','')or'';m=T,U,AD_L,H
 				if getattr(A,'_last_srv_b_sig',_B)!=m:
@@ -515,7 +515,7 @@ class HomeGridApp(DialogsMixin):
 						if F[x]is A._last_log_item:a=x;break
 					if a!=-1:Z=F[a+1:]
 					else:A.txt_log.delete(_c,_M);Z=F
-				for b in Z:y=b.get('level',_e);AG={_Q:(' OK ','b_ok'),_S:('WAIT','b_warn'),_z:('ERR ','b_err')};AH,AI=AG.get(y,('INFO','b_info'));A.txt_log.insert(_M,f" {AH} ",AI);A.txt_log.insert(_M,f"  {b["ts"]}   ",'dim');A.txt_log.insert(_M,f"{b["msg"]}\n",y)
+				for b in Z:y=b.get('level',_e);AG={_Q:(' OK ','b_ok'),_S:('WAIT','b_warn'),_z:('ERR ','b_err')};AH,AI=AG.get(y,('INFO','b_info'));A.txt_log.insert(_M,f" {AH} ",AI);A.txt_log.insert(_M,f"  {b['ts']}   ",'dim');A.txt_log.insert(_M,f"{b['msg']}\n",y)
 				z=int(A.txt_log.index('end-1c').split('.')[0])
 				if z>401:A.txt_log.delete(_c,f"{z-400}.0")
 				A.txt_log.see(_M);A.txt_log.configure(state=_W);A._center_log_vertically();A.last_log_len=len(F);A._last_log_item=F[-1]
