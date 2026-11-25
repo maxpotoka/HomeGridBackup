@@ -153,6 +153,11 @@ def detect_network_adapter(target_url=''):
 		if os.name==_J and local_ip:
 			ps=f"$ip='{local_ip}';$a=Get-NetIPAddress -IPAddress $ip -AddressFamily IPv4 -ErrorAction SilentlyContinue|Select-Object -First 1;if($a){{$n=Get-NetAdapter -InterfaceIndex $a.InterfaceIndex -ErrorAction SilentlyContinue|Select-Object -First 1;if($n){{Write-Output ($n.Name+'|'+$n.InterfaceDescription+'|'+$n.LinkSpeed+'|'+$n.MediaType)}}}}"
 			out=subprocess.check_output(('powershell','-NoProfile','-Command',ps),stdin=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2.5,**_WIN_NO_WINDOW).decode(_K,errors=_H).strip()
+			if'|'not in out:
+				out=subprocess.check_output(('wmic','nic','where','NetEnabled=true','get','Name,NetConnectionID,Speed','/format:csv'),stdin=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2.5,**_WIN_NO_WINDOW).decode(_K,errors=_H)
+				for ln in out.splitlines():
+					cs=dict(enumerate(ln.split(',')))
+					if len(cs)>=4 and cs.get(3,'').strip().isdigit():name=cs.get(2,'').strip();desc=cs.get(1,'').strip();mbps=max(1,int(int(cs.get(3,'0'))//1000000));atype=_classify_adapter(name,desc);break
 			if'|'in out:
 				pd=dict(enumerate(out.split('|')));name=pd.get(0,'').strip();desc=pd.get(1,'').strip();ls=pd.get(2,'').strip();mt=pd.get(3,'').strip()
 				m=re.search('(\\d+(?:\\.\\d+)?)\\s*(Gbps|Mbps|Kbps)',ls,re.I)
