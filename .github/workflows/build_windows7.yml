@@ -21,22 +21,22 @@ jobs:
       - name: Set up 32-bit Python 3.8 (Windows 7 compatible)
         uses: actions/setup-python@v5
         with:
-          python-version: "3.8.10"
-          architecture: "x86"
+          python-version: '3.8.10'
+          architecture: 'x86'
 
       - name: Install Python dependencies
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           python -m pip install --upgrade pip
-          pip install "nuitka<2.6" "pillow<11.0" pystray keyring send2trash
+          pip install 'nuitka<2.6' 'pillow<11.0' pystray keyring send2trash
           python -c "import sys,struct; assert sys.version_info[:2]==(3,8) and struct.calcsize('P')*8==32"
 
       - name: Set build variant (Windows 7 cloud sync preview)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Set-Content -Path coreuild_variant.py -Value 'WINDOWS7_CLOUD_SYNC_PREVIEW = True' -Encoding ascii
+          Set-Content -Path core\build_variant.py -Value 'WINDOWS7_CLOUD_SYNC_PREVIEW = True' -Encoding ascii
 
       - name: Build folder with Nuitka (MinGW64)
         shell: pwsh
@@ -59,9 +59,7 @@ jobs:
           )
           python -m nuitka @nuitkaArgs
           if ($LASTEXITCODE -ne 0) { throw "Nuitka failed: $LASTEXITCODE" }
-          if (-not (Test-Path 'dist_win7\main.dist\HomeGridBackup.exe')) {
-            throw 'HomeGridBackup.exe was not created'
-          }
+          if (-not (Test-Path 'dist_win7\main.dist\HomeGridBackup.exe')) { throw 'HomeGridBackup.exe was not created' }
 
       - name: Prepare installer payload
         shell: pwsh
@@ -78,7 +76,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
           if (-not $iscc) { $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe' }
-          if (-not (Test-Path $iscc)) { throw "Inno Setup not found" }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup not found' }
           New-Item -ItemType Directory -Force -Path 'release' | Out-Null
           & $iscc '/DAppVersion=3.03' '/DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup' '/DAppDirName=HomeGridBackup_x86' '/DX86=1' '/Orelease' 'packaging\windows_user_setup.iss'
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
