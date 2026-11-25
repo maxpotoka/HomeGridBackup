@@ -1,6 +1,7 @@
+# patch-id: tonal-contrast-layers-3.08
 # patch-id: stage-window-2.21
 # patch-id: homegrid-design-system-2.45
-# [ФАЙЛ: gui/styles.py (v2.02 | 22.11.2026 09:10) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
+# [ФАЙЛ: gui/styles.py (v2.03 | 25.11.2026 19:40) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 _d='darwin'
 _c='<Enter>'
 _b='#0f172a'
@@ -37,7 +38,7 @@ from core.config import VALID_SCALES
 UI_SCALE_LABELS=[(_C,'Авто (під монітор і DPI)'),('800x600','800 × 600 (SVGA)'),('1024x600','1024 × 600 (Нетбук)'),('1024x768','1024 × 768 (XGA)'),('1280x720','1280 × 720 (HD 720p)'),('1366x768','1366 × 768 (WXGA)'),('1600x900','1600 × 900 (HD+)'),('1920x1080','1920 × 1080 (Full HD)'),('2560x1440','2560 × 1440 (2K QHD)')]
 UI_FONT_LABELS=[(0,'Авто (за розміром вікна)'),(8,'8 pt (Дуже дрібний)'),(9,'9 pt (Дрібний)'),(10,'10 pt (Стандартний)'),(11,'11 pt (Середній)'),(12,'12 pt (Великий)'),(14,'14 pt (Дуже великий)'),(16,'16 pt (Підвищений)'),(18,'18 pt (Крупний)'),(20,'20 pt (Дуже крупний)'),(22,'22 pt (Суперкрупний)'),(24,'24 pt (Гігантський)'),(26,'26 pt (Максимальний)')]
 PBAR_STYLE_LABELS=[('v8','Адаптивний градієнт (v8)')]
-THEMES={'dark':{'bg':_U,_D:'#131c2e','card':'#182338',_M:_V,'text':_J,'muted':_W,_E:_K,_F:_X,_G:_Y,_H:_Z,_I:'#60a5fa',_N:'#23314d',_O:_U,_P:_B,_Q:_B,_R:_V,_S:'#334155','font':_L,_T:'flat'},'light':{'bg':'#f3f6fb',_D:_B,'card':_a,_M:'#dfe7f2','text':_b,'muted':'#64748b',_E:_K,_F:'#059669',_G:'#d97706',_H:'#dc2626',_I:_K,_N:'#e8eef7',_O:_a,_P:_B,_Q:_B,_R:'#e2e8f0',_S:'#cbd5e1','font':_L,_T:'flat'}}
+THEMES={'dark':{'bg':'#090e1a',_D:'#11192b','card':'#1e2b45',_M:'#334463','text':_J,'muted':_W,_E:_K,_F:_X,_G:_Y,_H:_Z,_I:'#60a5fa',_N:'#0d1526',_O:'#090e1a',_P:_B,_Q:_B,_R:_V,_S:'#3b4d6e','font':_L,_T:'flat'},'light':{'bg':'#eef2f8',_D:_B,'card':'#e6ecf5',_M:'#cbd5e1','text':_b,'muted':'#64748b',_E:_K,_F:'#059669',_G:'#d97706',_H:'#dc2626',_I:_K,_N:'#f8fafc',_O:_a,_P:_B,_Q:_B,_R:'#e2e8f0',_S:'#94a3b8','font':_L,_T:'flat'}}
 def _calc_screen_metrics(root,scale_pref=_C,font_pref=0,live_outer_wh=_A):
 	c='scaling';W=live_outer_wh;V=scale_pref;O=font_pref;D=root;K,L=0,0;E,F=D.winfo_screenwidth()or 1024,D.winfo_screenheight()or 768;A=96;P,Q=16,40
 	try:

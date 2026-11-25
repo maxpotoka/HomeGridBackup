@@ -47,7 +47,7 @@ jobs:
             '--python-flag=no_site', '--python-flag=no_asserts', '--python-flag=no_docstrings',
             '--enable-plugin=tk-inter', '--windows-console-mode=attach', '--assume-yes-for-downloads',
             '--company-name=HomeGrid', '--product-name=HomeGrid Backup',
-            '--file-version=3.03.0.0', '--product-version=3.03.0.0',
+            '--file-version=3.04.0.0', '--product-version=3.04.0.0',
             '--file-description=HomeGrid Backup Utility (Windows 7 x86)',
             '--include-data-files=icon.ico=icon.ico', '--windows-icon-from-ico=icon.ico',
             '--include-package=core', '--include-package=console', '--include-package=gui',
@@ -80,7 +80,7 @@ jobs:
           if (-not $iscc) { $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe' }
           if (-not (Test-Path $iscc)) { throw 'Inno Setup not found' }
           New-Item -ItemType Directory -Force -Path 'release' | Out-Null
-          & $iscc '/DAppVersion=3.03' '/DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup' '/DAppDirName=HomeGridBackup_x86' '/DX86=1' '/Orelease' 'packaging\windows_user_setup.iss'
+          & $iscc '/DAppVersion=3.04' '/DOutputBaseFilename=HomeGridBackup_Win7_x86_Setup' '/DAppDirName=HomeGridBackup_x86' '/DX86=1' '/Orelease' 'packaging\windows_user_setup.iss'
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
           if (-not (Test-Path 'release\HomeGridBackup_Win7_x86_Setup.exe')) { throw 'Installer was not created' }
 
@@ -96,6 +96,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
-          tag_name: v3.03-win7-x86-${{ github.run_number }}
-          name: HomeGrid Backup 3.03 (Windows 7 x86)
+          tag_name: v3.04-win7-x86-${{ github.run_number }}
+          name: HomeGrid Backup 3.04 (Windows 7 x86)
           files: release/HomeGridBackup_Win7_x86_Setup.exe

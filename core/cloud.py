@@ -1,4 +1,11 @@
+# patch-id: accurate-dl-speed-approx-3.18
+# patch-id: show-hw-tag-in-d1-table-3.17
 # patch-id: net-scope-adapter-3.01-p2
+# patch-id: pass-bench-fields-to-ops-3.09
+# patch-id: fix-d1-devs-bench-bars-3.08
+# patch-id: merge-d1-bench-metrics-3.07
+# patch-id: d1-multi-metrics-3.06
+# patch-id: speed-file-securedir-3.05
 _h='.HomeGridBackup-sources'
 _g='net_dir'
 _f='net_speed_mbps'
@@ -36,7 +43,7 @@ _A=.0
 import shutil,csv,json,os,platform,re
 from datetime import datetime
 from uuid import uuid4
-from core.config import SCRIPT_VER,get_logs_dir
+from core.config import SCRIPT_VER,SECURE_DIR
 _DEVICE_ID_RE=re.compile('^[0-9a-f]{32}$')
 class CloudRateLimitError(RuntimeError):0
 def cloud_sync_error_text(error,language='en'):return str(error)
@@ -105,7 +112,7 @@ def _write_speed_csv_report(records,output_path):
 def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb=_A,duration_sec=_D,**C):
 	R='operations.jsonl';L=size_mb;K=archive;J=stage;I=event;H='size_bytes';F=engine;B=duration_sec
 	if str(I).startswith('stage_'):return
-	M=_device_id(F.state);S=datetime.now().astimezone();D=os.path.join(get_logs_dir(F.state),_K,M);os.makedirs(D,mode=448,exist_ok=_G);E=os.path.join(D,R);A={_F:S.isoformat(timespec='milliseconds'),_B:M,_E:operation_id,_J:I,_W:SCRIPT_VER,_L:platform.system(),_M:platform.release(),_N:platform.machine(),'python_version':platform.python_version(),'archives_total':max(0,int(F.state.get('all_time_cnt',0))),'host_name':platform.node()}
+	M=_device_id(F.state);S=datetime.now().astimezone();D=os.path.join(SECURE_DIR,_K,M);os.makedirs(D,mode=448,exist_ok=_G);E=os.path.join(D,R);A={_F:S.isoformat(timespec='milliseconds'),_B:M,_E:operation_id,_J:I,_W:SCRIPT_VER,_L:platform.system(),_M:platform.release(),_N:platform.machine(),'python_version':platform.python_version(),'archives_total':max(0,int(F.state.get('all_time_cnt',0))),'host_name':platform.node()}
 	if J:A[_P]=J
 	if K:A[_Q]=os.path.basename(K)
 	if L:A[_R]=round(float(L),1)
@@ -120,6 +127,17 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 		for G in os.listdir(D):
 			if G.endswith(_O)and G!=R:os.remove(os.path.join(D,G))
 		with open(E,'r',encoding=_I)as V:P=[A for A in V if A.strip()]
+		# patch-id: cloud-gsi-sync-305
+		try:
+			if str(I)=='success' and F.state.get('global_speed_optin'):
+				from core.speed_bench import push_backup_speed
+				_spd_v = float(A.get(_U) or A.get(_d) or 0)
+				if _spd_v <= 0 and float(A.get(_R) or 0) > 0 and float(A.get(_S) or 0) > 0:
+					_spd_v = round(float(A[_R]) / float(A[_S]), 2)
+				_os_v = ('%s %s' % (A.get(_L, ''), str(A.get(_M, '')).split('-'))).strip()
+				push_backup_speed(F.state, _os_v, A.get('net_adapter_label') or A.get('net_adapter_type') or 'Backup', A.get('net_scope') or 'LAN', A.get(_R, 0), A.get(_S, 0), _spd_v, SCRIPT_VER)
+		except Exception:
+			pass
 		if len(P)>50:
 			Q=E+'.tmp'
 			with open(Q,'w',encoding=_I)as W:W.writelines(P[-50:])
@@ -128,11 +146,11 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 def sync_network_shared_journal(engine):
 	D=engine.state;A=os.path.expanduser((D.get(_g)or'').strip())
 	if not A or not os.path.isdir(A):return _C
-	C=_device_id(D);J=os.path.join(get_logs_dir(D),_K,C);B=os.path.join(A,_h);os.makedirs(B,exist_ok=_G);E=_collect_report_records((B,J),device_id=C)
+	C=_device_id(D);J=os.path.join(SECURE_DIR,_K,C);B=os.path.join(A,_h);os.makedirs(B,exist_ok=_G);E=_collect_report_records((B,J),device_id=C)
 	if E:F=os.path.join(B,f"{C}.jsonl.tmp");_write_jsonl_report(E,F);os.replace(F,os.path.join(B,f"{C}.jsonl"))
 	G=_collect_report_records((B,));H=os.path.join(A,'HomeGridBackup.log.tmp');_write_plain_text_report(G,H);os.replace(H,os.path.join(A,'HomeGridBackup.log'));I=os.path.join(A,'speed_journal.csv.tmp');_write_speed_csv_report(G,I);os.replace(I,os.path.join(A,'speed_journal.csv'));return _G
 def fetch_cloud_speed_stats(engine,refresh=_G):
-	k='avg_spd';j='avg_dur';i='spd_f';h='dev_label';S='net_spd_f';R='dur_f';K='.';L=engine.state;T=os.path.expanduser((L.get(_g)or'').strip());U=os.path.join(get_logs_dir(L),_K);V=os.path.join(U,'net_cache');B=os.path.join(T,_h)if T else''
+	k='avg_spd';j='avg_dur';i='spd_f';h='dev_label';S='net_spd_f';R='dur_f';K='.';L=engine.state;T=os.path.expanduser((L.get(_g)or'').strip());U=os.path.join(SECURE_DIR,_K);V=os.path.join(U,'net_cache');B=os.path.join(T,_h)if T else''
 	if B and os.path.isdir(B):
 		try:
 			os.makedirs(V,exist_ok=_G)
@@ -140,7 +158,10 @@ def fetch_cloud_speed_stats(engine,refresh=_G):
 				if M.endswith(_O):shutil.copy2(os.path.join(B,M),os.path.join(V,M))
 		except Exception:0
 	W=[U]
+	if os.path.isdir(V):W.append(V)
 	if B and os.path.isdir(B):W.append(B)
+	for extra in (os.path.join(T,'reports','net_cache') if T else '', r'P:\HomeGridBackup\.HomeGridBackup-sources', r'P:\HomeGridBackup\reports\net_cache'):
+		if extra and os.path.isdir(extra) and extra not in W:W.append(extra)
 	l=_collect_report_records(tuple(W));X={}
 	for H in _ordered_report_records(l):
 		C=str(H.get(_B)or _H);Y=str(H.get(_E)or H.get(_F)or'');Z=X.setdefault((C,Y),{_B:C,_E:Y})
@@ -150,9 +171,12 @@ def fetch_cloud_speed_stats(engine,refresh=_G):
 	for A in X.values():
 		N=float(A.get(_S)or _A);D=float(A.get(_R)or _A)
 		if N<=_A or D<=_A and not str(A.get(_Q,'')).lower().endswith('.zip'):continue
-		d=float(A.get(_T)or _A);G=float(A.get(_U)or _A)
+		d=float(A.get(_T)or _A);G=float(A.get(_U)or _A);apx=_C
 		if G<=_A and D>_A and d>_A:G=round(D/d,2)
-		if G<=_A:G=float(A.get(_d)or(round(D/N,2)if D>_A else _A))
+		if G<=_A:
+			G=float(A.get(_d)or _A)
+			if G<=_A and D>_A:G=round(D/N,2);apx=_G
+		A['spd_approx']=apx
 		J=str(A.get(_L)or'').strip();F=str(A.get(_M)or'').strip().partition('-').__getitem__(0)
 		if J=='Linux'and K in F:m,q,n=F.partition(K);F=f"{m}.{n.partition(K).__getitem__(0)}"
 		elif J=='Darwin':J='macOS';F=F.partition(K).__getitem__(0)
@@ -160,5 +184,65 @@ def fetch_cloud_speed_stats(engine,refresh=_G):
 	I.sort(key=lambda x:str(x.get(_F)or''),reverse=_G);g={}
 	for A in I:g.setdefault(A[_B],[]).append(A)
 	O=[]
-	for(C,P)in g.items():E=P[:2];o=round(sum(A[R]for A in E)/len(E),1);p=round(sum(A[i]for A in P)/len(P),2);Q=[A for A in P if A.get(S,0)>0];O.append({_B:C,'label':P[0][h],'is_own':C==c,'total_cnt':len(P),'sample_cnt':len(E),j:o,'min_dur':min(A[R]for A in E),'avg_net_spd':round(sum(A[S]for A in Q)/len(Q),1)if Q else _A,k:p})
+	for(C,P)in g.items():E=P[:2];o=round(sum(A[R]for A in E)/len(E),1);ex=[A for A in P if not A.get('spd_approx')and A[i]>0];src_p=ex or P;p=round(sum(A[i]for A in src_p)/len(src_p),2);Q=[A for A in P if A.get(S,0)>0];O.append({_B:C,'label':P[0][h],'is_own':C==c,'total_cnt':len(P),'sample_cnt':len(E),j:o,'min_dur':min(A[R]for A in E),'avg_net_spd':round(sum(A[S]for A in Q)/len(Q),1)if Q else _A,k:p})
 	O.sort(key=lambda d:(-d[k],d[j]));return{'ops':I,'devices':O}
+
+
+def fetch_global_d1_speed_stats(engine):
+    from core.speed_bench import fetch_global_stats
+    rows = fetch_global_stats()
+    def _os_key(val):
+        pts = str(val or '').strip().split()
+        if len(pts) >= 2 and pts[0] == 'Linux':
+            return 'Linux ' + '.'.join(pts[1].split('.')[:2])
+        return ' '.join(pts[:2]) if len(pts) >= 2 else (pts[0] if pts else '')
+    bench_map = {}
+    for x in rows:
+        if str(x.get('adapter') or '').strip().lower() == 'bench':
+            k_os = _os_key(x.get('os_label'))
+            if k_os:
+                bench_map[k_os] = x
+    ops, devs, seen_os = [], [], set()
+    for idx, r in enumerate(rows):
+        ad = str(r.get('adapter') or '').strip()
+        if ad.lower() == 'bench':
+            continue
+        os_l = str(r.get('os_label') or 'OS').strip()
+        k_os = _os_key(os_l)
+        seen_os.add(k_os)
+        bm = bench_map.get(k_os, {})
+        sc = str(r.get('scope') or 'LAN').strip()
+        cnt = int(r.get('tests') or 0)
+        usr = int(r.get('users') or 1)
+        aspd = float(r.get('avg_spd') or 0)
+        mspd = float(r.get('max_spd') or aspd)
+        acpu = round(float(r.get('avg_cpu') or bm.get('avg_cpu') or 0), 1)
+        adw = round(float(r.get('avg_disk_w') or bm.get('avg_disk_w') or 0), 1)
+        adr = round(float(r.get('avg_disk_r') or bm.get('avg_disk_r') or 0), 1)
+        if aspd <= 0 and acpu <= 0 and adw <= 0 and adr <= 0:
+            continue
+        short_os = os_l.replace('Pro for Workstations', 'Pro').replace('Home 22H2', 'Home').replace('Ultimate', '').strip()
+        hw_t = str(r.get('hw_tag') or bm.get('hw_tag') or '').strip()
+        hw_sfx = f' • {hw_t}' if hw_t else ''
+        did = f"d1_{idx}_{os_l}_{sc}"
+        is_net = (sc == 'Internet')
+        est_dur = round(300.0 / max(0.1, aspd), 1) if aspd > 0 else 0.0
+        ops.append({'device_id': did, 'dev_label': f"{short_os} ({usr} PC){hw_sfx}", 'net_lbl': f"{sc} ({cnt}x)", 'scope_norm': sc, 'archive': f"Avg: {aspd} MB/s • Max: {mspd} MB/s", 'mb_f': 300.0, 'dur_f': est_dur, 'spd_f': round(aspd, 2), 'net_spd_f': round(aspd, 2) if is_net else 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} tests"})
+        devs.append({'device_id': did, 'label': short_os, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': est_dur, 'min_dur': est_dur, 'avg_net_spd': round(aspd, 2) if is_net else 0.0, 'avg_spd': round(aspd, 2), 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"{sc} • {cnt}x"})
+    for k_os, bm in bench_map.items():
+        if k_os in seen_os:
+            continue
+        os_l = str(bm.get('os_label') or k_os).strip()
+        hw_t = str(bm.get('hw_tag') or '').strip()
+        hw_sfx = f' • {hw_t}' if hw_t else ''
+        cnt = int(bm.get('tests') or 1)
+        acpu = round(float(bm.get('avg_cpu') or 0), 1)
+        adw = round(float(bm.get('avg_disk_w') or 0), 1)
+        adr = round(float(bm.get('avg_disk_r') or 0), 1)
+        if acpu <= 0 and adw <= 0 and adr <= 0:
+            continue
+        did = f"d1_bench_{os_l}"
+        ops.append({'device_id': did, 'dev_label': f"{os_l}{hw_sfx}", 'net_lbl': f"Bench ({cnt}x)", 'scope_norm': 'LAN', 'archive': f"CPU: {acpu} • W: {adw} • R: {adr} MB/s", 'mb_f': 64.0, 'dur_f': 1.0, 'spd_f': 0.0, 'net_spd_f': 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'timestamp': f"{cnt} bench"})
+        devs.append({'device_id': did, 'label': os_l, 'is_own': False, 'total_cnt': cnt, 'sample_cnt': cnt, 'avg_dur': 1.0, 'min_dur': 1.0, 'avg_net_spd': 0.0, 'avg_spd': 0.0, 'avg_cpu': acpu, 'avg_disk_w': adw, 'avg_disk_r': adr, 'net_lbl': f"Bench • {cnt}x"})
+    devs.sort(key=lambda d: -(d['avg_spd'] or max(d['avg_cpu'], d['avg_disk_w'], d['avg_disk_r'])))
+    return {'ops': ops, 'devices': devs}

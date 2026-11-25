@@ -143,7 +143,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: macos-intel-latest
-          name: HomeGrid Backup 3.03 — macOS Intel (x86_64)
+          name: HomeGrid Backup 3.04 — macOS Intel (x86_64)
           body: |
             Архів **HomeGridBackup_macOS_Intel.7z** збережений. Також доданий пер-користувацький образ **HomeGridBackup_macOS_Intel.dmg**.
             В образі запустіть `Install HomeGridBackup.command`; програма встановиться в `/Applications/HomeGridBackup.app` (або `~/Applications/HomeGridBackup.app`, якщо немає прав запису в `/Applications`). Rclone 1.76.0 входить у комплект.

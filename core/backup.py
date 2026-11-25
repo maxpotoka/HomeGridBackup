@@ -1,3 +1,4 @@
+# patch-id: backup-32bit-pause5ms-and-log-fix-3.25
 # patch-id: main-win-adapter-badge-3.02
 # patch-id: net-scope-adapter-3.01-p2
 # patch-id: backup-timeout-retry-3.00
@@ -9,7 +10,7 @@
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: single-pass-verify-speed-2.75
-# [ФАЙЛ: core/backup.py (v2.17 | 25.11.2026 09:00) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.18 | 25.11.2026 18:05) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 # patch-id: pcloud-speed-progress-gradient-2.33
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
@@ -63,7 +64,8 @@ _D=None
 _C=.0
 _B=False
 _A=True
-import hashlib,http.cookiejar,json,os,re,shutil,time,urllib.request,zipfile,zlib
+import hashlib,http.cookiejar,json,os,re,shutil,sys,time,urllib.request,zipfile,zlib
+_IS_32BIT=(sys.maxsize<=2**32)
 from datetime import datetime
 from urllib.parse import urlparse
 from core.config import DEFAULT_TOK,NO_CLEAN,SCRIPT_VER,SILENT_MODE,commit_state,get_fast_sysinfo
@@ -182,7 +184,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 	Y=l.get(_q)
 	if not Y:raise RuntimeError(f"Сервер не створив завдання експорту: {D[:160]}")
 	n=f"{E}:{F}"if F not in(80,443)else E;return C,n,Y
-VERIFY_PAUSE_LITE=.012
+VERIFY_PAUSE_LITE=.005
 class _HashingReader:
 	def __init__(A,raw_file):A._f=raw_file;A.hasher=hashlib.sha256();A.hashed_pos=0
 	def read(A,size=-1):
@@ -242,7 +244,7 @@ def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_
 	if M.hasher.hexdigest().lower()==G and G:return{B:A,_G:_F,C:f"Цілісність 100% підтверджена ({N} файлів)"}
 	return{B:A,_G:_I,C:'УВАГА! Контрольна сума SHA-256 не збігається'}
 def verify_all_archives(state,progress_callback=_D,buf_size=1048576,cancel_flag=_D):
-	G=state;D=progress_callback;B=cancel_flag;S=time.time();T=VERIFY_PAUSE_LITE if G.get('lite_mode')else _C;E=G[_e];os.makedirs(E,exist_ok=_A);C=[]
+	G=state;D=progress_callback;B=cancel_flag;S=time.time();T=VERIFY_PAUSE_LITE if(G.get('lite_mode')or _IS_32BIT)else _C;buf_size=min(int(buf_size),262144)if _IS_32BIT else buf_size;E=G[_e];os.makedirs(E,exist_ok=_A);C=[]
 	for H in os.listdir(E):
 		if H.lower().endswith(_g):
 			I=os.path.join(E,H)
@@ -357,7 +359,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		try:AB=shutil.disk_usage(l).free
 		except OSError:AB=0
 		AW=int(H*1.25)+104857600 if H>0 else 536870912
-		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='??????? ?????? ???????? ?????'if AA else'????? ??????????? ? ???????? / ?????????? ???????';A.log(f"???? ({AX}): ?????? ????????? ?? ???????? ? ????????? ????? ?? SSD, ? ????? ???????? ? ????? ???????????.",_E)
+		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='увімкнено тільки мережеву папку'if AA else'папка знаходиться у хмарному або мережевому сховищі';A.log(f"Режим ({AX}): спершу завантажу та перевірю у тимчасовій папці на SSD, а потім перенесу в папку призначення.",_E)
 	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження ZIP-архіву з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25
 	for O in range(1,N+1):
 		if os.path.exists(G):os.remove(G)
@@ -408,7 +410,8 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"Local: {j}"]if L else[])+([f"Network: {A.state.get(_K)}"]if R else[]);A.log('Targets: '+' | '.join(AL),_H)
 		if L and R:A.log('Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.',_H)
 		AM=time.time();_record_cloud_event(A,C,_M,stage=AC);k,AN,AO=_backup_stage1_prepare(A,raw_url,force_skip);_record_cloud_event(A,C,_J,stage=AC,duration_sec=time.time()-AM,result=g);AP=time.time();_record_cloud_event(A,C,'milestone',stage='server_job_ready');AQ,H,l=_download_backup_zip(A,k,AN,AO,j,C);B=AQ;S=time.time();M=os.path.getsize(B);D=M/1048576.;_record_cloud_event(A,C,_M,stage=AD,archive=B);_record_cloud_event(A,C,_M,stage=AE,archive=B);m,AR=(66,5)if A.state.get(_N)and A.state.get(_k,_A)else(92,5);A.set_progress(m,f"Перевірка CRC32 + SHA-256: 0.0 / {D:.1f} МБ");AS=0;n=time.time()
-		with open(B,'rb',buffering=1048576)as AT:
+		_vbuf=262144 if _IS_32BIT else 1048576
+		with open(B,'rb',buffering=_vbuf)as AT:
 			K=_HashingReader(AT)
 			with zipfile.ZipFile(K,'r')as o:
 				p=o.infolist();G=len(p)
@@ -416,19 +419,19 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 				for T in p:
 					U=0
 					with o.open(T,'r')as AU:
-						for q in iter(lambda:AU.read(1048576),b''):
+						for q in iter(lambda:AU.read(_vbuf),b''):
 							U=zlib.crc32(q,U);AS+=len(q);r=time.time()
 							if r-n>=.5:n=r;AV=m+int(min(1.,K.hashed_pos/max(1,M))*AR);A.set_progress(AV,f"Перевірка CRC32 + SHA-256: {K.hashed_pos/1048576.:.1f} / {D:.1f} МБ")
 					if U&4294967295!=T.CRC:os.remove(B);raise RuntimeError(f"Пошкоджений файл в архіві: {T.filename}")
-			s=time.time();K.finalize_tail(1048576)
+			s=time.time();K.finalize_tail(_vbuf)
 		t=time.time();u=max(.001,s-S);v=max(.001,t-s);w=round(max(.1,u),1);x=round(max(.1,v),1);AW=round(max(.1,t-S),1);_record_cloud_event(A,C,_J,stage=AD,archive=B,duration_sec=u,files_count=G);y=K.hasher.hexdigest().lower()
 		if l and y!=l:os.remove(B);raise RuntimeError('Помилка запису на диск: SHA-256 файлу на носії не збігається зі завантаженим потоком!')
 		AX=y.upper();E=B+_W
 		with open(E,'w',encoding='utf-8')as AY:AY.write(f"{AX.lower()}  {os.path.basename(H)}\n")
 		if os.path.normcase(os.path.realpath(B))!=os.path.normcase(os.path.realpath(H)):
-			A.set_progress(97,'?????????? ???????????? ?????? ? ????? ???????????...');os.makedirs(os.path.dirname(H),exist_ok=_A);z=H+_W;shutil.move(B,H)
+			A.set_progress(97,'Перенесення перевіреного архіву у папку призначення...');os.makedirs(os.path.dirname(H),exist_ok=_A);z=H+_W;shutil.move(B,H)
 			if os.path.exists(E):shutil.move(E,z)
-			B=H;E=z;A.log(f"???? ?? .sha256 ?????????? ? ????? ???????????: {os.path.dirname(B)}",_F)
+			B=H;E=z;A.log(f"Архів та .sha256 перенесено у папку призначення: {os.path.dirname(B)}",_F)
 		A.log(f"Цілісність перевірено в 1 прохід ({G} файлів) за {AW} с. Збережено {os.path.basename(E)}",_F);_record_cloud_event(A,C,_J,stage=AE,archive=B,size_mb=D,duration_sec=v,files_count=G,size_bytes=M);V=bool(A.state.get(_r,_B))and bool((A.state.get(_s)or'').strip());W=_C
 		if V:AZ=time.time();_record_cloud_event(A,C,_M,stage=AF,archive=B);_copy_to_mirror(A,B,E);A0=max(.001,time.time()-AZ);W=round(max(.1,A0),1);_record_cloud_event(A,C,_J,stage=AF,archive=B,duration_sec=A0)
 		A1=bool(A.state.get(_T,_B))and bool((A.state.get(_K)or'').strip());Aa=time.time()

@@ -71,7 +71,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-apk-latest
-          name: HomeGrid Backup 3.03 — Android APK
+          name: HomeGrid Backup 3.04 — Android APK
           body: |
             Android APK built at ${{ steps.build_time.outputs.value }}.
           files: bin/*.apk

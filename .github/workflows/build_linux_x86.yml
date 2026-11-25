@@ -279,7 +279,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: linux-32bit-latest
-          name: HomeGrid Backup 3.03 — Linux 32-bit Legacy (i686)
+          name: HomeGrid Backup 3.04 — Linux 32-bit Legacy (i686)
           body: |
             Комплект містить 32-бітний виконуваний файл **HomeGridBackup** (ELF i686, Ubuntu 18.04 / glibc 2.27) і rclone 1.76.0.
 

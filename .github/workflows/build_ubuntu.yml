@@ -166,7 +166,7 @@ jobs:
         with:
           tag_name: ubuntu-x64-latest
           target_commitish: ${{ github.sha }}
-          name: HomeGrid Backup 3.03 — Ubuntu (Linux x86_64)
+          name: HomeGrid Backup 3.04 — Ubuntu (Linux x86_64)
           body: |
             Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
             - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`

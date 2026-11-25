@@ -6,7 +6,8 @@
 # patch-id: archives-label-and-logs-dir-2.60
 # patch-id: dest-stats-bg-worker-2.61
 # patch-id: split-last-backup-2.68
-# [ФАЙЛ: core/engine.py (v2.09 | 24.11.2026 00:35) — ЯДРО ДВИЖКА BACKUPENGINE]
+# patch-id: fix-engine-self-2.10
+# [ФАЙЛ: core/engine.py (v2.10 | 25.11.2026 14:42) — ЯДРО ДВИЖКА BACKUPENGINE]
 _b='.sha256'
 _a='_dest_stats_started'
 _Z='pcloud'
@@ -197,6 +198,40 @@ class BackupEngine:
 					else:B=f"{I}\n{J} МБ{E}  •  Без .sha256",_N
 			except Exception:B='Невідомо',_K
 		A._last_backup_cache=B;A._last_backup_cache_time=G;A._last_backup_cache_dir=C;A._last_backup_cache_lang=A.state.get(_E,_H);return B
+	def get_monthly_log_series(A):
+		from datetime import datetime as _dt;from core.config import get_logs_dir
+		now=_dt.now();y,m=now.year,now.month;keys=[]
+		for _ in range(6):
+			keys.append(f"{y:04d}-{m:02d}");m-=1
+			if m==0:m,y=12,y-1
+		keys.reverse();by_m={k:[0.0,0]for k in keys};seen=set()
+		for op in(getattr(A,'op_history',[])or[]):
+			if not isinstance(op,dict)or op.get(_L)!=_Q:continue
+			mb=float(op.get(_Y)or 0.0)
+			if mb<=0:continue
+			det=os.path.basename(str(op.get(_X)or'').split(' (')[0].strip())
+			if det:seen.add(det)
+			try:ym=_dt.strptime(str(op.get(_O,'')),_W).strftime('%Y-%m')
+			except Exception:ym=''
+			if ym in by_m:by_m[ym][0]+=mb;by_m[ym][1]+=1
+		lp=os.path.join(get_logs_dir(A.state),'backup.log')
+		if os.path.isfile(lp):
+			try:
+				with open(lp,'r',encoding='utf-8',errors='ignore')as f:
+					for ln in f:
+						if '.zip'not in ln:continue
+						m1=re.search(r'\[(\d{4}-\d{2})-\d{2}.*?\].*?([A-Za-z0-9_.-]+\.zip).*?([0-9]+(?:\.[0-9]+)?)\s*(?:МБ|MB)',ln)
+						if m1 and m1.group(2)not in seen and m1.group(1)in by_m:
+							seen.add(m1.group(2));by_m[m1.group(1)][0]+=float(m1.group(3));by_m[m1.group(1)][1]+=1
+			except Exception:0
+		for it in A.get_archive_snapshot():
+			if it['name']in seen:continue
+			ym=_dt.fromtimestamp(it[_V]).strftime('%Y-%m')
+			if ym in by_m:seen.add(it['name']);by_m[ym][0]+=it[_T]/1048576.0;by_m[ym][1]+=1
+		mn_uk={'01':'Січ','02':'Лют','03':'Бер','04':'Кві','05':'Тра','06':'Чер','07':'Лип','08':'Сер','09':'Вер','10':'Жов','11':'Лис','12':'Гру'}
+		mn_en={'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+		mp=mn_uk if A.state.get(_E,_H)=='uk'else mn_en
+		return tuple((mp[k[5:]],round(by_m[k][0]/by_m[k][1],1)if by_m[k][1]>0 else 0.0,by_m[k][1])for k in keys)
 	def get_detailed_stats(B):
 		y='%Y-%m';x='months';w='dur_cnt';v='total_dur_sec';u='avg_dur_sec';t='success_rate';s='avg_mb';r='sha_cnt';q='gfs_monthly';p='gfs_weekly';o='gfs_daily';e='span_days';X='all_time_mb';W='all_time_cnt';V='month_cnt';U='week_cnt';T='today_cnt';N='month_mb';M='week_mb';L='today_mb';D='total_cnt';C='total_mb';import time;from datetime import datetime as Y;O=B.state.get(_F,'');f=time.time();Z=Y.now();g=Z.replace(hour=0,minute=0,second=0,microsecond=0).timestamp();h=f-604800;i=f-2592000;A={T:0,L:_C,U:0,M:_C,V:0,N:_C,D:0,C:_C,o:0,p:0,q:0,r:0,s:_C,e:0,t:100,u:_C,v:_C,w:0,x:[]};P=[];a,Q=Z.year,Z.month
 		for _ in range(6):
