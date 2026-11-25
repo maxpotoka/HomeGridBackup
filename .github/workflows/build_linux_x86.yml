@@ -259,7 +259,7 @@ jobs:
 
       - name: Delete previous Linux 32-bit release and tag
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           gh release delete linux-32bit-latest --yes || true
           git push origin --delete linux-32bit-latest || true

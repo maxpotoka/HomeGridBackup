@@ -152,7 +152,7 @@ jobs:
 
       - name: Delete old Ubuntu release and tag
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           gh release delete ubuntu-x64-latest --yes || true
           git push origin --delete ubuntu-x64-latest || true

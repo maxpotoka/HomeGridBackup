@@ -87,6 +87,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: v3.03-win10-x64-${{ github.run_number }}
           name: HomeGrid Backup 3.03 (Windows 10/11 x64)
           files: release/HomeGridBackup_Win10_x64_Setup.exe
