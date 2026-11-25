@@ -128,6 +128,9 @@ jobs:
         id: build_time
         run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
 
+      - name: Strip raw .py sources before packaging
+        run: find . -maxdepth 4 \( -path './dist*' -o -path './build*' -o -path './*.app*' \) -name '*.py' -delete || true
+
       - name: Delete old macOS Intel releases
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}

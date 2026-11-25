@@ -150,6 +150,9 @@ jobs:
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
+      - name: Strip raw .py sources before packaging
+        run: find . -maxdepth 4 \( -path './dist*' -o -path './build*' -o -path './*.app*' \) -name '*.py' -delete || true
+
       - name: Delete old Ubuntu x64 releases
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}

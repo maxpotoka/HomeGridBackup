@@ -69,6 +69,7 @@ jobs:
           robocopy 'dist_win7\main.dist' 'packaging\installer_payload' /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
           if ($LASTEXITCODE -ge 8) { throw "robocopy failed: $LASTEXITCODE" }
           $global:LASTEXITCODE = 0
+          Get-ChildItem 'packaging\installer_payload' -Recurse -Filter '*.py' | Remove-Item -Force
 
       - name: Build installer with Inno Setup
         shell: pwsh
