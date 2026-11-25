@@ -455,7 +455,7 @@ class DialogsMixin:
 			box.pack(fill=_W, expand=_H, padx=14, pady=4)
 			tk.Label(box, text=title_uk if lang == _B else title_en, bg=p[_A], fg=p[_Q], font=(fam, fs, _I)).pack(anchor=_L, pady=(0, 4))
 			tv = ttk.Treeview(box, columns=('c1', 'my', 'd1', 'n'), show='headings', height=h_rows, style='HGB3.Treeview')
-			heads = (('c1', col1_uk if lang == _B else col1_en, 260, _L), ('my', 'Мої (медіана)' if lang == _B else 'Mine (median)', 185, _g), ('d1', 'Чужі D1 (медіана)' if lang == _B else 'Others D1 (median)', 185, _g), ('n', 'n (мої / D1)' if lang == _B else 'n (mine / D1)', 110, _g))
+			heads = (('c1', col1_uk if lang == _B else col1_en, 210, _L), ('my', 'Мої (медіана)' if lang == _B else 'Mine (median)', 155, _g), ('d1', 'Чужі D1 (медіана)' if lang == _B else 'Others D1 (median)', 155, _g), ('n', 'n (мої / D1)' if lang == _B else 'n (mine / D1)', 95, _g))
 			for cid, ht, wc, anc in heads:
 				tv.heading(cid, text=ht)
 				tv.column(cid, width=int(wc * k), minwidth=80, anchor=anc, stretch=(cid == 'c1'))
@@ -502,7 +502,11 @@ class DialogsMixin:
 		def _open_bpop():
 			from core.speed_bench import open_compact_bench_popup as _ocbp
 			_ocbp(dlg, self.engine.state, p, fs, fam, lambda: self.engine.state.get(_p, ''), on_done=lambda: _load(_H))
-		tk.Button(top_bar, text='⚡ Тест ПК/Диска' if lang == _B else '⚡ PC/Disk Test', command=_open_bpop, bg=p[_A], fg=p[_b], font=(fam, fs, _I), padx=10, pady=2, cursor=_R).pack(side=_J)
+		tk.Button(top_bar, text='⚡ Тест ПК/Диска' if lang == _B else '⚡ PC/Disk Test', command=_open_bpop, bg=p[_A], fg=p[_b], font=(fam, fs, _I), padx=10, pady=2, cursor=_R).pack(side=_J, padx=(0, 8))
+		def _open_ab():
+			from core.speed_bench import open_buffer_ab_popup as _oab
+			_oab(dlg, self.engine.state, p, fs, fam)
+		tk.Button(top_bar, text='🧪 Буфер 16 vs 256 КБ' if lang == _B else '🧪 Buffer 16 vs 256 KB', command=_open_ab, bg=p[_A], fg=p[_Q], font=(fam, fs), padx=10, pady=2, cursor=_R).pack(side=_J)
 		_load(_S)
 		dlg.after(40, lambda: dlg.winfo_exists() and _load(_H))
 	def open_stats_modal(self):
