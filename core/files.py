@@ -1,12 +1,19 @@
+# patch-id: files-packing-tarzst-3.39
+# patch-id: full-7-server-stages-3.33
+# patch-id: smart-devices-history-phase-3.32
 # patch-id: stage-window-2.21
-# [ФАЙЛ: core/files.py (v2.07 | 22.11.2026 09:10) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
+# [ФАЙЛ: core/files.py (v2.08 | 22.11.2026 09:10) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 _B=False
 _A=True
 import os,re,shutil
 from datetime import datetime
 try:from send2trash import send2trash
 except ImportError:send2trash=None
-def pretty_phase(ph):A='Обробка на сервері';return{'copying':'Копіювання бази та файлів','checking':'Перевірка файлів','packing':'Стиснення ZIP-архіву','preparing':'Підготовка на сервері','processing':A,'ready':'Архів готовий'}.get(ph,A)
+def pretty_phase(ph):
+	A='Обробка на сервері';p=str(ph or'').lower()
+	if'db'in p or'connect'in p:return'Підключення до бази даних'
+	if'history'in p or'device'in p:return'Копіювання історії розумних пристроїв'
+	return{'copying':'Копіювання бази та файлів','checking':'Перевірка файлів','packing':'Стиснення архіву TAR.ZST','preparing':'Підготовка на сервері','processing':A,'ready':'Архів готовий'}.get(p,A)
 def send_to_recycle_bin(filepath):
 	abs_path=os.path.abspath(filepath)
 	if send2trash is not None:

@@ -20,7 +20,7 @@ _T='size'
 _S='network'
 _R='mirror'
 _Q='Успішно'
-_P='.zip'
+_P=('.zip','.tar.zst')
 _O='ts'
 _N='warn'
 _M='info'
@@ -219,8 +219,8 @@ class BackupEngine:
 			try:
 				with open(lp,'r',encoding='utf-8',errors='ignore')as f:
 					for ln in f:
-						if '.zip'not in ln:continue
-						m1=re.search(r'\[(\d{4}-\d{2})-\d{2}.*?\].*?([A-Za-z0-9_.-]+\.zip).*?([0-9]+(?:\.[0-9]+)?)\s*(?:МБ|MB)',ln)
+						if '.zip'not in ln and '.tar.zst'not in ln:continue
+						m1=re.search(r'\[(\d{4}-\d{2})-\d{2}.*?\].*?([A-Za-z0-9_.-]+\.(?:zip|tar\.zst)).*?([0-9]+(?:\.[0-9]+)?)\s*(?:МБ|MB)',ln)
 						if m1 and m1.group(2)not in seen and m1.group(1)in by_m:
 							seen.add(m1.group(2));by_m[m1.group(1)][0]+=float(m1.group(3));by_m[m1.group(1)][1]+=1
 			except Exception:0

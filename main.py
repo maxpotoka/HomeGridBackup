@@ -1,7 +1,8 @@
+# patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
 # patch-id: crash-faulthandler-2.03
 # patch-id: android-no-pip-install-2.02
-# [ФАЙЛ: main.py (v2.03 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v2.04 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 #!/usr/bin/env python3
 _E='pystray'
 _D='keyring'
@@ -37,7 +38,7 @@ if not _IS_PY_CONSOLE_LAUNCHER:
 		except Exception:0
 if not is_compiled_app()and not IS_ANDROID:
 	_missing_pkgs=[]
-	for(_mod,_pkg)in((_C,_C),(_D,_D),(_E,_E),('PIL','pillow')):
+	for(_mod,_pkg)in((_C,_C),(_D,_D),(_E,_E),('PIL','pillow'),('zstandard','zstandard')):
 		try:__import__(_mod)
 		except ImportError:_missing_pkgs.append(_pkg)
 	if _missing_pkgs:

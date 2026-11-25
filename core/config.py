@@ -1,3 +1,7 @@
+# patch-id: cfg-disable-net-copy-3.40
+# patch-id: bump-ver-3.39
+# patch-id: cfg-force-tarzst-3.38
+# patch-id: cfg-archive-format-3.37
 # patch-id: default-optin-and-bottleneck-3.06
 # patch-id: main-win-adapter-badge-3.02
 # patch-id: net-scope-adapter-3.01-p2
@@ -41,7 +45,7 @@
 # patch-id: single-pass-verify-speed-2.75
 # patch-id: fix-linux-tray-menu-2.76
 # patch-id: bump-version-3.05
-# [ФАЙЛ: core/config.py (v2.66 | 25.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
+# [ФАЙЛ: core/config.py (v2.70 | 25.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
 # patch-id: pcloud-only-simple-ui-2.27
 # patch-id: fix-pcloud-vars-2.28
 # patch-id: fix-pcloud-nameerror-2.29
@@ -151,8 +155,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.31'
-BUILD_DATE='25.11.2026 23:59'
+SCRIPT_VER='3.40'
+BUILD_DATE='26.11.2026 03:30'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
@@ -310,7 +314,7 @@ def record_server_history(state,srv_url):
 	if not B:return
 	C=[A for A in A.get(_F)or[]if isinstance(A,str)and A.strip()and A.strip().rstrip('/')!=B];C.insert(0,B);A[_F]=C[:15]
 def load_state():
-	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_A,'show_bottleneck':_A,_l:'v8',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
+	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_A,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
 	if E:
 		try:
 			with open(E,'r',encoding=_C)as P:A=json.load(P)
@@ -330,8 +334,8 @@ def load_state():
 			if _Y in A:B[_Y]=max(0,int(A[_Y]or 0))
 			if _Z in A:B[_Z]=max(.0,float(A[_Z]or .0))
 			if isinstance(A.get(_a),bool):B[_a]=A[_a]
-			if isinstance(A.get(_X),bool):B[_X]=A[_X]and bool(B[_O])
-			if A.get(_b)in(_J,J,'network','both'):B[_b]=A[_b]
+			B[_X]=_B;B[_O]=''
+			B[_b]=_J
 			if not IS_ANDROID and isinstance(A.get(_c),bool):B[_c]=A[_c]
 			if isinstance(A.get(_d),str):B[_d]=A[_d].strip()or J
 			if isinstance(A.get(_e),str):B[_e]=A[_e].strip()or _A1
@@ -343,6 +347,7 @@ def load_state():
 			if isinstance(A.get(_H),int)and(A[_H]==0 or 8<=A[_H]<=28):B[_H]=A[_H]
 			if isinstance(A.get(_i),bool):B[_i]=A[_i]
 			if A.get(_l)in VALID_PBAR_STYLES:B[_l]=A[_l]
+			B['archive_format']='tar.zst'
 			if A.get(_f)in(O,'direct','permanent'):B[_f]=A[_f]
 			if A.get(_j)in VALID_TRAY_BACKENDS:B[_j]=A[_j]
 			for F in(_s,_k,_AD,_AE,_AF,_AG,_AC,_A2,_A3,_A5,'global_speed_optin','show_bottleneck'):
@@ -390,7 +395,7 @@ def commit_state(state):
 	try:os.makedirs(A[_D],exist_ok=_A)
 	except PermissionError:A[_D]=os.path.join(os.path.expanduser('~'),_q);os.makedirs(A[_D],exist_ok=_A)
 	if A.get(_E):record_server_history(A,A[_E])
-	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin','show_bottleneck';G={B:A[B]for B in F};D=CFG_FILE+'.tmp'
+	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,'archive_format',_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin','show_bottleneck';G={B:A[B]for B in F};D=CFG_FILE+'.tmp'
 	with open(D,'w',encoding=_C)as H:json.dump(G,H,indent=2,ensure_ascii=_B)
 	os.replace(D,CFG_FILE);B=_B
 	if HAS_KEYRING:

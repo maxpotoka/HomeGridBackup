@@ -1,3 +1,4 @@
+# patch-id: win-remove-fmt-switch-3.38
 # patch-id: remove-storages-hdr-taller-rows-3.25
 # patch-id: compact-log-bigger-footer-3.24
 # patch-id: footer-buttons-hierarchy-3.23
@@ -44,7 +45,7 @@
 # patch-id: local-always-on-3.05
 # patch-id: remove-mirror-ui-2.71-p1
 # patch-id: force-tall-pbar-and-grid-2.74
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.39 | 25.11.2026 20:30) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.40 | 25.11.2026 20:30) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 # patch-id: center-storage-notepad-2.40
 # patch-id: dashboard-redesign-2.34
 # patch-id: homegrid-design-system-2.45

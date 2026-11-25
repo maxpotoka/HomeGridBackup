@@ -18,7 +18,7 @@ def compute_gfs_plan(state):
 	try:
 		with os.scandir(F)as Q:
 			for B in Q:
-				if B.name.startswith('.')or not B.name.lower().endswith('.zip'):continue
+				if B.name.startswith('.')or not B.name.lower().endswith(('.zip','.tar.zst')):continue
 				if not(B.is_file(follow_symlinks=_C)and re.search('backup|KEEP',B.name)):continue
 				J=B.stat(follow_symlinks=_C);D.append((B.name,J.st_size,J.st_mtime_ns))
 	except Exception:D=[]
@@ -63,9 +63,9 @@ def apply_gfs_cleanup(engine,skip_prompt=_C,sync_cloud=_B):
 	for D in range(0,len(N),25):
 		F=N[D:D+25]
 		for C in F:
-			K=C[_A];H=K+_D;Q=C[_H];R=format_backup_dt(C['dt']);E=f"homegrid_backup_{Q}_{R}.zip";I=os.path.join(O,E)
+			K=C[_A];H=K+_D;Q=C[_H];R=format_backup_dt(C['dt']);ext_f='.tar.zst'if C[_E].lower().endswith('.tar.zst')else'.zip';E=f"homegrid_backup_{Q}_{R}{ext_f}";I=os.path.join(O,E)
 			if C[_E]!=E:
-				if os.path.exists(I):X=datetime.fromtimestamp(os.path.getmtime(K)).strftime('%S');E=f"homegrid_backup_{Q}_{R}_{X}.zip";I=os.path.join(O,E)
+				if os.path.exists(I):X=datetime.fromtimestamp(os.path.getmtime(K)).strftime('%S');E=f"homegrid_backup_{Q}_{R}_{X}{ext_f}";I=os.path.join(O,E)
 				if C[_E]!=E:
 					os.replace(K,I)
 					if os.path.exists(H):
