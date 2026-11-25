@@ -259,16 +259,24 @@ jobs:
 
       - name: Delete previous Linux 32-bit release and tag
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
           gh release delete linux-32bit-latest --yes || true
           git push origin --delete linux-32bit-latest || true
+
+      - name: Delete old Linux 32-bit releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          for t in $(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -F 'linux-32bit'); do
+            gh release delete "$t" --yes --cleanup-tag || true
+          done
 
       - name: Publish legacy 32-bit .7z to GitHub Releases
         uses: softprops/action-gh-release@v3
         with:
           tag_name: linux-32bit-latest
-          name: HomeGrid Backup — Linux 32-bit Legacy (i686 / glibc 2.27+) — ${{ steps.build_time.outputs.value }}
+          name: HomeGrid Backup 3.03 — Linux 32-bit Legacy (i686)
           body: |
             Комплект містить 32-бітний виконуваний файл **HomeGridBackup** (ELF i686, Ubuntu 18.04 / glibc 2.27) і rclone 1.76.0.
 

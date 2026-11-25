@@ -128,18 +128,19 @@ jobs:
         id: build_time
         run: echo "value=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
 
-      - name: Delete old macOS release and tag
+      - name: Delete old macOS Intel releases
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
-          gh release delete macos-intel-latest --yes || true
-          git push origin --delete macos-intel-latest || true
+          for t in $(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -F 'macos-intel'); do
+            gh release delete "$t" --yes --cleanup-tag || true
+          done
 
       - name: Publish clean .7z to GitHub Releases (no double zip)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: macos-intel-latest
-          name: HomeGrid Backup — macOS Intel (x86_64) — ${{ steps.build_time.outputs.value }}
+          name: HomeGrid Backup 3.03 — macOS Intel (x86_64)
           body: |
             Архів **HomeGridBackup_macOS_Intel.7z** збережений. Також доданий пер-користувацький образ **HomeGridBackup_macOS_Intel.dmg**.
             В образі запустіть `Install HomeGridBackup.command`; програма встановиться в `/Applications/HomeGridBackup.app` (або `~/Applications/HomeGridBackup.app`, якщо немає прав запису в `/Applications`). Rclone 1.76.0 входить у комплект.

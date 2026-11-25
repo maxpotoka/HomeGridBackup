@@ -150,19 +150,20 @@ jobs:
           cd ..
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
-      - name: Delete old Ubuntu release and tag
+      - name: Delete old Ubuntu x64 releases
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
-          gh release delete ubuntu-x64-latest --yes || true
-          git push origin --delete ubuntu-x64-latest || true
+          for t in $(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -F 'ubuntu-x64'); do
+            gh release delete "$t" --yes --cleanup-tag || true
+          done
 
       - name: Publish clean .7z to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ubuntu-x64-latest
           target_commitish: ${{ github.sha }}
-          name: HomeGrid Backup — Ubuntu (Linux x86_64)
+          name: HomeGrid Backup 3.03 — Ubuntu (Linux x86_64)
           body: |
             Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
             - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
