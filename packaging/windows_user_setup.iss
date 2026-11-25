@@ -1,18 +1,26 @@
 #ifndef AppVersion
-  #define AppVersion "2.25"
+  #define AppVersion "2.99"
 #endif
 
 #ifndef OutputBaseFilename
   #define OutputBaseFilename "HomeGridBackup_Setup"
 #endif
 
+#ifndef AppDirName
+  #define AppDirName "HomeGridBackup"
+#endif
+
 [Setup]
+#ifdef X86
+AppId={{6F1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D}
+#else
 AppId={{849CA065-D972-41A1-BA97-1B3858B1CA4B}
+#endif
 AppName=HomeGrid Backup
 AppVersion={#AppVersion}
 AppPublisher=HomeGrid
-DefaultDirName={localappdata}\Programs\HomeGridBackup
-DisableDirPage=yes
+DefaultDirName={localappdata}\Programs\{#AppDirName}
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=6.1

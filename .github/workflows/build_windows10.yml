@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-win10:
@@ -47,7 +47,7 @@ jobs:
             '--python-flag=no_site', '--python-flag=no_asserts', '--python-flag=no_docstrings',
             '--enable-plugin=tk-inter', '--windows-console-mode=attach', '--assume-yes-for-downloads',
             '--company-name=HomeGrid', '--product-name=HomeGrid Backup',
-            '--file-version=1.0.55.0', '--product-version=1.0.55.0',
+            '--file-version=2.99.0.0', '--product-version=2.99.0.0',
             '--file-description=HomeGrid Backup Utility (Windows 10/11 x64)',
             '--include-data-files=icon.ico=icon.ico', '--windows-icon-from-ico=icon.ico',
             '--include-package=core', '--include-package=console', '--include-package=gui',
@@ -80,22 +80,13 @@ jobs:
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path $iscc)) { throw "Inno Setup not found: $iscc" }
           New-Item -ItemType Directory -Force -Path 'release' | Out-Null
-          & $iscc '/DAppVersion=2.25' '/DOutputBaseFilename=HomeGridBackup_Win10_x64_Setup' '/Orelease' 'packaging\windows_user_setup.iss'
+          & $iscc '/DAppVersion=2.99' '/DOutputBaseFilename=HomeGridBackup_Win10_x64_Setup' '/Orelease' 'packaging\windows_user_setup.iss'
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
           if (-not (Test-Path 'release\HomeGridBackup_Win10_x64_Setup.exe')) { throw 'Installer was not created' }
 
-      - name: Collect output
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path 'output' | Out-Null
-          Copy-Item 'dist_win10\main.dist' 'output\HomeGridBackup_win10_folder' -Recurse -Force
-          Copy-Item 'release\HomeGridBackup_Win10_x64_Setup.exe' 'output\'
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: HomeGridBackup_win10_${{ github.run_number }}
-          path: output/
-          if-no-files-found: error
-          retention-days: 30
+          tag_name: v2.99-win10-x64-${{ github.run_number }}
+          name: HomeGrid Backup 2.99 (Windows 10/11 x64)
+          files: release/HomeGridBackup_Win10_x64_Setup.exe
