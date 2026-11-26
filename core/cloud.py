@@ -1,3 +1,4 @@
+# patch-id: norm-default-ports-3.55
 # patch-id: fix-net-filter-wifi-gbps-3.49
 # patch-id: fix-srv-host-fallback-3.48
 # patch-id: fix-server-tab-stats-3.47
@@ -335,7 +336,7 @@ def _os_arch_lbl(raw_sys, os_bit=''):
     return f"{base} ({b})"
 
 def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb, est=''):
-    sh = str(srv_h or '').strip() or 'Unknown server'
+    sh = str(srv_h or '').strip().removesuffix(':443').removesuffix(':80') or 'Unknown server'
     os_s = _os_arch_lbl(os_lbl)
     base = _grp_lbl(sc, ad, lk, est)
     b_kb = int(buf_kb or 64)
@@ -361,7 +362,7 @@ def build_three_section_stats(engine, refresh=True):
             sv = round(rw_fall / tm, 2)
         if sv <= 0:
             continue
-        h = str(o.get('srv_host') or o.get('srv_norm') or '').strip()
+        h = str(o.get('srv_host') or o.get('srv_norm') or '').strip().removesuffix(':443').removesuffix(':80')
         if not h or h == 'Server':
             _hh = (st.get('server') or (st.get('server_history') or [''])[0]).replace('http://', '').replace('https://', '').strip().rstrip('/')
             h = _hh or 'Unknown server'

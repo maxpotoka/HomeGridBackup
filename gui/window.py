@@ -1,3 +1,5 @@
+# patch-id: rocksolid-fav-pins-3.56
+# patch-id: per-server-pins-3.50
 # patch-id: win-remove-fmt-switch-3.38
 # patch-id: remove-storages-hdr-taller-rows-3.25
 # patch-id: compact-log-bigger-footer-3.24
@@ -132,7 +134,7 @@ _A='panel'
 import os,threading,time,tkinter as tk
 from core.backup import run_backup_task
 from core.build_variant import WINDOWS7_CLOUD_SYNC_PREVIEW
-from core.config import BUILD_DATE,DEFAULT_BACKUP_DIR,NO_TRAY,SCRIPT_VER,commit_state,get_logs_dir
+from core.config import BUILD_DATE,DEFAULT_BACKUP_DIR,NO_TRAY,SCRIPT_VER,apply_server_auth,commit_state,get_logs_dir,remove_server_auth,save_server_auth
 from core.files import choose_folder_native,get_app_icon_path,open_folder_native
 from core.i18n import apply_widget_i18n,tr
 from core.network import normalize_server_url,run_connect_task,run_scan_task
@@ -378,14 +380,14 @@ class HomeGridApp(DialogsMixin):
 		E=A.engine.state.get(_U,_V);C=A._get_palette();G=A.metrics[_L];B=tk.Menu(A.root,tearoff=0,bg=C[_A],fg=C[_H],activebackground=C[_f],activeforeground=_q,font=(A._base_fam,G))
 		for(F,H,I)in D:B.add_command(label=tr(f"{F}   (TCP: {H} мс, API: {I} мс)",E),command=lambda u=F:A._select_discovered_server(u))
 		B.add_separator();B.add_command(label=tr(_A8,E),command=A.do_scan);B.tk_popup(A.btn_scan.winfo_rootx(),A.btn_scan.winfo_rooty()+A.btn_scan.winfo_height())
-	def _select_discovered_server(A,url):B=url;A.var_srv.set(B);A.engine.state[_v]=B;A._last_synced_srv=B;A._render_fav_servers();A.engine.log(f"Обрано виявлений у мережі сервер: {B}",_Q)
+	def _select_discovered_server(A,url):save_server_auth(A.engine.state,A.engine.state.get(_v));B=url;A.var_srv.set(B);A.engine.state[_v]=B;apply_server_auth(A.engine.state,B);A._last_synced_srv=B;commit_state(A.engine.state);A._render_fav_servers();A.engine.log(f"Обрано виявлений у мережі сервер: {B}",_Q)
 	def _add_current_to_favs(A):
-		A._apply_srv_autofill();B=A.var_srv.get().strip().rstrip('/')
+		A._apply_srv_autofill();B=A.var_srv.get().strip().rstrip('!').rstrip('/')
 		if not B:return
-		C=[A.strip().rstrip('/')for A in A.engine.state.get(_u)or[]if A.strip()]
-		if B not in C:C.append(B);A.engine.state[_u]=C[:8];commit_state(A.engine.state);A._render_fav_servers()
-	def _remove_from_favs(A,url):B=(url or'').strip().rstrip('/');A.engine.state[_u]=[A for A in A.engine.state.get(_u)or[]if A.strip().rstrip('/')!=B];commit_state(A.engine.state);A._render_fav_servers()
-	def _pick_fav_server(A,url):B=url;A.var_srv.set(B);A.engine.state[_v]=B;A._last_synced_srv=B;commit_state(A.engine.state);A._render_fav_servers()
+		C=[A.strip().rstrip('!').rstrip('/')for A in A.engine.state.get(_u)or[]if A.strip()]
+		if B not in C:C.append(B);A.engine.state[_u]=C[:8];save_server_auth(A.engine.state,B);commit_state(A.engine.state);A._render_fav_servers()
+	def _remove_from_favs(A,url):B=(url or'').strip().rstrip('/');A.engine.state[_u]=[A for A in A.engine.state.get(_u)or[]if A.strip().rstrip('/')!=B];remove_server_auth(A.engine.state,B);commit_state(A.engine.state);A._render_fav_servers()
+	def _pick_fav_server(A,url):save_server_auth(A.engine.state,A.engine.state.get(_v));B=url;A.var_srv.set(B);A.engine.state[_v]=B;apply_server_auth(A.engine.state,B);A._last_synced_srv=B;commit_state(A.engine.state);A._render_fav_servers()
 	def _render_fav_servers(A):
 		if not hasattr(A,'fav_bar')or not A.fav_bar.winfo_exists():return
 		for J in A.fav_bar.winfo_children():J.destroy()
@@ -445,7 +447,7 @@ class HomeGridApp(DialogsMixin):
 	def do_scan(A):threading.Thread(target=run_scan_task,args=(A.engine,),daemon=_D).start()
 	def do_backup(A):A._apply_srv_autofill();A.save_net_manual();A.save_cloud_path_manual();threading.Thread(target=run_backup_task,args=(A.engine,A.var_srv.get(),_F,_F,_F),daemon=_D).start()
 	def reset_pins(A):
-		if not A.engine.is_running:A.engine.state['session_token']=A.engine.state['login_pin']=A.engine.state['editor_pin']='';commit_state(A.engine.state);A.engine.log('Збережені PIN-коди та токен сесії очищено (Keyring / .env).',_S)
+		if not A.engine.is_running:A.engine.state['session_token']=A.engine.state['login_pin']=A.engine.state['editor_pin']=A.engine.state['server_pins_json']='';commit_state(A.engine.state);A.engine.log('Збережені PIN-коди та токен сесії очищено (Keyring / .env).',_S)
 	def choose_dir(A):
 		B=choose_folder_native(A.engine.state[_R])
 		if B:A.engine.state[_R]=B;A.var_dir.set(B);commit_state(A.engine.state);A.engine.log(f"Папку збереження змінено на: {B}",_Q)

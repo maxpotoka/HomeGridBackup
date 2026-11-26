@@ -1,3 +1,5 @@
+# patch-id: rocksolid-fav-pins-3.56
+# patch-id: per-server-pins-3.50
 # patch-id: bump-ver-3.46
 # patch-id: bump-ver-3.42
 # patch-id: bump-ver-3.41
@@ -158,8 +160,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.43'
-BUILD_DATE='26.11.2026 04:30'
+SCRIPT_VER='3.45'
+BUILD_DATE='26.11.2026 03:06'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
@@ -179,7 +181,7 @@ if not HAS_DISPLAY and not HIDDEN_MODE:
 	GUI_MODE=_B;CLI_MODE=_A
 NO_CLEAN=any(A in('--no-clean','/noclean')for A in ARGS_LOW)
 NO_TRAY=any(A in('--no-tray','/notray')for A in ARGS_LOW)
-SECRET_KEYS=_x,_y,_z,_A0
+SECRET_KEYS=_x,_y,_z,_A0,'server_pins_json'
 SCHED_TASK_NAME=_A1
 VALID_PBAR_STYLES='v8',
 VALID_THEMES='dark','light'
@@ -269,7 +271,7 @@ def _read_env_secrets():
 		except Exception:0
 	return B
 def _write_env_secrets(state):
-	A=state;_ensure_secure_dir();B=ENV_FILE+'.tmp';C=['# HomeGrid Backup — захищені токени та PIN-коди',f"CLIENT_TOKEN={A.get(_x,'')}",f"SESSION_TOKEN={A.get(_y,'')}",f"LOGIN_PIN={A.get(_z,'')}",f"EDITOR_PIN={A.get(_A0,'')}"]
+	A=state;_ensure_secure_dir();B=ENV_FILE+'.tmp';C=['# HomeGrid Backup — захищені токени та PIN-коди',f"CLIENT_TOKEN={A.get(_x,'')}",f"SESSION_TOKEN={A.get(_y,'')}",f"LOGIN_PIN={A.get(_z,'')}",f"EDITOR_PIN={A.get(_A0,'')}",f"SERVER_PINS_JSON={A.get('server_pins_json','')}"]
 	with open(B,'w',encoding=_C)as D:D.write('\n'.join(C)+'\n')
 	if os.name!=_p:
 		try:os.chmod(B,384)
@@ -316,8 +318,48 @@ def record_server_history(state,srv_url):
 	A=state;B=(srv_url or'').strip().rstrip('/')
 	if not B:return
 	C=[A for A in A.get(_F)or[]if isinstance(A,str)and A.strip()and A.strip().rstrip('/')!=B];C.insert(0,B);A[_F]=C[:15]
+def _norm_srv_key(u):
+	return (u or '').strip().rstrip('!').rstrip('/')
+def get_server_pins_map(state):
+	raw = state.get('server_pins_json') or ''
+	if not raw: return {}
+	try:
+		d = json.loads(raw)
+		return d if isinstance(d, dict) else {}
+	except Exception:
+		return {}
+def save_server_auth(state, srv_url):
+	k = _norm_srv_key(srv_url)
+	if not k: return
+	m = get_server_pins_map(state)
+	lp, ep, st = str(state.get(_z) or '').strip(), str(state.get(_A0) or '').strip(), str(state.get(_y) or '').strip()
+	if lp or ep or st:
+		m[k] = {'lp': lp, 'ep': ep, 'st': st}
+	elif k in m:
+		del m[k]
+	state['server_pins_json'] = json.dumps(m, ensure_ascii=_B) if m else ''
+	state[_I] = _A
+def apply_server_auth(state, srv_url):
+	k = _norm_srv_key(srv_url)
+	m = get_server_pins_map(state)
+	rec = m.get(k) if k else _S
+	if isinstance(rec, dict):
+		state[_z] = str(rec.get('lp') or '')
+		state[_A0] = str(rec.get('ep') or '')
+		state[_y] = str(rec.get('st') or '')
+	else:
+		state[_z] = ''
+		state[_A0] = ''
+		state[_y] = ''
+def remove_server_auth(state, srv_url):
+	k = _norm_srv_key(srv_url)
+	m = get_server_pins_map(state)
+	if k in m:
+		del m[k]
+		state['server_pins_json'] = json.dumps(m, ensure_ascii=_B) if m else ''
+		state[_I] = _A
 def load_state():
-	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_B,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
+	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],'server_pins_json':'',_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_B,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
 	if E:
 		try:
 			with open(E,'r',encoding=_C)as P:A=json.load(P)
@@ -381,11 +423,16 @@ def load_state():
 				if N:B[C]=N.strip();M=_A
 			B[_o]='keyring'
 		except Exception:0
-	if not M:
-		I=_read_env_secrets()
-		for C in SECRET_KEYS:
-			if I.get(C):B[C]=I[C]
-		if I or not HAS_KEYRING:B[_o]='env'
+	I=_read_env_secrets()
+	for C in SECRET_KEYS:
+		if not B.get(C) and I.get(C):B[C]=I[C]
+	if not M and(I or not HAS_KEYRING):B[_o]='env'
+	if not B.get('server_pins_json') and isinstance(A.get('server_pins'),dict) and A['server_pins']:
+		B['server_pins_json']=json.dumps(A['server_pins'],ensure_ascii=_B)
+	if B[_E]:
+		_pm=get_server_pins_map(B)
+		if _norm_srv_key(B[_E]) in _pm:apply_server_auth(B,B[_E])
+		elif B[_z] or B[_A0] or B[_y]:save_server_auth(B,B[_E])
 	if IS_ANDROID:
 		try:
 			os.makedirs(B[_D],exist_ok=_A)
@@ -398,7 +445,7 @@ def commit_state(state):
 	try:os.makedirs(A[_D],exist_ok=_A)
 	except PermissionError:A[_D]=os.path.join(os.path.expanduser('~'),_q);os.makedirs(A[_D],exist_ok=_A)
 	if A.get(_E):record_server_history(A,A[_E])
-	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,'archive_format',_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin','show_bottleneck';G={B:A[B]for B in F};D=CFG_FILE+'.tmp'
+	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,'archive_format',_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin','show_bottleneck';G={B:A[B]for B in F};G['server_pins']=get_server_pins_map(A);D=CFG_FILE+'.tmp'
 	with open(D,'w',encoding=_C)as H:json.dump(G,H,indent=2,ensure_ascii=_B)
 	os.replace(D,CFG_FILE);B=_B
 	if HAS_KEYRING:

@@ -1,3 +1,4 @@
+# patch-id: per-server-pins-3.50
 # patch-id: bak-tarzst-file-count-3.42
 # patch-id: bak-disable-net-copy-3.40
 # patch-id: bak-force-tarzst-3.38
@@ -73,7 +74,7 @@ import hashlib,http.cookiejar,json,os,re,shutil,sys,time,urllib.request,zipfile,
 _IS_32BIT=(sys.maxsize<=2**32)
 from datetime import datetime
 from urllib.parse import urlparse
-from core.config import DEFAULT_TOK,NO_CLEAN,SCRIPT_VER,SILENT_MODE,commit_state,get_fast_sysinfo
+from core.config import DEFAULT_TOK,NO_CLEAN,SCRIPT_VER,SILENT_MODE,apply_server_auth,commit_state,get_fast_sysinfo,save_server_auth
 from core.files import format_backup_dt,format_duration,pretty_phase
 from core.network import BROWSER_UA,_seed_cookie,detect_network_adapter,invoke_http,normalize_server_url,scan_lan_servers,verify_host_and_hgm
 def _record_cloud_event(engine,operation_id,event,**B):
@@ -147,7 +148,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 		A.set_progress(5,'Перевірка сайту та сервера HGM...');f,B,g,S,T=verify_host_and_hgm(A,C)
 		if not f:A.diag_net=f"{E}:{F} (ОФЛАЙН)";raise RuntimeError(g)
 		A.diag_net=f"{E}:{F} (ОНЛАЙН)";A.diag_ping=f"TCP {S} мс | API {T} мс";A.diag_adapter=detect_network_adapter(A.state.get('server','')).get('label','');A.log(f"Сервер HGM онлайн (TCP: {S} мс, API: {T} мс)",_F)
-	if C!=A.state[N]:A.state[N]=C;A.state[_Z]=_A
+	if C!=A.state[N]:A.state[N]=C;apply_server_auth(A.state,C);A.state[_Z]=_A
 	A.set_progress(12,'Перевірка сесії та авторизація...');I=A.state[_P]==''
 	if not I:
 		h=int(time.time()*1000);B,B,i,B,B,B=invoke_http(f"{C}/api/auth/status?_t={h}",A.state)
@@ -162,7 +163,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 				A.log('Невірний LOGIN PIN!',_I);A.state[_Q]=''
 				if SILENT_MODE:raise RuntimeError('Збережений LOGIN PIN відхилено сервером.')
 				continue
-			A.state[_Q]=J;A.state[_Z]=_A
+			A.state[_Q]=J;save_server_auth(A.state,C);A.state[_Z]=_A
 			if U:A.state[_P]=U;A.log('Авторизація успішна!',_F);break
 			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
 			raise RuntimeError('Сервер не повернув cookie сесії.')
@@ -180,7 +181,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 			A.state[_V]=''
 			if SILENT_MODE and not M:raise RuntimeError('Збережений EDITOR PIN відхилено.')
 			continue
-		A.state[_V]=G;A.state[_Z]=_A
+		A.state[_V]=G;save_server_auth(A.state,C);A.state[_Z]=_A
 		if X:A.state[_P]=X
 		fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.)
 	if not D or not D.strip():raise RuntimeError(f"Помилка підготовки (порожня відповідь сервера, HTTP {L}): {V}")
