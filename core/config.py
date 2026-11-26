@@ -40,20 +40,7 @@
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: pcloud-inline-path-2.63
 # patch-id: lan-btn-layout68-2.64
-# patch-id: fav-servers-pills-2.65
-# patch-id: big-bottom-pbar-2.66
-# patch-id: pcloud-stats-refresh-compact-2.67
-# patch-id: split-last-backup-2.68
-# patch-id: pretty-last-backup-2.69
-# patch-id: tall-pbar-server-marquee-2.70
-# patch-id: force-tall-pbar-and-grid-2.74
-# patch-id: single-pass-verify-speed-2.75
-# patch-id: fix-linux-tray-menu-2.76
-# patch-id: bump-version-3.05
-# [ФАЙЛ: core/config.py (v2.72 | 25.11.2026 20:30) — КОНФИГУРАЦИЯ, СЕКРЕТЫ KEYRING/.ENV И ЛОГИРОВАНИЕ]
-# patch-id: pcloud-only-simple-ui-2.27
-# patch-id: fix-pcloud-vars-2.28
-# patch-id: fix-pcloud-nameerror-2.29
+## patch-id: fix-pcloud-nameerror-2.29
 # patch-id: pcloud-clean-hints-2.30
 # patch-id: cloud-speed-stats-2.31
 # patch-id: linux-wayland-sni-bridge-2.32
