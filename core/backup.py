@@ -1,3 +1,6 @@
+# patch-id: server-inverter-image-fix-display-3.93
+# patch-id: tar-zst-verify-and-i18n-3.89
+# patch-id: tar-zst-log-label-3.88
 # patch-id: keep-part-on-stream-eof-3.87
 # patch-id: http-range-resume-polish-3.86
 # patch-id: http-range-resume-download-3.85
@@ -5,7 +8,7 @@
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.28 | 27.11.2026 00:22) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.31 | 27.11.2026 01:08) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -156,7 +159,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
 			raise RuntimeError('Сервер не повернув cookie сесії.')
 	else:A.log('Активну сесію підтверджено.',_F)
-	A.set_progress(_D,'Запит на підготовку бекапу...');fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
+	A.set_progress(_D,'Запит на підготовку бекапу...');from core.network import fetch_server_inverter_image as _fsi;_fsi(A,C);fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
 	while D and _o in D:
 		if A.state[_V]:G=A.state[_V]
 		elif not M and A.state[_Q]:G=A.state[_Q];M=_A
@@ -218,21 +221,46 @@ def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_
 	try:
 		with open(D,'rb',buffering=max(1048576,L))as a:
 			M=_HashingReader(a)
-			with zipfile.ZipFile(M,'r')as V:
-				W=V.infolist();N=len(W)
-				if N<1:return{B:A,_G:_I,C:'Порожній ZIP-архів'}
-				for O in W:
-					P=0
-					with V.open(O,'r')as b:
-						while _A:
-							if S and S.get(_f):return{B:A,_G:_E,C:'Перевірку перервано'}
-							F=b.read(L)
-							if not F:break
-							P=zlib.crc32(F,P);I+=len(F);J+=len(F)
-							if T and J>=4194304:J=0;time.sleep(T)
-							Z()
-					if P&4294967295!=O.CRC:return{B:A,_G:_I,C:f"Пошкоджений CRC32 у файлі: {O.filename}"}
-			if E:M.finalize_tail(max(1048576,L))
+			if D.lower().endswith('.tar.zst'):
+				N=1
+				try:
+					import zstandard as _zst,tarfile as _tf
+					_fc=0
+					with _zst.ZstdDecompressor().stream_reader(M)as _zr,_tf.open(fileobj=_zr,mode='r|')as _tar:
+						for _tm in _tar:
+							if S and S.get(_f):return{B:A,_G:_E,C:'\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0443 \u043f\u0435\u0440\u0435\u0440\u0432\u0430\u043d\u043e'}
+							if _tm.isfile():
+								_fc+=1;_fo=_tar.extractfile(_tm)
+								if _fo:
+									while _A:
+										F=_fo.read(L)
+										if not F:break
+										I+=len(F);J+=len(F)
+										if T and J>=4194304:J=0;time.sleep(T)
+										Z()
+					N=max(1,_fc)
+				except ImportError:
+					while _A:
+						F=M.read(L)
+						if not F:break
+						I+=len(F);Z()
+				if E:M.finalize_tail(max(1048576,L))
+			else:
+				with zipfile.ZipFile(M,'r')as V:
+					W=V.infolist();N=len(W)
+					if N<1:return{B:A,_G:_I,C:'Порожній ZIP-архів'}
+					for O in W:
+						P=0
+						with V.open(O,'r')as b:
+							while _A:
+								if S and S.get(_f):return{B:A,_G:_E,C:'Перевірку перервано'}
+								F=b.read(L)
+								if not F:break
+								P=zlib.crc32(F,P);I+=len(F);J+=len(F)
+								if T and J>=4194304:J=0;time.sleep(T)
+								Z()
+						if P&4294967295!=O.CRC:return{B:A,_G:_I,C:f"Пошкоджений CRC32 у файлі: {O.filename}"}
+				if E:M.finalize_tail(max(1048576,L))
 	except Exception as H:return{B:A,_G:_I,C:f"Помилка перевірки архіву: {H}"}
 	if not E:return{B:A,_G:_E,C:f"ZIP OK ({N} файлів), але файл .sha256 відсутній"}
 	if M.hasher.hexdigest().lower()==G and G:return{B:A,_G:_F,C:f"Цілісність 100% підтверджена ({N} файлів)"}
@@ -355,7 +383,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		except OSError:AB=0
 		AW=int(H*1.25)+104857600 if H>0 else 536870912
 		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='увімкнено тільки мережеву папку'if AA else'папка знаходиться у хмарному або мережевому сховищі';A.log(f"Режим ({AX}): спершу завантажу та перевірю у тимчасовій папці на SSD, а потім перенесу в папку призначення.",_E)
-	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження ZIP-архіву з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25;_saved_r=(D.get('sha256')or'').strip().lower();_dl_base=0
+	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження архіву TAR.ZST з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25;_saved_r=(D.get('sha256')or'').strip().lower();_dl_base=0
 	for O in range(1,N+1):
 		_ex_sz=os.path.getsize(G)if os.path.exists(G)else 0
 		if H>0 and _ex_sz>=H:

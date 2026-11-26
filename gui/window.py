@@ -1,6 +1,8 @@
+# patch-id: server-inverter-image-fix-display-3.93
+# patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.43 | 26.11.2026 18:28) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.46 | 27.11.2026 01:08) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -224,11 +226,11 @@ class HomeGridApp(DialogsMixin):
 		S=tk.Frame(C,bd=0,highlightthickness=0);S.grid(row=0,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.ent_srv=tk.Entry(S,width=1,textvariable=A.var_srv,bd=0,highlightthickness=1,font=(A._base_fam,B));A.ent_srv.pack(side=_E,fill=D,expand=_D,ipady=4)
 		A.btn_scan=tk.Button(S,text=_A8,command=A.on_scan_btn_click,padx=8,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_scan.pack(side=_E,padx=(6,0),fill='y')
-		A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3)
+		C.columnconfigure(4,minsize=0);A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3);A.lbl_srv_logo=tk.Label(C,bd=0,highlightthickness=1);
 		A.l_fav=tk.Label(C,text='\u041e\u0431\u0440\u0430\u043d\u0456:',anchor=_J,font=(A._base_fam,max(8,B-1)));A.l_fav.grid(row=1,column=0,sticky=_J,padx=(0,6),pady=3)
 		A.fav_bar=tk.Frame(C,bd=0,highlightthickness=0);A.fav_bar.grid(row=1,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.btn_hist=tk.Button(C,text='\u0406\u0441\u0442\u043e\u0440\u0456\u044f',command=A.open_history_modal,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_hist.grid(row=1,column=3,sticky=I,padx=(4,0),pady=3)
-		A.conn_sep=tk.Frame(C,height=1,bd=0,highlightthickness=0);A.conn_sep.grid(row=2,column=0,columnspan=4,sticky=H,pady=(4,4))
+		A.conn_sep=tk.Frame(C,height=1,bd=0,highlightthickness=0);A.conn_sep.grid(row=2,column=0,columnspan=5,sticky=H,pady=(4,4))
 		A.l_copies_hdr=tk.Label(C,text='\u0421\u0445\u043e\u0432\u0438\u0449\u0430:',anchor=_J,font=(A._base_fam,max(8,B-1),_C))
 		T=tk.Frame(C,bd=0,highlightthickness=0);T.grid(row=4,column=0,sticky=_J,padx=(0,6),pady=3);A.engine.state[_AO]=_D
 		A.l_dir=tk.Label(T,text='\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0430 \u043f\u0430\u043f\u043a\u0430:',anchor=_J,font=(A._base_fam,B));A.l_dir.pack(side=_E)
@@ -569,6 +571,24 @@ class HomeGridApp(DialogsMixin):
 							if E is _B:S.set(tr('оновлення...',C));R.configure(fg=B[_I])
 							elif not E.get(_Q):AA=tr(E.get(A2)or'недоступно',C);S.set(AA);R.configure(fg=B[_b]if E.get(A2)else B[_T])
 							else:AB=f" — Вільно: {E[_AA]} ГБ"if E.get(_AA,-1)>=0 else'';AC=f" ({tr('в черзі',C)})"if E.get(A3)else'';S.set(tr(f"{E['count']} архівів ({E['mb']} МБ){AB}",C)+AC);R.configure(fg=B[_b]if E.get(A3)else B[_K]if K==_g else B[_P])
+			if hasattr(A,'lbl_srv_logo'):
+				_lsig=getattr(A.engine,'server_logo_sig',_B);_lcur=(A.var_srv.get()or'').strip().rstrip('!').rstrip('/')
+				_lbase=_lsig if isinstance(_lsig,tuple)else'';
+				if _lbase and _lcur and not _lcur.startswith(_lbase)and not _lbase.startswith(_lcur):_lsig=_B
+				if getattr(A,'_last_srv_logo_sig',_B)!=_lsig:
+					A._last_srv_logo_sig=_lsig;_lraw=getattr(A.engine,'server_logo_bytes',_B)if _lsig else _B
+					if _lraw:
+						_pimg=_B;_th_h=max(56,int(68*A.metrics.get('k',1.)))
+						try:
+							import io as _io;from PIL import Image as _PIL_I,ImageTk as _PIL_T
+							_im=_PIL_I.open(_io.BytesIO(_lraw));_im.thumbnail((int(_th_h*1.6),_th_h),_PIL_I.LANCZOS);_pimg=_PIL_T.PhotoImage(_im)
+						except Exception:
+							try:import base64 as _b64;_pimg=tk.PhotoImage(data=_b64.b64encode(_lraw))
+							except Exception:_pimg=_B
+						if _pimg is not _B:
+							_pal_l=A._get_palette();A._srv_logo_img=_pimg;A.lbl_srv_logo.configure(image=_pimg,bg=_pal_l[_N],highlightbackground=_pal_l[_O]);A.lbl_srv_logo.grid(row=0,column=4,rowspan=2,sticky='ns',padx=(8,0),pady=2)
+						else:A.lbl_srv_logo.grid_forget()
+					else:A.lbl_srv_logo.grid_forget()
 			if hasattr(A,'lbl_srv_badge'):
 				T=getattr(A.engine,'diag_net','')or'';U=getattr(A.engine,'diag_ping','')or'';AD_L=getattr(A.engine,'diag_adapter','')or'';m=T,U,AD_L,H
 				if getattr(A,'_last_srv_b_sig',_B)!=m:

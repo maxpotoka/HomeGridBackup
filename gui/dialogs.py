@@ -1,3 +1,8 @@
+# patch-id: confirm-modal-inverter-image-sync-3.95
+# patch-id: confirm-modal-inverter-image-left-3.94
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.48 | 27.11.2026 01:18)
+# patch-id: larger-lan-and-confirm-dialogs-3.90
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.46 | 27.11.2026 00:36)
 # patch-id: backup-report-3stage-hbar-3.82
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.45 | 26.11.2026 17:58)
 # patch-id: direct-cloud-write-setting-3.76
@@ -187,6 +192,25 @@ def _render_report_3stage_bar(dlg, p, d, fam, fs, lang, k_sc):
     cv.bind('<Configure>', _draw)
     dlg.after(30, _draw)
 
+def _build_modal_inv_photo(engine, k_sc, max_h_px):
+    raw_b = getattr(engine, 'server_logo_bytes', None)
+    if not raw_b:
+        return None
+    th = max(72, int(round(max_h_px * k_sc)))
+    tw = max(56, int(round(th * 0.85)))
+    try:
+        import io as _io
+        from PIL import Image as _PIL_I, ImageTk as _PIL_T
+        im = _PIL_I.open(_io.BytesIO(raw_b))
+        im.thumbnail((tw, th), _PIL_I.LANCZOS)
+        return _PIL_T.PhotoImage(im)
+    except Exception:
+        try:
+            import base64 as _b64
+            return tk.PhotoImage(data=_b64.b64encode(raw_b))
+        except Exception:
+            return None
+
 class DialogsMixin:
 	def _ui_fam(self):
 		if hasattr(self,'_base_fam')and self._base_fam:return self._base_fam
@@ -274,25 +298,33 @@ class DialogsMixin:
 			raw_stages=[(t,v,c)for(t,v,c)in raw_stages if float(v or 0)>0];stages=[(f"{i}. {t}",v,c)for(i,(t,v,c))in enumerate(raw_stages,1)]
 			for(idx_r,(lbl_st,val_s,col_st))in enumerate(stages):pct_v=min(100,int(round(float(val_s)/tot_s*100)));_pct_s=f"  ({pct_v}%)"if pct_v>0 else'';is_spd_row=('/с' in lbl_st or 'MB/s' in lbl_st);tk.Label(mid_c,text=lbl_st,bg=p[_A],fg=p[_U]if('Скачування'in lbl_st or 'Network download'in lbl_st)else col_st,font=(fam,fs+2,_I)if is_spd_row else(fam,fs+2),anchor=_L).grid(row=idx_r,column=0,sticky=_L,pady=4);tk.Label(mid_c,text=f"{format_duration(val_s,lang).partition(_s).__getitem__(0)}{_pct_s}",bg=p[_A],fg=col_st,font=(fam,fs+2,_I),anchor=_i).grid(row=idx_r,column=1,sticky=_i,padx=(12,0),pady=4)
 			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(4,10));bot_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=8);bot_c.pack(side=_Z,fill=_C,padx=16,pady=(0,6));tk.Label(bot_c,text=f"Сховище:  {d.get(A,0)} архівів ({d.get(B,0)} МБ)   •   Вільно:  {d.get(C,0)} ГБ   •   Застарілих GFS:  {d.get(D,0)} шт."if lang==_B else f"Storage:  {d.get(A,0)} archives ({d.get(B,0)} MB)   •   Free:  {d.get(C,0)} GB   •   Outdated GFS:  {d.get(D,0)}",bg=p[_A],fg=p[_O],font=(fam,fs+2),anchor=_L).pack(fill=_C);btn_ok_r=tk.Button(bf,text='ОК'if lang==_B else'OK',command=_close_rep,bg=p[_U],fg=p[_v],font=(fam,fs+2,_I),padx=24,pady=5,cursor=_R);btn_ok_r.pack(side=_K);dlg.after(350,lambda:(dlg.bind(_A7,_close_rep),dlg.bind(_AJ,_close_rep),btn_ok_r.focus_set())if dlg.winfo_exists()else _M);self._fit_dialog(dlg);return
-		is_lan_dlg=m[_j]=='lan_found';dlg,p,_=self._make_dialog(m[_AD],660 if is_lan_dlg else 590,340 if is_lan_dlg else 235)
+		fs=max(10,self.metrics[_k]);fam=self._ui_fam();k=self.metrics[_a]
+		is_lan_dlg=m[_j]=='lan_found';_has_mimg=(m[_j]=='confirm'and bool(getattr(self.engine,'server_logo_bytes',_M)));dlg,p,_=self._make_dialog(m[_AD],680 if is_lan_dlg else(600 if _has_mimg else 520),340 if is_lan_dlg else(245 if _has_mimg else 225))
 		def _done(val):
 			try:dlg.destroy()
 			except Exception:0
 			self.engine.submit_modal(val)
 		dlg.protocol(_A5,lambda:_done(''if m[_j]==E else _S))
 		if is_lan_dlg:
-			items=m.get('default')or[];hdr_t='Оберіть дію для виявленого сервера в локальній мережі:'if lang==_B else'Choose an action for the discovered LAN server:';tk.Label(dlg,text=hdr_t,bg=p[_G],fg=p[_O],font=(_N,fs)).pack(anchor=_L,padx=16,pady=(14,8));box=tk.Frame(dlg,bg=p[_G]);box.pack(fill=_W,expand=_H,padx=16,pady=(0,6))
-			for(url,t_ms,a_ms)in items:row=tk.Frame(box,bg=p[_A],bd=1,relief=_Y,padx=10,pady=8);row.pack(fill=_C,pady=4);info_f=tk.Frame(row,bg=p[_A]);info_f.pack(side=_J,fill=_C,expand=_H);tk.Label(info_f,text=url,bg=p[_A],fg=p[_Q],font=(_N,fs+1,_I)).pack(anchor=_L);ms_unit='мс'if lang==_B else'ms';tk.Label(info_f,text=f"TCP: {t_ms} {ms_unit}  •  API: {a_ms} {ms_unit}",bg=p[_A],fg=p[_O],font=(_N,max(8,fs-1))).pack(anchor=_L);btn_bkp_t='🔌 Підключити та бекап'if lang==_B else'🔌 Connect & Backup';btn_sav_t='⭐ В Історію'if lang==_B else'⭐ Save to History';tk.Button(row,text=btn_bkp_t,command=lambda u=url:_done({F:'backup',G:u}),bg=p[_U],fg=p[_v],font=(_N,fs,_I),padx=10,pady=4,cursor=_R).pack(side=_K,padx=(6,0));tk.Button(row,text=btn_sav_t,command=lambda u=url:_done({F:'save',G:u}),bg=p[_y],fg=_l,font=(_N,fs,_I),padx=10,pady=4,cursor=_R).pack(side=_K,padx=6)
-			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=12);tk.Button(bf,text=_w if lang==_B else'Close',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(_N,fs),padx=14,pady=5).pack(side=_K);self._fit_dialog(dlg);return
-		is_list='• 'in m[_D]
+			items=m.get('default')or[];hdr_t='\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0434\u0456\u044e \u0434\u043b\u044f \u0432\u0438\u044f\u0432\u043b\u0435\u043d\u043e\u0433\u043e \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0432 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0456\u0439 \u043c\u0435\u0440\u0435\u0436\u0456:'if lang==_B else'Choose an action for the discovered LAN server:';tk.Label(dlg,text=hdr_t,bg=p[_G],fg=p[_D],font=(fam,fs),wraplength=int(620*k)).pack(anchor=_L,padx=18,pady=(18,10));box=tk.Frame(dlg,bg=p[_G]);box.pack(fill=_W,expand=_H,padx=18,pady=(0,8))
+			for(url,t_ms,a_ms)in items:row=tk.Frame(box,bg=p[_A],bd=1,relief=_Y,padx=12,pady=10);row.pack(fill=_C,pady=5);info_f=tk.Frame(row,bg=p[_A]);info_f.pack(side=_J,fill=_C,expand=_H);tk.Label(info_f,text=url,bg=p[_A],fg=p[_Q],font=(fam,fs+1,_I)).pack(anchor=_L);ms_unit='\u043c\u0441'if lang==_B else'ms';tk.Label(info_f,text=f"TCP: {t_ms} {ms_unit}  \u2022  API: {a_ms} {ms_unit}",bg=p[_A],fg=p[_O],font=(fam,max(9,fs-1))).pack(anchor=_L,pady=(2,0));btn_bkp_t='\U0001f50c \u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438 \u0442\u0430 \u0431\u0435\u043a\u0430\u043f'if lang==_B else'\U0001f50c Connect & Backup';btn_sav_t='\u2b50 \u0412 \u0406\u0441\u0442\u043e\u0440\u0456\u044e'if lang==_B else'\u2b50 Save to History';tk.Button(row,text=btn_bkp_t,command=lambda u=url:_done({F:'backup',G:u}),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=(6,0));tk.Button(row,text=btn_sav_t,command=lambda u=url:_done({F:'save',G:u}),bg=p[_y],fg=_l,font=(fam,fs),padx=14,pady=6,cursor=_R).pack(side=_K,padx=6)
+			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14));dlg.bind(_AJ,lambda _e:_done(_S));tk.Button(bf,text=_w if lang==_B else'Close',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);self._fit_dialog(dlg);return
+		is_list='\u2022 'in m[_D]
 		if is_list:
-			lines=[ln.strip()for ln in m[_D].splitlines()if ln.strip()];tk.Label(dlg,text=lines[0],bg=p[_G],fg=p[_D],anchor=_L,justify=_J,font=(_N,fs,_I)).pack(pady=(14,6),padx=18,fill=_C);list_box=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=10,pady=8);list_box.pack(padx=18,pady=(0,8),fill=_C)
-			for ln in lines[1:]:clean_ln=ln.lstrip('• ').strip();prefix='•  'if ln.startswith('•')else'';tk.Label(list_box,text=f"{prefix}{clean_ln}",bg=p[_A],fg=p[_b]if prefix else p[_O],anchor=_L,justify=_J,font=(_A9,max(9,fs-1))).pack(anchor=_L,pady=1)
-		else:tk.Label(dlg,text=m[_D],bg=p[_G],fg=p[_D],justify=_g,anchor=_g,wraplength=int(480*self.metrics[_a]),font=(_N,fs)).pack(pady=(16,10),padx=18,fill=_C)
-		bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=12)
-		if m[_j]==E:v_pin=tk.StringVar();ent=tk.Entry(dlg,textvariable=v_pin,show='•',bg=p[_c],fg=p[_D],insertbackground=p[_D],font=(_N,fs+2),justify=_g);ent.pack(padx=40,fill=_C,ipady=4);ent.focus_set();ent.bind(_A7,lambda e:_done(v_pin.get().strip()));tk.Button(bf,text=_A6,command=lambda:_done(''),bg=p[_A],fg=p[_D],font=(_N,fs),padx=14,pady=5).pack(side=_K,padx=8);tk.Button(bf,text='Підтвердити',command=lambda:_done(v_pin.get().strip()),bg=p[_U],fg=p[_v],font=(_N,fs,_I),padx=14,pady=5).pack(side=_K,padx=8)
-		elif m[_j]=='confirm':tk.Button(bf,text='Ні',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(_N,fs),padx=16,pady=5).pack(side=_K,padx=8);tk.Button(bf,text='Так',command=lambda:_done(_H),bg=p[_b],fg=_l,font=(_N,fs,_I),padx=16,pady=5).pack(side=_K,padx=8)
-		else:tk.Button(bf,text='ОК',command=lambda:_done(_H),bg=p[_U],fg=p[_v],font=(_N,fs,_I),padx=18,pady=5).pack(side=_K,padx=8)
+			lines=[ln.strip()for ln in m[_D].splitlines()if ln.strip()];tk.Label(dlg,text=lines[0],bg=p[_G],fg=p[_D],anchor=_L,justify=_J,font=(fam,fs,_I)).pack(pady=(18,8),padx=18,fill=_C);list_box=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=12,pady=10);list_box.pack(padx=18,pady=(0,10),fill=_C)
+			for ln in lines[1:]:clean_ln=ln.lstrip('\u2022 ').strip();prefix='\u2022  'if ln.startswith('\u2022')else'';tk.Label(list_box,text=f"{prefix}{clean_ln}",bg=p[_A],fg=p[_b]if prefix else p[_O],anchor=_L,justify=_J,font=(_A9,max(9,fs-1))).pack(anchor=_L,pady=2)
+		else:
+			_m_pimg=_build_modal_inv_photo(self.engine,k,112)if _has_mimg else _M
+			if _m_pimg is not _M:
+				dlg._modal_inv_img=_m_pimg;_bf_body=tk.Frame(dlg,bg=p[_G]);_bf_body.pack(pady=(16,8),padx=18,expand=_H,fill=_C)
+				_img_box=tk.Frame(_bf_body,bg=p[_A],bd=1,relief=_Y,padx=4,pady=4);_img_box.pack(side=_J,padx=(0,14))
+				tk.Label(_img_box,image=_m_pimg,bg=p[_A],bd=0).pack()
+				tk.Label(_bf_body,text=m[_D],bg=p[_G],fg=p[_D],justify=_J,anchor=_L,wraplength=int(420*k),font=(fam,fs)).pack(side=_J,expand=_H,fill=_C)
+			else:tk.Label(dlg,text=m[_D],bg=p[_G],fg=p[_D],justify=_g,anchor=_g,wraplength=int(460*k),font=(fam,fs)).pack(pady=(18,10),padx=18,expand=_H,fill=_C)
+		bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14))
+		if m[_j]==E:v_pin=tk.StringVar();ent=tk.Entry(dlg,textvariable=v_pin,show='\u2022',bg=p[_c],fg=p[_D],insertbackground=p[_D],font=(fam,fs+2),justify=_g);ent.pack(padx=40,fill=_C,ipady=5);ent.focus_set();ent.bind(_A7,lambda e:_done(v_pin.get().strip()));dlg.bind(_AJ,lambda _e:_done(''));tk.Button(bf,text=_A6,command=lambda:_done(''),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);tk.Button(bf,text='\u041f\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438',command=lambda:_done(v_pin.get().strip()),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
+		elif m[_j]=='confirm':dlg.bind(_AJ,lambda _e:_done(_S));dlg.bind(_A7,lambda _e:_done(_H));tk.Button(bf,text='\u041d\u0456',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);tk.Button(bf,text='\u0422\u0430\u043a',command=lambda:_done(_H),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
+		else:dlg.bind(_AJ,lambda _e:_done(_H));dlg.bind(_A7,lambda _e:_done(_H));tk.Button(bf,text='\u041e\u041a',command=lambda:_done(_H),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=18,pady=6,cursor=_R).pack(side=_K,padx=6)
 		self._fit_dialog(dlg)
 	def open_history_modal(self):
 		D='server_history';C='_render_fav_servers';B='favorite_servers';A='/';fs=self.metrics[_k];dlg,p,_=self._make_dialog('Історія адрес серверів',560,380);tk.Label(dlg,text='Оберіть раніше збережену адресу або видаліть зайву:',bg=p[_G],fg=p[_O],font=(_N,fs)).pack(anchor=_L,padx=14,pady=(10,6));box=tk.Frame(dlg,bg=p[_G]);box.pack(fill=_W,expand=_H,padx=14)

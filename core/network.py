@@ -1,5 +1,9 @@
+# patch-id: confirm-modal-inverter-image-sync-3.95
+# patch-id: server-inverter-image-fix-display-3.93
+# patch-id: server-inverter-image-auth-3.92
+# patch-id: server-inverter-image-preview-3.91
 # patch-id: net-scope-adapter-3.01-p1
-# [ФАЙЛ: core/network.py (v2.02 | 22.11.2026 08:40) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v2.06 | 27.11.2026 01:18) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 _W='NOT_HGM'
 _V='server_history'
 _U='timeout'
@@ -43,7 +47,7 @@ _WIN_NO_WINDOW={_T:134217728}if os.name==_J else{}
 import urllib.error,urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
-from core.config import DEFAULT_TOK,SILENT_MODE,commit_state
+from core.config import DEFAULT_TOK,SILENT_MODE,apply_server_auth,commit_state
 BROWSER_UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
 def _seed_cookie(jar,url,name,value):
 	B=value
@@ -387,6 +391,73 @@ def scan_lan_servers(engine):
 					C.append((I,N,O));X=f"http://{I}:18899";A.discovered_servers=[(f"http://{A}:18899",B,C)for(A,B,C)in C];A.log(f"Знайдено сервер: {X} (TCP: {N} мс, API: {O} мс)",_I);A.set_pill(f"Знайдено: {len(C)}",_S)
 					if J and J!=A.state[_E]:A.state[_E]=J;A.state[_N]=_A
 	return C
+def fetch_server_inverter_image(engine, srv_url, wait_timeout=0.0):
+	import threading
+	def _worker():
+		try:
+			base = (srv_url or '').strip().rstrip('!').rstrip('/')
+			if not base:
+				return
+			apply_server_auth(engine.state, base)
+			pin_v = (engine.state.get('login_pin') or '').strip()
+			if pin_v and not (engine.state.get('session_token') or '').strip():
+				ok_l, _, _, ses_l, _, _ = invoke_http(f"{base}/api/auth/login", engine.state, 'POST', json.dumps({'pin': pin_v}), base, f"{base}/login", 8.0, send_ses=_B)
+				if ok_l and ses_l:
+					engine.state['session_token'] = ses_l
+					commit_state(engine.state)
+			inv_id = ''
+			for ep in ('/api/inverters', '/api/status', '/api/mini-dashboard'):
+				ok, st_c, body, _, _, _ = invoke_http(f"{base}{ep}", engine.state, timeout=6.0)
+				if ok and st_c == 200 and body:
+					m_id = re.search(r'"(?:selected_inverter_id|inverter_id|default_inverter_id|active_inverter_id)"\s*:\s*"([0-9a-fA-F-]{8,64})"', body)
+					if not m_id:
+						m_id = re.search(r'inverter_id=([0-9a-fA-F-]{8,64})', body)
+					if not m_id:
+						m_id = re.search(r'"id"\s*:\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"', body)
+					if m_id:
+						inv_id = m_id.group(1).strip()
+						break
+			img_url = f"{base}/api/mini-dashboard/inverter-image?inverter_id={inv_id}" if inv_id else f"{base}/api/mini-dashboard/inverter-image"
+			jar = engine.state.get(_P)
+			if jar is _C:
+				jar = http.cookiejar.CookieJar()
+				engine.state[_P] = jar
+			cli_t = engine.state.get(_E) or DEFAULT_TOK
+			ses_t = engine.state.get('session_token') or ''
+			if cli_t:
+				_seed_cookie(jar, img_url, 'hg_client', cli_t)
+			if ses_t:
+				_seed_cookie(jar, img_url, 'homegrid_dash_session', ses_t)
+			raw_bytes = b''
+			for no_px in (_A, _B):
+				try:
+					hds = [urllib.request.HTTPCookieProcessor(jar)]
+					if no_px:
+						hds.append(urllib.request.ProxyHandler({}))
+					op = urllib.request.build_opener(*hds)
+					req = urllib.request.Request(img_url, headers={'User-Agent': BROWSER_UA, 'Accept': 'image/png,image/webp,image/jpeg,image/gif,*/*'})
+					with op.open(req, timeout=8.0) as resp:
+						ctype = (resp.headers.get('Content-Type') or '').lower()
+						data = resp.read(2097152)
+						if data and ('image/' in ctype or data[:8] == b'\x89PNG\r\n\x1a\n' or data[:3] == b'\xff\xd8\xff' or data[:4] == b'RIFF' or data[:6] in (b'GIF87a', b'GIF89a')):
+							raw_bytes = data
+							break
+				except Exception:
+					pass
+			with engine.lock:
+				engine.server_logo_bytes = raw_bytes if raw_bytes else _C
+				engine.server_logo_url = base if raw_bytes else ''
+				engine.server_logo_sig = (base, len(raw_bytes)) if raw_bytes else _C
+		except Exception:
+			with engine.lock:
+				engine.server_logo_bytes = _C
+				engine.server_logo_sig = _C
+	_th = threading.Thread(target=_worker, daemon=_A)
+	_th.start()
+	if wait_timeout and wait_timeout > 0:
+		_th.join(timeout=wait_timeout)
+
+
 def run_connect_task(engine,raw_url,force_skip=_B):
 	A=engine;from core.backup import run_backup_task as L
 	if A.is_running:return
@@ -402,6 +473,8 @@ def run_connect_task(engine,raw_url,force_skip=_B):
 			A.state[_G]=B;commit_state(A.state);A.diag_net=f"{C}:{D} (ОНЛАЙН)";A.diag_ping=f"TCP {K} мс | API {G} мс";A.set_pill(f"ОНЛАЙН | {G} мс",_I);A.log(f"Підключено до HomeGrid Monitor: {B} (TCP: {K} мс, API: {G} мс)",_I);A.set_progress(100,'Підключення успішне');E=_A
 	finally:
 		with A.lock:A.is_running=_B;A.indeterminate=_B
+	if E:
+		fetch_server_inverter_image(A,A.state[_G],wait_timeout=0.0 if SILENT_MODE else 1.8)
 	if E and not SILENT_MODE:
 		if A.ask_modal('confirm','Сервер підключено',f"Успішно підключено до {A.state[_G]}. Виконати резервне копіювання зараз?"):L(A,A.state[_G],H)
 def run_scan_task(engine):
