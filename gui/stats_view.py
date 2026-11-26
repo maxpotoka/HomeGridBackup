@@ -1,3 +1,9 @@
+# patch-id: stats-compact-x-labels-3.80
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.25 | 26.11.2026 17:35)
+# patch-id: stats-dynamic-cols-3.79
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.24 | 26.11.2026 17:30)
+# patch-id: stats-sort-desc-3.78
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.23 | 26.11.2026 17:25)
 # patch-id: stats-view-exact-filters-3.70
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.22 | 26.11.2026 12:35)
 # patch-id: d1-sync-keys-fix-3.61
@@ -67,8 +73,8 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         parts = [x.strip() for x in str(raw or '').split(chr(8226))]
         if len(parts) >= 2:
             p0 = parts[0].split(':')[0].split('(')[0].strip()
-            if len(p0) > 24:
-                p0 = p0[:23] + chr(8230)
+            if len(p0) > 13:
+                p0 = p0[:12] + chr(8230)
             mid = ' '.join(parts[1:-1])
             net_t = 'WAN' if 'Internet' in mid else ('Wi-Fi' if 'Wi-Fi' in mid else ('Eth 1G' if '1 Gbps' in mid else ('Ethernet' if 'Ethernet' in mid else '')))
             p1 = parts[-1].replace('buf ', '').strip()[:12]
@@ -77,7 +83,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
             if net_t:
                 top = f"{net_t} {p1} ({os_s})" if os_s else f"{net_t} \u2022 {p1}"
             else:
-                top = os_raw[:16] or p1
+                top = (os_raw[:12] + chr(8230) if len(os_raw) > 13 else os_raw) or p1
             return f"{top}\n({p0})"
         t = str(raw or '')
         return (t[:24] + chr(8230)) if len(t) > 25 else t
@@ -103,7 +109,8 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         for gi in range(4):
             gy = int(y1 - ch * gi / 3.0)
             cv.create_line(pad_l, gy, w - pad_r, gy, fill='#1e293b', dash=(2, 3))
-        vis = rows[:6]
+        max_cols = max(6, min(12, int((w - pad_l - pad_r) // max(1, int(130 * k)))))
+        vis = rows[:max_cols]
         slot = (w - pad_l - pad_r) / max(1, len(vis))
         bw = max(14, min(int(38 * k), int(slot * (0.45 if len(series) == 1 else 0.27))))
         for idx_r, r in enumerate(vis):
@@ -176,6 +183,8 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         if osf and osf != 'ALL':
             all_r = [r for r in all_r if str(r.get('os') or '').strip().lower() == osf.lower()]
         rows = [r for r in all_r if r.get('n_my', 0) > 0] if who == 'MY' else ([r for r in all_r if r.get('n_d1', 0) > 0] if who == 'D1' else all_r)
+        if sk != 'hardware':
+            rows = sorted(rows, key=lambda r: (float(r.get('my') or 0) if who == 'MY' else (float(r.get('d1') or 0) if who == 'D1' else max(float(r.get('my') or 0), float(r.get('d1') or 0)))), reverse=True)
         for r in rows:
             tv.insert('', 'end', values=(r[lkey], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=(('own',) if r.get('n_my', 0) > 0 else ()))
         _draw_hw_cards(rows) if sk == 'hardware' else _draw_vbars(rows, lkey)
@@ -251,7 +260,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
                 lbl_st.configure(text=f"D1: {_d1_e}" if _d1_e else _ok_t, fg=p['red'] if _d1_e else p['green'])
                 if hasattr(engine, 'log'):
                     if _d1_e:
-                        engine.log(f'[D1] омилка читання з хмари: {_d1_e}', 'err')
+                        engine.log(f'[D1] \u041f\u043e\u043c\u0438\u043b\u043a\u0430 \u0447\u0438\u0442\u0430\u043d\u043d\u044f \u0437 \u0445\u043c\u0430\u0440\u0438: {_d1_e}', 'err')
                     else:
                         engine.log(f'[D1] \u0427\u0438\u0442\u0430\u043d\u043d\u044f \u0437 \u0445\u043c\u0430\u0440\u0438: отримано {_d1_n} записів (джерело: {_d1_s})', 'ok')
             root.after(0, _u)
