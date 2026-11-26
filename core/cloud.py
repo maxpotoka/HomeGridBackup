@@ -1,4 +1,19 @@
+# patch-id: fix-net-filter-wifi-gbps-3.49
+# patch-id: fix-srv-host-fallback-3.48
+# patch-id: fix-server-tab-stats-3.47
+# patch-id: cloud-srv-raw-and-threshold-3.46
+# patch-id: os-home-reports-dir-3.45
 # patch-id: cloud-fair-speed-3.43
+import stat, tempfile, threading
+_rep_lock = threading.Lock()
+def _reports_base_dir():
+	h = os.path.expanduser('~')
+	d = os.path.join(h, 'documents') if os.path.isdir(os.path.join(h, 'documents')) else (os.path.join(h, 'Documents') if os.path.isdir(os.path.join(h, 'Documents')) else '')
+	if os.name == 'nt' or os.sys.platform == 'darwin':
+		b = os.path.join(d or h, 'HomeGridBackup', _K)
+	else:
+		b = os.path.join(h, 'HomeGridBackup', _K)
+	return b
 # patch-id: accurate-dl-speed-approx-3.18
 # patch-id: show-hw-tag-in-d1-table-3.17
 # patch-id: net-scope-adapter-3.01-p2
@@ -113,7 +128,10 @@ def _write_speed_csv_report(records,output_path):
 def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb=_A,duration_sec=_D,**C):
 	R='operations.jsonl';L=size_mb;K=archive;J=stage;I=event;H='size_bytes';F=engine;B=duration_sec
 	if str(I).startswith('stage_'):return
-	M=_device_id(F.state);S=datetime.now().astimezone();D=os.path.join(SECURE_DIR,_K,M);os.makedirs(D,mode=448,exist_ok=_G);E=os.path.join(D,R);A={_F:S.isoformat(timespec='milliseconds'),_B:M,_E:operation_id,_J:I,_W:SCRIPT_VER,_L:platform.system(),_M:platform.release(),_N:platform.machine(),'python_version':platform.python_version(),'archives_total':max(0,int(F.state.get('all_time_cnt',0))),'host_name':''}
+	M=_device_id(F.state);S=datetime.now().astimezone();D=os.path.join(_reports_base_dir(),M);
+	try:os.makedirs(D,exist_ok=_G)
+	except Exception:D=os.path.join(tempfile.gettempdir(),'HomeGridBackup_reports',M);os.makedirs(D,exist_ok=_G)
+	E=os.path.join(D,R);A={_F:S.isoformat(timespec='milliseconds'),_B:M,_E:operation_id,_J:I,_W:SCRIPT_VER,_L:platform.system(),_M:platform.release(),_N:platform.machine(),'python_version':platform.python_version(),'archives_total':max(0,int(F.state.get('all_time_cnt',0))),'host_name':''}
 	if J:A[_P]=J
 	if K:A[_Q]=os.path.basename(K)
 	if L:A[_R]=round(float(L),1)
@@ -121,11 +139,19 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 	if B is not _D:B=max(_A,float(B));A[_S]=round(B,3);A['duration_ms']=round(B*1000)
 	_srv_t=float(A.get(_Y)or A.get('server_packing_sec')or 0)
 	if float(A.get('srv_speed_mbps')or 0)<=0 and _srv_t>0 and float(A.get(_R)or 0)>0:A['srv_speed_mbps']=round(float(A[_R])/_srv_t,2)
-	T={_X,'archive_sequence','srv_speed_mbps',_d,_U,_T,_Y,'server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec',_Z,_a,'mirror_enabled',_b,'net_enabled',_e,_f,'gfs_removed_count','system_info','net_scope','srv_conn_est','net_adapter_name','net_adapter_type','net_link_mbps','net_adapter_label','srv_host','os_bit','buf_kb',_c,'result','error_type'}
+	T={_X,'archive_sequence','srv_speed_mbps','srv_raw_mb',_d,_U,_T,_Y,'server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec',_Z,_a,'mirror_enabled',_b,'net_enabled',_e,_f,'gfs_removed_count','system_info','net_scope','srv_conn_est','net_adapter_name','net_adapter_type','net_link_mbps','net_adapter_label','srv_host','os_bit','buf_kb',_c,'result','error_type'}
 	for N in T.intersection(C):
 		O=C[N]
 		if O is not _D:A[N]=O
-	with open(E,'a',encoding=_I)as U:U.write(json.dumps(A,ensure_ascii=_C)+chr(10))
+	with _rep_lock:
+		for _att in range(3):
+			try:
+				if os.path.exists(E):os.chmod(E,stat.S_IWRITE|stat.S_IREAD)
+				with open(E,'a',encoding=_I)as U:U.write(json.dumps(A,ensure_ascii=_C)+chr(10))
+				break
+			except PermissionError:
+				if _att==2:raise
+				import time as _tm;_tm.sleep(0.05)
 	try:
 		for G in os.listdir(D):
 			if G.endswith(_O)and G!=R:os.remove(os.path.join(D,G))
@@ -149,11 +175,11 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 def sync_network_shared_journal(engine):
 	D=engine.state;A=os.path.expanduser((D.get(_g)or'').strip())
 	if not A or not os.path.isdir(A):return _C
-	C=_device_id(D);J=os.path.join(SECURE_DIR,_K,C);B=os.path.join(A,_h);os.makedirs(B,exist_ok=_G);E=_collect_report_records((B,J),device_id=C)
+	C=_device_id(D);J=os.path.join(_reports_base_dir(),C);B=os.path.join(A,_h);os.makedirs(B,exist_ok=_G);E=_collect_report_records((B,J),device_id=C)
 	if E:F=os.path.join(B,f"{C}.jsonl.tmp");_write_jsonl_report(E,F);os.replace(F,os.path.join(B,f"{C}.jsonl"))
 	G=_collect_report_records((B,));H=os.path.join(A,'HomeGridBackup.log.tmp');_write_plain_text_report(G,H);os.replace(H,os.path.join(A,'HomeGridBackup.log'));I=os.path.join(A,'speed_journal.csv.tmp');_write_speed_csv_report(G,I);os.replace(I,os.path.join(A,'speed_journal.csv'));return _G
 def fetch_cloud_speed_stats(engine,refresh=_G):
-	k='avg_spd';j='avg_dur';i='spd_f';h='dev_label';S='net_spd_f';R='dur_f';K='.';L=engine.state;T=os.path.expanduser((L.get(_g)or'').strip());U=os.path.join(SECURE_DIR,_K);V=os.path.join(U,'net_cache');B=os.path.join(T,_h)if T else''
+	k='avg_spd';j='avg_dur';i='spd_f';h='dev_label';S='net_spd_f';R='dur_f';K='.';L=engine.state;T=os.path.expanduser((L.get(_g)or'').strip());U=_reports_base_dir();V=os.path.join(U,'net_cache');_old_u=os.path.join(SECURE_DIR,_K);B=os.path.join(T,_h)if T else''
 	if B and os.path.isdir(B):
 		try:
 			os.makedirs(V,exist_ok=_G)
@@ -161,6 +187,7 @@ def fetch_cloud_speed_stats(engine,refresh=_G):
 				if M.endswith(_O):shutil.copy2(os.path.join(B,M),os.path.join(V,M))
 		except Exception:0
 	W=[U]
+	if os.path.isdir(_old_u)and _old_u!=U:W.append(_old_u)
 	if os.path.isdir(V):W.append(V)
 	if B and os.path.isdir(B):W.append(B)
 	for extra in (os.path.join(T,'reports','net_cache') if T else '',):
@@ -288,10 +315,10 @@ def _med(v):
     x = [float(i) for i in v if float(i or 0) > 0]
     return round(_st.median(x), 1) if x else 0.0
 
-def _grp_lbl(sc, ad, lk):
+def _grp_lbl(sc, ad, lk, est=''):
     if str(sc).lower() == 'internet':
         return 'Internet (WAN)'
-    a_low = str(ad or '').lower()
+    a_low = f'{ad} {est}'.lower()
     is_wifi = any(w in a_low for w in ('wi-fi', 'wifi', 'wlan', 'wireless', '802.11'))
     kind = 'Wi-Fi' if is_wifi else 'Ethernet'
     m = int(lk or 0)
@@ -307,10 +334,10 @@ def _os_arch_lbl(raw_sys, os_bit=''):
     base = t.split('[')[0].split('|')[0].strip() if ('[' in t or '|' in t) else (t or f"{_pl.system()} {_pl.release()}".strip())
     return f"{base} ({b})"
 
-def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb):
+def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb, est=''):
     sh = str(srv_h or '').strip() or 'Unknown server'
     os_s = _os_arch_lbl(os_lbl)
-    base = _grp_lbl(sc, ad, lk)
+    base = _grp_lbl(sc, ad, lk, est)
     b_kb = int(buf_kb or 64)
     return f"{sh} • {os_s} • {base} • buf {b_kb} KB"
 
@@ -325,28 +352,33 @@ def build_three_section_stats(engine, refresh=True):
     for o in ops:
         sv = float(o.get('srv_speed_mbps') or 0)
         tm = float(o.get('server_duration_sec') or o.get('server_packing_sec') or 0)
-        rw = float(o.get('srv_raw_mb') or 0)
+        if tm <= 0 and float(o.get('dur_f') or 0) > float(o.get('download_duration_sec') or 0) + 0.2:
+            tm = round(float(o.get('dur_f')) - float(o.get('download_duration_sec') or 0), 2)
+        rw = float(o.get('srv_raw_mb') or 0); rw_fall = float(o.get('mb_f') or 0)
         if rw > 0 and tm > 0:
             sv = round(rw / tm, 2)
+        elif sv <= 0 and rw_fall > 0 and tm > 0:
+            sv = round(rw_fall / tm, 2)
         if sv <= 0:
             continue
         h = str(o.get('srv_host') or o.get('srv_norm') or '').strip()
         if not h or h == 'Server':
-            h = 'Unknown server'
-        srv_my.setdefault(h, []).append(sv)
+            _hh = (st.get('server') or (st.get('server_history') or [''])[0]).replace('http://', '').replace('https://', '').strip().rstrip('/')
+            h = _hh or 'Unknown server'
+        srv_my.setdefault(h, []).append((sv, float(o.get('srv_raw_mb') or 0) > 0))
     d1_srv_by_h = {}
     for r in d1:
         if r.get('kind') == 'bench':
             continue
         sv = float(r.get('srv_mbs') or 0)
-        if sv < 10:
+        if sv <= 0:
             continue
         h = str(r.get('srv_host') or '').strip() or 'Unknown server'
         d1_srv_by_h.setdefault(h, []).append(sv)
     all_hosts = list(srv_my.keys()) + [h for h in d1_srv_by_h if h not in srv_my]
     srv_rows = []
     for h in all_hosts:
-        v_my = srv_my.get(h, [])
+        _raw_l = [s[0] for s in srv_my.get(h, []) if s[1]][:5]; v_my = _raw_l or [s[0] for s in srv_my.get(h, [])][:5]
         v_d1 = d1_srv_by_h.get(h, [])
         srv_rows.append({'name': h, 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
     net_my, net_sz = {}, {}
@@ -359,7 +391,7 @@ def build_three_section_stats(engine, refresh=True):
             sh = 'Unknown server'
         os_s = _os_arch_lbl(o.get('system_info'), o.get('os_bit'))
         b_kb = int(o.get('buf_kb') or 64)
-        g = _net_pair_key(sh, os_s, o.get('scope_norm'), o.get('net_adapter_type') or o.get('net_adapter_label'), o.get('net_link_mbps'), b_kb)
+        g = _net_pair_key(sh, os_s, o.get('scope_norm'), o.get('net_adapter_type') or o.get('net_adapter_label'), o.get('net_link_mbps'), b_kb, o.get('srv_conn_est'))
         net_my.setdefault(g, []).append(sp)
         if sz > 0:
             net_sz.setdefault(g, []).append(sz)

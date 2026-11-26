@@ -14,7 +14,8 @@
 # patch-id: speed-journal-auto-target-2.62
 # patch-id: tall-pbar-server-marquee-2.70
 # patch-id: single-pass-verify-speed-2.75
-# [ФАЙЛ: core/backup.py (v2.21 | 25.11.2026 18:05) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# patch-id: fix-unbound-local-m-3.44
+# [ФАЙЛ: core/backup.py (v2.22 | 26.11.2026 02:25) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 # patch-id: pcloud-speed-progress-gradient-2.33
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
@@ -424,9 +425,9 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 					import zstandard as _zst,tarfile as _tf
 					_fc=0
 					with _zst.ZstdDecompressor().stream_reader(K)as _zr,_tf.open(fileobj=_zr,mode='r|')as _tar:
-						for _m in _tar:
-							if _m.isfile():
-								_fc+=1;_fo=_tar.extractfile(_m)
+						for _tm in _tar:
+							if _tm.isfile():
+								_fc+=1;_fo=_tar.extractfile(_tm)
 								if _fo:
 									while _fo.read(_vbuf):0
 					G=max(1,_fc)
