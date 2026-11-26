@@ -1,3 +1,5 @@
+# patch-id: stats-view-exact-filters-3.70
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.22 | 26.11.2026 12:35)
 # patch-id: d1-sync-keys-fix-3.61
 # patch-id: d1-log-events-3.60
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.20 | 26.11.2026 11:20)
@@ -163,7 +165,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         all_r = state_data.get(sk, [])
         sf = srv_var.get()
         if sf and sf != 'ALL' and sk in ('server', 'network'):
-            all_r = [r for r in all_r if str(r.get(lkey) or '').startswith(sf)]
+            all_r = [r for r in all_r if str(r.get(lkey) or '').partition('\u2022')[0].strip() == sf]
         nf = net_var.get()
         if nf and nf != 'ALL' and sk == 'network':
             all_r = [r for r in all_r if nf in str(r.get('group') or '')]
@@ -172,7 +174,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
             all_r = [r for r in all_r if str(r.get('pc') or '') == pf]
         osf = os_var.get()
         if osf and osf != 'ALL':
-            all_r = [r for r in all_r if osf.lower() in str(r.get('os') or r.get(lkey) or '').lower()]
+            all_r = [r for r in all_r if str(r.get('os') or '').strip().lower() == osf.lower()]
         rows = [r for r in all_r if r.get('n_my', 0) > 0] if who == 'MY' else ([r for r in all_r if r.get('n_d1', 0) > 0] if who == 'D1' else all_r)
         for r in rows:
             tv.insert('', 'end', values=(r[lkey], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=(('own',) if r.get('n_my', 0) > 0 else ()))

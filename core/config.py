@@ -1,3 +1,5 @@
+# patch-id: cloud-union-d1-keys-3.71
+# patch-id: stats-view-exact-filters-3.70
 # patch-id: d1-mine-backup-safe-3.68
 # patch-id: d1-mine-backup-merge-3.67
 # patch-id: d1-post-200-none-fix-3.66
@@ -111,8 +113,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.68'
-BUILD_DATE='26.11.2026 12:22'
+SCRIPT_VER='3.71'
+BUILD_DATE='26.11.2026 12:35'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)

@@ -1,3 +1,4 @@
+# patch-id: cloud-union-d1-keys-3.71
 # patch-id: d1-mine-backup-safe-3.68
 # patch-id: d1-sync-keys-fix-3.61
 # patch-id: d1-cache-toggle-setting-3.58
@@ -447,12 +448,25 @@ def build_three_section_stats(engine, refresh=True):
         n_rep = max(1, int(r.get('tests') or 1))
         d1_srv_by_os.setdefault(os_k, []).extend([sv] * n_rep)
     srv_rows = []
+    _seen_srv_os = set()
     for h, items_my in srv_my.items():
         _raw_l = [s[0] for s in items_my if s[1]][:5]
         v_my = _raw_l or [s[0] for s in items_my][:5]
         os_tag = items_my[0][2]
-        v_d1 = d1_srv_by_os.get(_os_base_norm(os_tag), [])
+        _ok = _os_base_norm(os_tag)
+        _seen_srv_os.add(_ok)
+        v_d1 = d1_srv_by_os.get(_ok, [])
         srv_rows.append({'name': h, 'os': os_tag, 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
+    _d1_os_lbl = {}
+    for r in d1:
+        if r.get('kind') != 'bench' and float(r.get('srv_mbs') or r.get('avg_srv') or 0) > 0:
+            _ok = _os_base_norm(r.get('os_label'))
+            if _ok and _ok not in _d1_os_lbl:
+                _d1_os_lbl[_ok] = str(r.get('os_label') or _ok).strip()
+    for _ok, v_d1 in d1_srv_by_os.items():
+        if _ok not in _seen_srv_os and v_d1:
+            os_tag = _d1_os_lbl.get(_ok, _ok)
+            srv_rows.append({'name': f'Cloud D1 • {os_tag}', 'os': os_tag, 'my': 0.0, 'd1': _med(v_d1), 'n_my': 0, 'n_d1': len(v_d1)})
     net_my, net_sz = {}, {}
     for o in ops:
         sp, sz = float(o.get('spd_f') or 0), float(o.get('mb_f') or 0)
@@ -485,6 +499,23 @@ def build_three_section_stats(engine, refresh=True):
                 continue
             dm.extend([sp_d] * max(1, int(r.get('tests') or 1)))
         net_rows.append({'group': g, 'os': os_part, 'my': _med(v), 'd1': _med(dm), 'n_my': len(v), 'n_d1': len(dm)})
+    _seen_net_os = {(_os_base_norm(r['os']), 'Internet' in r['group']) for r in net_rows}
+    _d1_net_grp = {}
+    for r in d1:
+        if r.get('kind') == 'bench' or str(r.get('adapter') or '').lower() == 'bench':
+            continue
+        sp_d = float(r.get('spd_mbs') or r.get('avg_spd') or 0)
+        if sp_d <= 0:
+            continue
+        os_raw = str(r.get('os_label') or '').strip()
+        _ok = _os_base_norm(os_raw)
+        r_wan = (str(r.get('scope') or '').lower() == 'internet')
+        if (_ok, r_wan) in _seen_net_os:
+            continue
+        _d1_net_grp.setdefault((_ok, r_wan, os_raw), []).extend([sp_d] * max(1, int(r.get('tests') or 1)))
+    for (_ok, r_wan, os_raw), dm in _d1_net_grp.items():
+        sc_lbl = 'Internet' if r_wan else 'LAN'
+        net_rows.append({'group': f'Cloud D1 • {os_raw} • {sc_lbl}', 'os': os_raw, 'my': 0.0, 'd1': _med(dm), 'n_my': 0, 'n_d1': len(dm)})
     import platform as _pl
     from core.speed_bench import load_local_benchmarks, _hw_tag
     def_pc = f"{_pl.node()} ({_hw_tag()})"[:48]
