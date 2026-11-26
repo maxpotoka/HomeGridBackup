@@ -1,3 +1,5 @@
+# patch-id: backup-report-3stage-hbar-3.82
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.45 | 26.11.2026 17:58)
 # patch-id: direct-cloud-write-setting-3.76
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.44 | 26.11.2026 14:20)
 # patch-id: d1-upload-refresh-true-3.63
@@ -141,6 +143,50 @@ class _EmbeddedDialog(tk.Frame):
 	def destroy(self):
 		if callable(self._on_close_cb):self._on_close_cb()
 		super().destroy()
+def _render_report_3stage_bar(dlg, p, d, fam, fs, lang, k_sc):
+    t_srv = sum(float(d.get(k) or 0) for k in ('srv_db_sec', 'srv_copy_sec', 'srv_chk_sec', 'srv_hist_sec', 'srv_proc_sec', 'srv_pack_sec', 'srv_sec', 'srv_prep_sec'))
+    t_net = float(d.get('dl_sec') or 0)
+    t_loc = sum(float(d.get(k) or 0) for k in ('crc_sec', 'ver_sec', 'sha_sec', 'mir_sec', 'net_sec'))
+    t_all = max(0.1, t_srv + t_net + t_loc)
+    box = tk.Frame(dlg, bg=p['card'], bd=1, relief='solid', padx=14, pady=8)
+    box.pack(fill='x', padx=16, pady=(0, 8))
+    cv = tk.Canvas(box, height=max(24, int(26 * k_sc)), bg=p['log_bg'], highlightthickness=1, highlightbackground=p['border'])
+    cv.pack(fill='x')
+    leg = tk.Frame(box, bg=p['card'])
+    leg.pack(fill='x', pady=(5, 0))
+    items = [
+        ('\u0421\u0435\u0440\u0432\u0435\u0440' if lang == 'uk' else 'Server', t_srv, '#818cf8'),
+        ('\u041c\u0435\u0440\u0435\u0436\u0430' if lang == 'uk' else 'Network', t_net, '#38bdf8'),
+        ('\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430/\u0434\u0438\u0441\u043a' if lang == 'uk' else 'Verify/Disk', t_loc, '#22c55e'),
+    ]
+    for name, val, col in items:
+        pct = int(round(val / t_all * 100))
+        dur_s = format_duration(val, lang).partition(' (').__getitem__(0)
+        tk.Label(leg, text='\u25a0', bg=p['card'], fg=col, font=(fam, fs, 'bold')).pack(side='left', padx=(0, 3))
+        tk.Label(leg, text=f"{name}: {dur_s} ({pct}%)", bg=p['card'], fg=p['text'], font=(fam, max(8, fs - 1))).pack(side='left', padx=(0, 14))
+    def _draw(_e=None):
+        if not cv.winfo_exists():
+            return
+        cv.delete('all')
+        w_g = max(200, cv.winfo_width())
+        h_g = max(20, cv.winfo_height())
+        act = [(n, v, c) for (n, v, c) in items if v > 0]
+        if not act:
+            return
+        raw_w = [max(6.0, w_g * (v / t_all)) for (_, v, _) in act]
+        sc_w = w_g / max(1.0, sum(raw_w))
+        cx = 0.0
+        for idx, ((n, v, c), rw) in enumerate(zip(act, raw_w)):
+            sw = (w_g - cx) if idx == len(act) - 1 else (rw * sc_w)
+            x2 = cx + sw
+            cv.create_rectangle(cx, 0, x2, h_g, fill=c, outline=p['card'], width=1)
+            pct = int(round(v / t_all * 100))
+            if sw >= 54:
+                cv.create_text((cx + x2) / 2, h_g / 2, text=f"{pct}%", fill='#0f172a', font=(fam, max(8, fs - 1), 'bold'))
+            cx = x2
+    cv.bind('<Configure>', _draw)
+    dlg.after(30, _draw)
+
 class DialogsMixin:
 	def _ui_fam(self):
 		if hasattr(self,'_base_fam')and self._base_fam:return self._base_fam
@@ -222,7 +268,7 @@ class DialogsMixin:
 			dlg.protocol(_A5,_close_rep);tot_s=max(.1,float(d.get('total_sec',.1)));tot_disp=format_duration(tot_s,lang).partition(_s).__getitem__(0);fn_s=d.get(_AA,'backup.zip');sz_s=d.get('size_mb',_T);fc_s=d.get('files_cnt',0);ts_a=d.get('ts_start',_X);ts_b=d.get('ts_end',_X);spd_s=d.get('spd_mbs',_T);srv_spd_s=float(d.get('srv_spd_mbs')or 0);top_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);top_c.pack(fill=_C,padx=16,pady=(12,8));import ipaddress as _ipa;from urllib.parse import urlparse as _up;srv_raw=str(d.get('srv')or self.engine.state.get(_A3,'')).strip();_h=_up(srv_raw).hostname or srv_raw if srv_raw else''
 			try:_is_lan=_ipa.ip_address(_h).is_private or _ipa.ip_address(_h).is_loopback
 			except Exception:_is_lan=_h.endswith('.local')or _h in('localhost',)
-			net_tag=('Локальна мережа / LAN'if _is_lan else'Інтернет / Зовнішній')if lang==_B else'Local Network / LAN'if _is_lan else'Internet / External';srv_disp=f"{srv_raw}  [{net_tag}]"if srv_raw else _X;tk.Label(top_c,text=f"Файл архіву:  {fn_s}"if lang==_B else f"Archive file:  {fn_s}",bg=p[_A],fg=p[_Q],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Джерело (сервер):  {srv_disp}"if lang==_B else f"Source server:  {srv_disp}",bg=p[_A],fg=p[_U]if _is_lan else p[_b],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));_fc_part=(f" ({fc_s} файлів)"if lang==_B else f" ({fc_s} files)")if int(fc_s or 0)>0 else'';tk.Label(top_c,text=f"Розмір:  {sz_s} МБ{_fc_part}   •   CRC32 + SHA-256: Підтверджено"if lang==_B else f"Size:  {sz_s} MB{_fc_part}   •   CRC32 + SHA-256: Verified",bg=p[_A],fg=p[_D],font=(fam,fs+2),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_disp})"if lang==_B else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_disp})",bg=p[_A],fg=p[_U],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g);mid_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);mid_c.pack(fill=_C,padx=16,pady=(0,8));mid_c.columnconfigure(0,weight=1);raw_stages=([('Підключення до бази даних:'if lang==_B else'Server database connection:',d.get('srv_db_sec',_T),p[_Q])]if float(d.get('srv_db_sec',0)or 0)>0 else[])+[('Збір та копіювання даних на сервері:'if lang==_B else'Server data collection & copy:',d.get('srv_copy_sec',_T),p[_D]),('Перевірка файлів на сервері:'if lang==_B else'Server file verification:',d.get('srv_chk_sec',_T),p[_D])]+([('Копіювання історії розумних пристроїв:'if lang==_B else'Smart devices history copy:',d.get('srv_hist_sec',_T),p[_Q])]if float(d.get('srv_hist_sec',0)or 0)>0 else[])+[('Обробка на сервері:'if lang==_B else'Processing on server:',d.get('srv_proc_sec',_T),p[_D]),(f'Стиснення та пакування TAR.ZST на сервері ({srv_spd_s} {_AB}):'if lang==_B and srv_spd_s>0 else f'Server TAR.ZST packing ({srv_spd_s} {_AC}):'if srv_spd_s>0 else'Стиснення та пакування TAR.ZST на сервері:'if lang==_B else'Server TAR.ZST archive packing:',d.get('srv_pack_sec',d.get('srv_sec',_T)),p[_D]),('Підготовка та аналіз на сервері:'if lang==_B else'Server preparation & scan:',d.get('srv_prep_sec',_T),p[_D]),(f"Скачування по мережі ({spd_s} {_AB if lang==_B else _AC}):"if lang==_B else f"Network download ({spd_s} MB/s):",d.get('dl_sec',_T),p[_Q]),('Перевірка архіву CRC32 (програма):'if lang==_B else'Local CRC32 integrity check:',d.get('crc_sec',d.get('ver_sec',_T)),p[_D]),('Розрахунок та звірка SHA-256:'if lang==_B else'Local SHA-256 hash verification:',d.get('sha_sec',_T),p[_D])]
+			net_tag=('Локальна мережа / LAN'if _is_lan else'Інтернет / Зовнішній')if lang==_B else'Local Network / LAN'if _is_lan else'Internet / External';srv_disp=f"{srv_raw}  [{net_tag}]"if srv_raw else _X;tk.Label(top_c,text=f"Файл архіву:  {fn_s}"if lang==_B else f"Archive file:  {fn_s}",bg=p[_A],fg=p[_Q],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Джерело (сервер):  {srv_disp}"if lang==_B else f"Source server:  {srv_disp}",bg=p[_A],fg=p[_U]if _is_lan else p[_b],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));_fc_part=(f" ({fc_s} файлів)"if lang==_B else f" ({fc_s} files)")if int(fc_s or 0)>0 else'';tk.Label(top_c,text=f"Розмір:  {sz_s} МБ{_fc_part}   •   CRC32 + SHA-256: Підтверджено"if lang==_B else f"Size:  {sz_s} MB{_fc_part}   •   CRC32 + SHA-256: Verified",bg=p[_A],fg=p[_D],font=(fam,fs+2),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_disp})"if lang==_B else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_disp})",bg=p[_A],fg=p[_U],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g);_render_report_3stage_bar(dlg,p,d,fam,fs,lang,self.metrics[_a]);mid_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);mid_c.pack(fill=_C,padx=16,pady=(0,8));mid_c.columnconfigure(0,weight=1);raw_stages=([('Підключення до бази даних:'if lang==_B else'Server database connection:',d.get('srv_db_sec',_T),p[_Q])]if float(d.get('srv_db_sec',0)or 0)>0 else[])+[('Збір та копіювання даних на сервері:'if lang==_B else'Server data collection & copy:',d.get('srv_copy_sec',_T),p[_D]),('Перевірка файлів на сервері:'if lang==_B else'Server file verification:',d.get('srv_chk_sec',_T),p[_D])]+([('Копіювання історії розумних пристроїв:'if lang==_B else'Smart devices history copy:',d.get('srv_hist_sec',_T),p[_Q])]if float(d.get('srv_hist_sec',0)or 0)>0 else[])+[('Обробка на сервері:'if lang==_B else'Processing on server:',d.get('srv_proc_sec',_T),p[_D]),(f'Стиснення та пакування TAR.ZST на сервері ({srv_spd_s} {_AB}):'if lang==_B and srv_spd_s>0 else f'Server TAR.ZST packing ({srv_spd_s} {_AC}):'if srv_spd_s>0 else'Стиснення та пакування TAR.ZST на сервері:'if lang==_B else'Server TAR.ZST archive packing:',d.get('srv_pack_sec',d.get('srv_sec',_T)),p[_D]),('Підготовка та аналіз на сервері:'if lang==_B else'Server preparation & scan:',d.get('srv_prep_sec',_T),p[_D]),(f"Скачування по мережі ({spd_s} {_AB if lang==_B else _AC}):"if lang==_B else f"Network download ({spd_s} MB/s):",d.get('dl_sec',_T),p[_Q]),('Перевірка архіву CRC32 (програма):'if lang==_B else'Local CRC32 integrity check:',d.get('crc_sec',d.get('ver_sec',_T)),p[_D]),('Розрахунок та звірка SHA-256:'if lang==_B else'Local SHA-256 hash verification:',d.get('sha_sec',_T),p[_D])]
 			if d.get('mir_active'):raw_stages.append(('Дзеркальне копіювання:'if lang==_B else'Mirror folder copy:',d.get('mir_sec',_T),p[_U]))
 			if d.get('net_active'):raw_stages.append(('Копіювання у мережеву папку:'if lang==_B else'Network folder copy:',d.get('net_sec',_T),p[_Q]))
 			raw_stages=[(t,v,c)for(t,v,c)in raw_stages if float(v or 0)>0];stages=[(f"{i}. {t}",v,c)for(i,(t,v,c))in enumerate(raw_stages,1)]

@@ -1,5 +1,6 @@
+# patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.42 | 26.11.2026 09:50) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.43 | 26.11.2026 18:28) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -591,7 +592,7 @@ class HomeGridApp(DialogsMixin):
 			mid_txt='  •  '.join(ex_p)if ex_p else'—'
 			if getattr(A,'_last_stage_val',_B)!=(st_txt,mid_txt):A._last_stage_val=(st_txt,mid_txt);A.var_stage.set(st_txt);A.var_sched_info.set(mid_txt)
 			r=A.engine.indeterminate,A.engine.progress,C
-			if getattr(A,'_last_pct_sig',_B)!=r:A._last_pct_sig=r;A.var_pct.set(tr('пошук...',C)if A.engine.indeterminate else f"{A.engine.progress}%")
+			if getattr(A,'_last_pct_sig',_B)!=r:A._last_pct_sig=r;A.var_pct.set(('\u0437\u0431\u0456\u0440\u043a\u0430...'if C=='uk'else'working...')if A.engine.indeterminate else f"{A.engine.progress}%")
 			s=A.engine.progress,A.engine.indeterminate,A.engine.stage,D.get(A4,'v8'),bool(D.get(_a,_F))
 			if getattr(A,'_last_psig',_B)!=s or A.engine.indeterminate:A._last_psig=s;A.pbar.set_state(A.engine.progress,A.engine.indeterminate,D.get(A4,'v8'),bool(D.get(_a,_F)),A._get_palette(),A.engine.stage,D.get(_U,_V))
 			X=_W if A.engine.is_running else _Y;Y=_F;t=X,C,H,P

@@ -1,5 +1,6 @@
+# patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: force-tall-pbar-and-grid-2.74
-# [ФАЙЛ: gui/widgets.py (v2.10 | 24.11.2026 02:15) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
+# [ФАЙЛ: gui/widgets.py (v2.11 | 26.11.2026 18:28) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
 _W='hidden'
 _V='#1d6ef2'
 _U='Segoe UI'
@@ -99,7 +100,7 @@ class StyledProgressBar(tk.Canvas):
 	def __init__(A,parent,height=20,**B):super().__init__(parent,height=height,highlightthickness=0,bd=0,**B);A.pct=0;A.indet=_G;A.lite_mode=_G;A.theme=THEMES['dark'];A.lang='en';A._phase=0;A._strips=[];A._text=_A;A._cw=A._ch=0;A.bind('<Configure>',lambda e:A._rebuild())
 	def set_state(A,pct,indet,style_name,lite_mode,theme,status_lbl='',lang='en'):
 		B=theme;A.lang=lang or'en';A.pct=max(0,min(100,int(pct or 0)));A.indet=bool(indet)
-		if A.indet:A._phase=(A._phase+1)%40
+		if A.indet:A._phase=(A._phase+1)%36
 		C=bool(lite_mode)
 		if C!=A.lite_mode or B!=A.theme or A._cw==0 or abs(A.winfo_height()-A._ch)>2:A.lite_mode=C;A.theme=B;A._rebuild();return
 		A._update()
@@ -114,13 +115,13 @@ class StyledProgressBar(tk.Canvas):
 		if A.lite_mode:
 			if A._text is _A:return
 			if A.indet:
-				L=A._phase%(LITE_CHARS-4);G=['-']*LITE_CHARS
-				for M in range(4):G[L+M]='#'
-				H=f"[{''.join(G)}] {tr('пошук...',A.lang)}"
+				_span=LITE_CHARS-5;_pos=A._phase if A._phase<=_span else(2*_span-A._phase);_pos=max(0,min(_span,_pos));G=['-']*LITE_CHARS
+				for M in range(5):G[_pos+M]='#'
+				H=f"[{''.join(G)}] ..."
 			else:I=int(round(A.pct/1e2*LITE_CHARS));H=f"[{'#'*I}{'-'*(LITE_CHARS-I)}] {A.pct:3d}%"
 			A.itemconfigure(A._text,text=H);return
 		C,N=A._cw,A._ch
-		if A.indet:E=max(40,int(C*.28));B=int(A._phase/39.*(C+E)-E);D=B+E
+		if A.indet:E=max(44,int(C*.26));_t=A._phase/18. if A._phase<=18 else(36-A._phase)/18.;B=int(2+_t*max(1,C-4-E));D=B+E
 		else:B=2;D=2+int((C-4)*A.pct/1e2)
 		B,D=max(2,B),min(C-2,D)
 		for(O,P,F)in A._strips:

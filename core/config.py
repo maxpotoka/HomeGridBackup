@@ -1,3 +1,7 @@
+# patch-id: independent-1-100-per-stage-3.84
+# patch-id: pingpong-and-3stage-1-100-3.83
+# patch-id: backup-report-3stage-hbar-3.82
+# patch-id: stats-3d-bars-3.81
 # patch-id: stats-compact-x-labels-3.80
 # patch-id: stats-dynamic-cols-3.79
 # patch-id: stats-sort-desc-3.78
@@ -122,8 +126,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.80'
-BUILD_DATE='26.11.2026 17:35'
+SCRIPT_VER='3.84'
+BUILD_DATE='26.11.2026 18:50'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)

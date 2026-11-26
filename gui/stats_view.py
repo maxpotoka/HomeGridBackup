@@ -1,3 +1,5 @@
+# patch-id: stats-3d-bars-3.81
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.26 | 26.11.2026 17:45)
 # patch-id: stats-compact-x-labels-3.80
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.25 | 26.11.2026 17:35)
 # patch-id: stats-dynamic-cols-3.79
@@ -93,6 +95,22 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         low = '\u043c\u0430\u043b\u043e \u0434\u0430\u043d\u0438\u0445' if lang == 'uk' else 'low data'
         if n <= 0 or float(val or 0) <= 0: return '\u2014'
         return f"{val} {u}" + (f" ({low})" if n < 3 else "")
+    def _draw_3d_col(bx, by_top, bx_r, by_bot, theme_c):
+        dx = max(4, int(7 * k))
+        dy = max(3, int(5 * k))
+        if theme_c == 'zero':
+            cv.create_polygon(bx, by_bot - 2, bx + dx, by_bot - 2 - dy, bx_r + dx, by_bot - 2 - dy, bx_r, by_bot - 2, fill='#334155', outline='')
+            return
+        pal3d = {
+            'blue':  ('#38bdf8', '#0284c7', '#7dd3fc', '#bae6fd'),
+            'amber': ('#f59e0b', '#b45309', '#fbbf24', '#fde68a'),
+        }
+        c_front, c_side, c_top, c_hi = pal3d[theme_c]
+        cv.create_polygon(bx_r, by_bot, bx_r + dx + 4, by_bot - dy + 2, bx_r + dx + 4, by_top - dy + 4, bx_r, by_top + 2, fill='#05080f', outline='')
+        cv.create_polygon(bx_r, by_top, bx_r + dx, by_top - dy, bx_r + dx, by_bot - dy, bx_r, by_bot, fill=c_side, outline='')
+        cv.create_polygon(bx, by_top, bx + dx, by_top - dy, bx_r + dx, by_top - dy, bx_r, by_top, fill=c_top, outline='')
+        cv.create_rectangle(bx, by_top, bx_r, by_bot, fill=c_front, outline='')
+        cv.create_line(bx + 1, by_top + 1, bx_r - 1, by_top + 1, fill=c_hi)
     def _draw_vbars(rows, lkey):
         cv.delete('all')
         w, h = max(420, cv.winfo_width() or int(880 * k)), max(150, cv.winfo_height() or int(195 * k))
@@ -119,9 +137,9 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
                 val = float(r.get(vk) or 0)
                 bx = (cx - bw // 2) if len(series) == 1 else (cx - bw - 3 if idx_b == 0 else cx + 3)
                 dy = max(4, int((val / mx) * ch)) if val > 0 else 2
-                cv.create_rectangle(bx, y1 - dy, bx + bw, y1, fill=c1 if val > 0 else '#334155', outline='')
+                _draw_3d_col(bx, y1 - dy, bx + bw, y1, ('blue' if vk == 'my' else 'amber') if val > 0 else 'zero')
                 if val > 0:
-                    cv.create_text(bx + bw // 2, y1 - dy - int(9 * k), text=f"{val}", fill=c2, font=(fam, max(7, fs - 2), 'bold'))
+                    cv.create_text(bx + bw // 2 + int(3 * k), y1 - dy - int(12 * k), text=f"{val}", fill=c2, font=(fam, max(7, fs - 2), 'bold'))
             cv.create_text(cx, y1 + int(17 * k), text=_short_x(r.get(lkey)), justify='center', fill=p['text'], font=(fam, max(7, fs - 2)))
     def _draw_hw_cards(rows):
         cv.delete('all')
@@ -153,9 +171,9 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
             for bi, (_, val, c1, c2, blbl) in enumerate(bars):
                 bx = (cx - bw // 2) if len(bars) == 1 else (cx - bw - 4 if bi == 0 else cx + 4)
                 dy = max(4, int((val / mx) * ch)) if val > 0 else 2
-                cv.create_rectangle(bx, y_bot - dy, bx + bw, y_bot, fill=c1 if val > 0 else '#334155', outline='')
+                _draw_3d_col(bx, y_bot - dy, bx + bw, y_bot, ('blue' if bi == 0 and bars[0][0] == 'my' else 'amber') if val > 0 else 'zero')
                 if val > 0:
-                    cv.create_text(bx + bw // 2, y_bot - dy - int(9 * k), text=f"{val}", fill=c2, font=(fam, max(7, fs - 2), 'bold'))
+                    cv.create_text(bx + bw // 2 + int(3 * k), y_bot - dy - int(12 * k), text=f"{val}", fill=c2, font=(fam, max(7, fs - 2), 'bold'))
                 cv.create_text(bx + bw // 2, y_bot + int(10 * k), text=blbl, fill=p['muted'], font=(fam, max(7, fs - 2)))
 
     def _render_sec():
