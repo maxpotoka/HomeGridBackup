@@ -1,3 +1,4 @@
+# patch-id: server-hw-status-ui-4.03b
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
@@ -226,11 +227,11 @@ class HomeGridApp(DialogsMixin):
 		S=tk.Frame(C,bd=0,highlightthickness=0);S.grid(row=0,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.ent_srv=tk.Entry(S,width=1,textvariable=A.var_srv,bd=0,highlightthickness=1,font=(A._base_fam,B));A.ent_srv.pack(side=_E,fill=D,expand=_D,ipady=4)
 		A.btn_scan=tk.Button(S,text=_A8,command=A.on_scan_btn_click,padx=8,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_scan.pack(side=_E,padx=(6,0),fill='y')
-		C.columnconfigure(4,minsize=0);A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3);A.lbl_srv_logo=tk.Label(C,bd=0,highlightthickness=1);
+		C.columnconfigure(4,minsize=0);A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3);A.lbl_srv_logo=tk.Label(C,bd=0,highlightthickness=1);A.lbl_srv_hw=tk.Label(C,bd=0,justify='left',anchor='w',font=(A._base_fam,max(8,B-1)));
 		A.l_fav=tk.Label(C,text='\u041e\u0431\u0440\u0430\u043d\u0456:',anchor=_J,font=(A._base_fam,max(8,B-1)));A.l_fav.grid(row=1,column=0,sticky=_J,padx=(0,6),pady=3)
 		A.fav_bar=tk.Frame(C,bd=0,highlightthickness=0);A.fav_bar.grid(row=1,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.btn_hist=tk.Button(C,text='\u0406\u0441\u0442\u043e\u0440\u0456\u044f',command=A.open_history_modal,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_hist.grid(row=1,column=3,sticky=I,padx=(4,0),pady=3)
-		A.conn_sep=tk.Frame(C,height=1,bd=0,highlightthickness=0);A.conn_sep.grid(row=2,column=0,columnspan=5,sticky=H,pady=(4,4))
+		A.conn_sep=tk.Frame(C,height=1,bd=0,highlightthickness=0);A.conn_sep.grid(row=2,column=0,columnspan=6,sticky=H,pady=(4,4))
 		A.l_copies_hdr=tk.Label(C,text='\u0421\u0445\u043e\u0432\u0438\u0449\u0430:',anchor=_J,font=(A._base_fam,max(8,B-1),_C))
 		T=tk.Frame(C,bd=0,highlightthickness=0);T.grid(row=4,column=0,sticky=_J,padx=(0,6),pady=3);A.engine.state[_AO]=_D
 		A.l_dir=tk.Label(T,text='\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0430 \u043f\u0430\u043f\u043a\u0430:',anchor=_J,font=(A._base_fam,B));A.l_dir.pack(side=_E)
@@ -589,6 +590,12 @@ class HomeGridApp(DialogsMixin):
 							_pal_l=A._get_palette();A._srv_logo_img=_pimg;A.lbl_srv_logo.configure(image=_pimg,bg=_pal_l[_N],highlightbackground=_pal_l[_O]);A.lbl_srv_logo.grid(row=0,column=4,rowspan=2,sticky='ns',padx=(8,0),pady=2)
 						else:A.lbl_srv_logo.grid_forget()
 					else:A.lbl_srv_logo.grid_forget()
+			if hasattr(A,'lbl_srv_hw'):
+				_hws=(getattr(A.engine,'server_hw_status','')or'')if getattr(A.engine,'server_logo_sig',_B)else''
+				if getattr(A,'_last_srv_hw_s',_B)!=_hws:
+					A._last_srv_hw_s=_hws;_pal_h=A._get_palette()
+					if _hws:A.lbl_srv_hw.configure(text=_hws,bg=_pal_h[_N],fg=_pal_h[_P]);A.lbl_srv_hw.grid(row=0,column=5,rowspan=2,sticky='w',padx=(8,2),pady=2)
+					else:A.lbl_srv_hw.grid_forget()
 			if hasattr(A,'lbl_srv_badge'):
 				T=getattr(A.engine,'diag_net','')or'';U=getattr(A.engine,'diag_ping','')or'';AD_L=getattr(A.engine,'diag_adapter','')or'';m=T,U,AD_L,H
 				if getattr(A,'_last_srv_b_sig',_B)!=m:

@@ -1,3 +1,5 @@
+# patch-id: remove-server-version-probe-4.02
+# patch-id: health-endpoint-and-srv-version-4.00
 # patch-id: actionable-errors-and-terms-3.99c
 # patch-id: backup-logs-uk-consistency-3.98
 # patch-id: server-inverter-image-fix-display-3.93

@@ -1,3 +1,7 @@
+# patch-id: server-hw-status-fetch-4.03a
+# patch-id: remove-server-version-probe-4.02
+# patch-id: extract-hgm-web-version-4.01
+# patch-id: health-endpoint-and-srv-version-4.00
 # patch-id: actionable-errors-and-terms-3.99c
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: server-inverter-image-fix-display-3.93
@@ -225,17 +229,32 @@ def _os_gateway_and_arp():
 		else:A=subprocess.run([E,'-n','get','default'],**B).stdout or'';C=re.findall('gateway:\\s*(\\d+\\.\\d+\\.\\d+\\.\\d+)',A);A=subprocess.run([F,'-an'],**B).stdout or'';D=re.findall('\\((\\d+\\.\\d+\\.\\d+\\.\\d+)\\) at ',A)
 	except Exception:0
 	return C,D
+
 def test_hgm_stage2(base_url,state,timeout=6.):
-	E=timeout;D=state;C=base_url;I=int(time.time()*1000);J,K,F,A,A,G=invoke_http(f"{C}/api/auth/status?_t={I}",D,timeout=E,send_cli=_A,send_ses=_B)
+	E=timeout;D=state;C=base_url;I=int(time.time()*1000)
+	_hok,_hst,_hbody,_,_,_hms=invoke_http(f"{C}/api/health?_t={I}",D,timeout=min(4.,E),send_cli=_A,send_ses=_B)
+	if _hok and _hst==200 and _hbody:
+		try:
+			_hd=json.loads(_hbody)
+			if isinstance(_hd,dict):
+				_sn=str(_hd.get('service')or _hd.get('name')or _hd.get('app')or'').strip()
+				if'homegrid monitor'in _sn.lower():
+					_sv=str(_hd.get('version')or _hd.get('app_version')or _hd.get('server_version')or'').strip()
+					if isinstance(D,dict)and _sv:D['_last_srv_ver']=_sv
+					return _A,_hms
+		except Exception:0
+	J,K,F,A,A,G=invoke_http(f"{C}/api/auth/status?_t={I}",D,timeout=E,send_cli=_A,send_ses=_B)
 	if J and K==200 and F:
 		try:
 			H=json.loads(F)
-			if isinstance(H,dict)and isinstance(H.get('authenticated'),bool):return _A,G
+			if isinstance(H,dict)and isinstance(H.get('authenticated'),bool):
+				return _A,G
 		except Exception:0
 	A,L,B,A,A,M=invoke_http(f"{C}/login",D,timeout=E,send_cli=_A,send_ses=_B)
 	if L==200 and B:
 		N=bool(re.search('HomeGrid\\s+Monitor',B,re.IGNORECASE));O=bool(re.search('PV\\s+аналітики|PIN-захист|hg_client|DashboardPanelHeader',B,re.IGNORECASE))
-		if N and O:return _A,M or G
+		if N and O:
+			return _A,M or G
 	return _B,_D
 def _linux_proc_net_hints():
 	G='00000000';C,D=[],[]
@@ -445,7 +464,31 @@ def fetch_server_inverter_image(engine, srv_url, wait_timeout=0.0):
 							break
 				except Exception:
 					pass
+			hw_txt = ''
+			ok_s, st_s, bd_s, _, _, _ = invoke_http(f"{base}/api/status", engine.state, timeout=5.0)
+			if ok_s and st_s == 200 and bd_s:
+				try:
+					sd = json.loads(bd_s)
+					if isinstance(sd, dict):
+						lbl_m = str(sd.get('inverter_driver_label') or '').strip()
+						mod_m = str((sd.get('driver_status') or {}).get('resolved_model') or '').strip()
+						inv_n = f"{lbl_m} {mod_m}".strip() or 'Inverter'
+						lv = sd.get('live') or {}
+						bs = lv.get('battery_soc') or {}
+						soc_v = bs.get('value_pct') if bs.get('value_pct') is not None else lv.get('soc')
+						bat_v = lv.get('batV')
+						src_t = str(lv.get('modeText') or lv.get('source') or '').strip()
+						pb = sd.get('phone_battery') or {}
+						p_lvl = pb.get('level')
+						p_chg = ' \u26a1' if pb.get('charging') else ''
+						l1 = f"{inv_n} \u2022 {src_t}" if src_t else inv_n
+						p2 = []
+						if soc_v is not None: p2.append(f"\u0410\u041a\u0411: {int(round(float(soc_v)))}%" + (f" ({float(bat_v):.1f} \u0412)" if bat_v else ''))
+						if p_lvl is not None: p2.append(f"\u0421\u0435\u0440\u0432\u0435\u0440: {int(round(float(p_lvl)))}%{p_chg}")
+						hw_txt = l1 + ('\n' + ' \u2022 '.join(p2) if p2 else '')
+				except Exception: pass
 			with engine.lock:
+				engine.server_hw_status = hw_txt
 				engine.server_logo_bytes = raw_bytes if raw_bytes else _C
 				engine.server_logo_url = base if raw_bytes else ''
 				engine.server_logo_sig = (base, len(raw_bytes)) if raw_bytes else _C
@@ -471,7 +514,7 @@ def run_connect_task(engine,raw_url,force_skip=_B):
 		else:
 			A.set_progress(_C,f"Перевірка сайту та HGM ({C}:{D})...");N,I,J,K,G=verify_host_and_hgm(A,B)
 			if not N:A.log(J,_L);A.diag_net=f"{C}:{D} ({I})";A.diag_ping='Помилка перевірки';A.set_pill('Не є сервером HGM'if I==_W else'Сайт недоступний',_L);A.set_progress(0,J);return
-			A.state[_G]=B;commit_state(A.state);A.diag_net=f"{C}:{D} (ОНЛАЙН)";A.diag_ping=f"TCP {K} мс | API {G} мс";A.set_pill(f"ОНЛАЙН | {G} мс",_I);A.log(f"Підключено до HomeGrid Monitor: {B} (TCP: {K} мс, API: {G} мс)",_I);A.set_progress(100,'Підключення успішне');E=_A
+			A.state[_G]=B;commit_state(A.state);A.diag_net=f"{C}:{D} (ОНЛАЙН)";A.diag_ping=f"TCP {K} мс | API {G} мс";A.set_pill(f"ОНЛАЙН | {G} мс",_I);A.log(f"\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e \u0434\u043e HomeGrid Monitor: {B} (TCP: {K} \u043c\u0441, API: {G} \u043c\u0441)",_I);A.set_progress(100,'Підключення успішне');E=_A
 	finally:
 		with A.lock:A.is_running=_B;A.indeterminate=_B
 	if E:
