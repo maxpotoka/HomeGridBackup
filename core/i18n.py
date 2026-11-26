@@ -1,33 +1,5 @@
 # patch-id: i18n-packing-tarzst-3.39
-# patch-id: i18n-browse-btn-3.08
-# patch-id: i18n-gsi-304
-# patch-id: i18n-hw-bench-304
-# patch-id: backup-timeout-retry-3.00
-# patch-id: startup-version-log-2.80
-# patch-id: i18n-ping-and-retry-en-2.79
-# patch-id: opt-log-i18n-ui-2.20
-# patch-id: stage-window-2.21
-# patch-id: android-storage-fallback-2.13
-# patch-id: linux-xorg-tray-menu-2.26
-# patch-id: card-conn-copies-2.59
-# patch-id: archives-label-and-logs-dir-2.60
-# patch-id: dest-stats-bg-worker-2.61
-# patch-id: speed-journal-auto-target-2.62
-# patch-id: pcloud-inline-path-2.63
-# patch-id: lan-btn-layout68-2.64
-# patch-id: fav-servers-pills-2.65
-# patch-id: pcloud-stats-refresh-compact-2.67
 # [ФАЙЛ: core/i18n.py (v2.25 | 25.11.2026 19:40) — ПЕРЕВОД ИНТЕРФЕЙСА И СООБЩЕНИЙ (EN / UK)]
-    # patch-id: pcloud-only-simple-ui-2.27
-    # patch-id: center-storage-notepad-2.40
-    # patch-id: settings-all-tabs-homegrid-2.46
-    # patch-id: settings-two-pane-sidebar-2.47
-    # patch-id: settings-grouped-sidebar-clean-2.48
-    # patch-id: settings-logical-sections-2.49
-    # patch-id: settings-polish-labels-cloud-grid-2.50
-    # patch-id: settings-fifth-tray-tab-2.51
-    # patch-id: pcloud-retention-count-size-2.52
-    # patch-id: pcloud-disable-and-freespace-2.57
 _x='Expired:'
 _w='Speed:'
 _v='Швидкість:'

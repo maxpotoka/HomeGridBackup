@@ -1,11 +1,5 @@
-# patch-id: pcloud-speed-progress-gradient-2.33
-# patch-id: linux-wayland-sni-bridge-2.32
-# patch-id: linux-xorg-tray-menu-2.26
-# patch-id: macos-tray-quit-apps-2.41
-# patch-id: cumulative-linux-tray-pcloud-menu-2.42
 # patch-id: fix-linux-tray-menu-2.76
 # [ФАЙЛ: gui/tray.py (v2.10 | 24.11.2026 09:25)
-# patch-id: macos-quit-and-buttons-2.17
 _j='✖ Вихід'
 _i='Налаштування'
 _h='Аналіз GFS / SHA-256'

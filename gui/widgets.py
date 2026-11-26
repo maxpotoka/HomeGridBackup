@@ -1,9 +1,5 @@
-# patch-id: tall-pbar-server-marquee-2.70
 # patch-id: force-tall-pbar-and-grid-2.74
 # [ФАЙЛ: gui/widgets.py (v2.10 | 24.11.2026 02:15) — ИНДИКАТОР ПРОГРЕССА (V8 + LITE)]
-# patch-id: progress-2.09
-# patch-id: homegrid-design-system-2.45
-# patch-id: settings-two-pane-sidebar-2.47
 _W='hidden'
 _V='#1d6ef2'
 _U='Segoe UI'

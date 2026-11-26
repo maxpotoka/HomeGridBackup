@@ -1,12 +1,4 @@
 # patch-id: fix-net-drive-status-and-build-retry-2.78
-# patch-id: idle-ui-cache-2.19
-# patch-id: stage-window-2.21
-# patch-id: archive-scan-cache-2.04
-# patch-id: android-storage-fallback-2.06
-# patch-id: archives-label-and-logs-dir-2.60
-# patch-id: dest-stats-bg-worker-2.61
-# patch-id: split-last-backup-2.68
-# patch-id: fix-engine-self-2.10
 # [ФАЙЛ: core/engine.py (v2.10 | 25.11.2026 14:42) — ЯДРО ДВИЖКА BACKUPENGINE]
 _b='.sha256'
 _a='_dest_stats_started'

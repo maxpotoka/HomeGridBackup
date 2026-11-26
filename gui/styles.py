@@ -1,6 +1,4 @@
 # patch-id: tonal-contrast-layers-3.08
-# patch-id: stage-window-2.21
-# patch-id: homegrid-design-system-2.45
 # [ФАЙЛ: gui/styles.py (v2.03 | 25.11.2026 19:40) — ТЕМЫ ОФОРМЛЕНИЯ, МАСШТАБ ЭКРАНА (DPI WIN7) И TOOLTIP]
 _d='darwin'
 _c='<Enter>'

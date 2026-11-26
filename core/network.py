@@ -1,5 +1,4 @@
 # patch-id: net-scope-adapter-3.01-p1
-# patch-id: lan-scan-2.19
 # [ФАЙЛ: core/network.py (v2.02 | 22.11.2026 08:40) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 _W='NOT_HGM'
 _V='server_history'

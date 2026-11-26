@@ -1,53 +1,5 @@
 # patch-id: ubuntu-embedded-dlg-fix-3.57
-# patch-id: highlight-speeds-report-3.54
-# patch-id: center-top-report-lines-3.53
-# patch-id: larger-report-font-3.51
-# patch-id: dialogs-fair-speed-3.43
-# patch-id: dialogs-hide-zero-report-3.41
-# patch-id: speed-modal-4rows-and-headers-3.31
-# patch-id: work-speed-clamp-to-main-win-3.30
-# patch-id: leader-size-normalized-score-3.28
-# patch-id: leader-speed-and-time-score-3.27
-# patch-id: fix-d1-mode-labels-3.26
-# patch-id: settings-optin-bottleneck-toggles-3.06
-# patch-id: rename-work-speed-title-3.22
-# patch-id: fix-btop-tuple-indexing-3.19
-# patch-id: stats-tooltip-bottleneck-legend-pad-3.18
-# patch-id: net-scope-adapter-3.01-p3
-# patch-id: fix-dialogs-fstring-syntax-2.99
-# patch-id: io-pause-buf128-2.18
-# patch-id: stage-window-2.21
-# patch-id: pcloud-only-simple-ui-2.27
-# patch-id: fix-pcloud-vars-2.28
-# patch-id: fix-pcloud-nameerror-2.29
-# patch-id: pcloud-clean-hints-2.30
-# patch-id: settings-two-pane-sidebar-2.47
-# patch-id: settings-grouped-sidebar-clean-2.48
-# patch-id: settings-logical-sections-2.49
-# patch-id: settings-polish-labels-cloud-grid-2.50
-# patch-id: settings-fifth-tray-tab-2.51
-# patch-id: pcloud-retention-count-size-2.52
-# patch-id: horizontal-pcloud-and-ui-tabs-2.53
-# patch-id: pcloud-compact-sync-icon-2.54
-# patch-id: fix-tooltip-import-2.55
-# patch-id: pcloud-disable-and-freespace-2.57
-# patch-id: destination-copies-network-journal-2.58-p4
-# patch-id: archives-label-and-logs-dir-2.60
-# patch-id: speed-journal-auto-target-2.62
-# patch-id: pcloud-inline-path-2.63
-# patch-id: fav-servers-pills-2.65
-# patch-id: remove-speed-journal-ui-3.05
-# patch-id: restore-bench-tab-and-d1-legend-3.06
-# patch-id: preserve-d1-bench-in-render-3.09
-# patch-id: move-bench-to-stats-popup-3.13
-# patch-id: bench-btn-second-row-right-3.14
-# patch-id: fix-stats-first-open-empty-3.15
 # [ФАЙЛ: gui/dialogs.py (v2.39 | 25.11.2026 15:45)
-# patch-id: fix-i18n-dialogs-2.11 — МОДАЛЬНЫЕ ДИАЛОГИ, НАСТРОЙКИ, АНАЛИЗ GFS И О ПРОГРАММЕ]
-# patch-id: pcloud-speed-progress-gradient-2.33
-# patch-id: cloud-speed-stats-2.31
-# patch-id: settings-all-tabs-homegrid-2.46
-# patch-id: homegrid-design-system-2.45
 _AU='<Double-1>'
 _AT='sha_checked_mtime'
 _AS='sha_detail'

@@ -1,7 +1,5 @@
 # patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
-# patch-id: crash-faulthandler-2.03
-# patch-id: android-no-pip-install-2.02
 # [ФАЙЛ: main.py (v2.04 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 #!/usr/bin/env python3
 _E='pystray'

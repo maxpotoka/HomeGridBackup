@@ -1,11 +1,4 @@
 # patch-id: client-os-binding-3.58
-# patch-id: norm-default-ports-3.55
-# patch-id: fix-net-filter-wifi-gbps-3.49
-# patch-id: fix-srv-host-fallback-3.48
-# patch-id: fix-server-tab-stats-3.47
-# patch-id: cloud-srv-raw-and-threshold-3.46
-# patch-id: os-home-reports-dir-3.45
-# patch-id: cloud-fair-speed-3.43
 import stat, tempfile, threading
 _rep_lock = threading.Lock()
 def _reports_base_dir():
@@ -16,14 +9,6 @@ def _reports_base_dir():
 	else:
 		b = os.path.join(h, 'HomeGridBackup', _K)
 	return b
-# patch-id: accurate-dl-speed-approx-3.18
-# patch-id: show-hw-tag-in-d1-table-3.17
-# patch-id: net-scope-adapter-3.01-p2
-# patch-id: pass-bench-fields-to-ops-3.09
-# patch-id: fix-d1-devs-bench-bars-3.08
-# patch-id: merge-d1-bench-metrics-3.07
-# patch-id: d1-multi-metrics-3.06
-# patch-id: speed-file-securedir-3.05
 _h='.HomeGridBackup-sources'
 _g='net_dir'
 _f='net_speed_mbps'
@@ -158,7 +143,6 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 		for G in os.listdir(D):
 			if G.endswith(_O)and G!=R:os.remove(os.path.join(D,G))
 		with open(E,'r',encoding=_I)as V:P=[A for A in V if A.strip()]
-		# patch-id: cloud-gsi-sync-305
 		try:
 			if str(I)=='success' and F.state.get('global_speed_optin'):
 				from core.speed_bench import push_backup_speed

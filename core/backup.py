@@ -1,23 +1,5 @@
 # patch-id: per-server-pins-3.50
-# patch-id: bak-tarzst-file-count-3.42
-# patch-id: bak-disable-net-copy-3.40
-# patch-id: bak-force-tarzst-3.38
-# patch-id: history-indeterminate-time-3.34
-# patch-id: backup-32bit-pause5ms-and-log-fix-3.25
-# patch-id: main-win-adapter-badge-3.02
-# patch-id: net-scope-adapter-3.01-p2
-# patch-id: backup-timeout-retry-3.00
-# patch-id: fix-net-drive-status-and-build-retry-2.78
-# patch-id: io-pause-buf128-2.18
-# patch-id: stage-window-2.21
-# patch-id: adaptive-status-poll-2.11
-# patch-id: card-conn-copies-2.59
-# patch-id: speed-journal-auto-target-2.62
-# patch-id: tall-pbar-server-marquee-2.70
-# patch-id: single-pass-verify-speed-2.75
-# patch-id: fix-unbound-local-m-3.44
 # [ФАЙЛ: core/backup.py (v2.22 | 26.11.2026 02:25) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
-# patch-id: pcloud-speed-progress-gradient-2.33
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'

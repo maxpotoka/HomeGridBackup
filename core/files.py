@@ -1,7 +1,4 @@
 # patch-id: files-packing-tarzst-3.39
-# patch-id: full-7-server-stages-3.33
-# patch-id: smart-devices-history-phase-3.32
-# patch-id: stage-window-2.21
 # [ФАЙЛ: core/files.py (v2.08 | 22.11.2026 09:10) — ФАЙЛОВЫЕ УТИЛИТЫ WINDOWS (КОРЗИНА, ПАПКИ, ДАТЫ)]
 _B=False
 _A=True
