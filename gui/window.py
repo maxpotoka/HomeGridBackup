@@ -1,5 +1,5 @@
-# patch-id: disk-gauge-win7-text-3.60
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.40 | 25.11.2026 20:30) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# patch-id: disk-gauge-order-2.42
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.42 | 26.11.2026 09:50) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -234,7 +234,7 @@ class HomeGridApp(DialogsMixin):
 		A.ent_dir=tk.Entry(C,width=1,textvariable=A.var_dir,bd=0,highlightthickness=1,font=(A._base_fam,B));A.ent_dir.grid(row=4,column=1,sticky=H,padx=(0,4),pady=3,ipady=4)
 		A.btn_dir=tk.Button(C,text='📂 Обрати',command=A.choose_dir,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_dir.grid(row=4,column=2,sticky=I,padx=2,pady=3)
 		A.var_loc_st=tk.StringVar(value='\u2014');A.lbl_loc_st=tk.Label(C,textvariable=A.var_loc_st,anchor=_J,font=(A._base_fam,max(8,B-1)),cursor=_G);A.lbl_loc_st.grid(row=4,column=3,sticky=_J,padx=(6,0),pady=3)
-		A.lbl_loc_st.bind(K,lambda _e:A.open_backup_folder());A.btn_open_dir=tk.Button(C,text='\u2197',command=A.open_backup_folder);A.disk_bar=tk.Canvas(C,height=32,bd=0,highlightthickness=1);A.disk_bar.grid(row=5,column=0,columnspan=4,sticky=H,pady=(4,2));A.disk_bar.bind('<Configure>',lambda _e:(setattr(A,'_last_disk_sig',_B)));AR_SZ=tk.Frame(C,bd=0,highlightthickness=0);AR_SZ.grid(row=6,column=0,columnspan=4,sticky=H,pady=(3,0));AR_L=tk.Frame(AR_SZ,bd=0,highlightthickness=0);AR_L.pack(side=G);A.var_k_size=tk.StringVar(value='0 MB');A.var_k_cnt=tk.StringVar(value='0');A.var_k_free=tk.StringVar(value='—');A.var_k_l1=tk.StringVar(value='Archives size');A.var_k_l2=tk.StringVar(value='Archives');A.var_k_l3=tk.StringVar(value='Free space');A._kpi_w=[];_kl=tk.Label(AR_L,textvariable=A.var_k_l1,font=(A._base_fam,max(8,B-1)));_kl.pack(side=_E,padx=(0,6));_kv=tk.Label(AR_L,textvariable=A.var_k_size,font=(A._base_fam,B,_C));_kv.pack(side=_E);A._kpi_w.append((AR_L,_kv,_kl));A.last_box=tk.Frame(AR_SZ,padx=8,pady=3,bd=0,highlightthickness=1);A.last_box.pack(side=_E);A.last_stripe=tk.Frame(A.last_box,width=3);A.last_stripe.pack(side=_E,fill='y',padx=(0,7));A.last_inner=tk.Frame(A.last_box);A.last_inner.pack(side=_E,fill=D);W=tk.Frame(A.last_inner);W.pack(fill=D);A.t3_cap=tk.Label(W,text='ОСТАННІЙ:',font=(A._base_fam,max(8,B-2),_C));A.t3_cap.pack(side=_E,padx=(0,5));A.t3_val=tk.Label(W,textvariable=A.var_last_bkp,font=(A._base_fam,max(8,B-1),_C));A.t3_val.pack(side=_E);A.t3_sub=tk.Label(A.last_inner,textvariable=A.var_last_bkp_sub,anchor=_J,font=(A._base_fam,max(8,B-2)));A.t3_sub.pack(fill=D)
+		A.lbl_loc_st.bind(K,lambda _e:A.open_backup_folder());A.btn_open_dir=tk.Button(C,text='\u2197',command=A.open_backup_folder);A.disk_box=tk.Frame(C,bd=0,highlightthickness=0);A.disk_box.grid(row=5,column=0,columnspan=4,sticky=H,pady=(5,2));_dh=tk.Frame(A.disk_box,bd=0,highlightthickness=0);_dh.pack(fill=D,pady=(0,3));A.var_disk_pct=tk.StringVar(value='\u0414\u0438\u0441\u043a: \u2014');A.var_disk_det=tk.StringVar(value='');A.lbl_disk_pct=tk.Label(_dh,textvariable=A.var_disk_pct,anchor=_J,font=(A._base_fam,max(9,B),_C));A.lbl_disk_pct.pack(side=_E);A.lbl_disk_det=tk.Label(_dh,textvariable=A.var_disk_det,anchor='e',font=(A._base_fam,max(8,B-1),_C));A.lbl_disk_det.pack(side=G);A.disk_bar=tk.Canvas(A.disk_box,height=12,bd=0,highlightthickness=1);A.disk_bar.pack(fill=D);A.disk_bar.bind('<Configure>',lambda _e:setattr(A,'_last_disk_sig',_B));AR_SZ=tk.Frame(C,bd=0,highlightthickness=0);AR_SZ.grid(row=6,column=0,columnspan=4,sticky=H,pady=(3,0));AR_L=tk.Frame(AR_SZ,bd=0,highlightthickness=0);AR_L.pack(side=G);A.var_k_size=tk.StringVar(value='0 MB');A.var_k_cnt=tk.StringVar(value='0');A.var_k_free=tk.StringVar(value='—');A.var_k_l1=tk.StringVar(value='Archives size');A.var_k_l2=tk.StringVar(value='Archives');A.var_k_l3=tk.StringVar(value='Free space');A._kpi_w=[];_kl=tk.Label(AR_L,textvariable=A.var_k_l1,font=(A._base_fam,max(8,B-1)));_kl.pack(side=_E,padx=(0,6));_kv=tk.Label(AR_L,textvariable=A.var_k_size,font=(A._base_fam,B,_C));_kv.pack(side=_E);A._kpi_w.append((AR_L,_kv,_kl));A.last_box=tk.Frame(AR_SZ,padx=8,pady=3,bd=0,highlightthickness=1);A.last_box.pack(side=_E);A.last_stripe=tk.Frame(A.last_box,width=3);A.last_stripe.pack(side=_E,fill='y',padx=(0,7));A.last_inner=tk.Frame(A.last_box);A.last_inner.pack(side=_E,fill=D);W=tk.Frame(A.last_inner);W.pack(fill=D);A.t3_cap=tk.Label(W,text='ОСТАННІЙ:',font=(A._base_fam,max(8,B-2),_C));A.t3_cap.pack(side=_E,padx=(0,5));A.t3_val=tk.Label(W,textvariable=A.var_last_bkp,font=(A._base_fam,max(8,B-1),_C));A.t3_val.pack(side=_E);A.t3_sub=tk.Label(A.last_inner,textvariable=A.var_last_bkp_sub,anchor=_J,font=(A._base_fam,max(8,B-2)));A.t3_sub.pack(fill=D)
 		U=tk.Frame(C,bd=0,highlightthickness=0);A.var_net_en=tk.BooleanVar(value=bool(A.engine.state.get(_l,_F))and bool(A.var_net_dir.get().strip()))
 		A.chk_net_tog=HomeGridToggle(U,variable=A.var_net_en,command=A.toggle_net_dir,compact=_D,palette=A._get_palette(),font_sz=max(8,B-1));A.chk_net_tog.pack(side=_E,padx=(0,5))
 		A.l_net=tk.Label(U,text='\u041c\u0435\u0440\u0435\u0436\u0430',anchor=_J,font=(A._base_fam,max(8,B-1)),cursor=_G);A.l_net.pack(side=_E);A.l_net.bind(K,lambda _e:A.chk_net_tog._on_click_compact())
@@ -304,6 +304,7 @@ class HomeGridApp(DialogsMixin):
 		if hasattr(A,'t3_sub'):A.t3_sub.configure(bg=B[_N],fg=B[_H],font=G)
 		if hasattr(A,'last_box'):A.last_box.configure(bg=B[_N],highlightbackground=B[_O]);A.last_inner.configure(bg=B[_N]);A.t3_cap.configure(bg=B[_N]);A.t3_val.configure(bg=B[_N]);A.last_stripe.configure(bg=B[_K])
 		if hasattr(A,'disk_bar'):A.disk_bar.configure(bg=B[_N],highlightbackground=B[_O])
+		if hasattr(A,'lbl_disk_pct'):A.lbl_disk_pct.configure(bg=B[_A],fg=B[_H],font=F);A.lbl_disk_det.configure(bg=B[_A],fg=B[_I],font=G)
 		if hasattr(A,'lbl_spark'):A.lbl_spark.configure(bg=B[_A],fg=B[_I],font=N)
 		if hasattr(A,'spark_cv'):A.spark_cv.configure(bg=B[_N],highlightbackground=B[_O])
 		if hasattr(A,'lbl_pct'):A.lbl_pct.configure(bg=B[_N],fg=B[_K],highlightbackground=B[_O],font=F)
@@ -517,22 +518,22 @@ class HomeGridApp(DialogsMixin):
 				A._last_disk_sig=j;sz_s=f"{round(i/1024.0,2)} {'ГБ'if C=='uk'else'GB'}"if i>=1024 else f"{round(i,1)} {'МБ'if C=='uk'else'MB'}";fr_s=f"{Q} {'ГБ'if C=='uk'else'GB'}"if Q>=0 else'—';A.var_k_size.set(sz_s);A.var_k_cnt.set(str(h));A.var_k_free.set(fr_s);A.var_k_l1.set('Обсяг архівів'if C=='uk'else'Archives size');A.var_k_l2.set('Архівів'if C=='uk'else'Archives');A.var_k_l3.set('Вільно'if C=='uk'else'Free space')
 				B_p=A._get_palette()
 				if hasattr(A,'disk_bar')and A.disk_bar.winfo_exists():
-					A.disk_bar.delete('all');bw=max(160,A.disk_bar.winfo_width());bh=32;A.disk_bar.create_rectangle(0,0,bw,bh,fill=B_p[_N],outline='')
+					A.disk_bar.delete('all');bw=max(160,A.disk_bar.winfo_width());bh=12;_fcol=B_p.get('bg','#0f172a')if H==_Z else B_p.get(_O,'#cbd5e1');A.disk_bar.create_rectangle(1,1,bw-1,bh-1,fill=_fcol,outline='')
+					_lbl_d='\u0414\u0438\u0441\u043a'if C=='uk'else'Disk';_lbl_b='\u0410\u0440\u0445\u0456\u0432\u0438'if C=='uk'else'Backups';_lbl_f='\u0412\u0456\u043b\u044c\u043d\u043e'if C=='uk'else'Free';_ug='\u0413\u0411'if C=='uk'else'GB';iw=max(10,bw-2)
 					try:
-						import shutil as _sh_u;_du=_sh_u.disk_usage(D.get(_R)or'.');_tot=max(1,_du.total);_bkp_b=int(i*1048576);_oth_b=max(0,_du.used-_bkp_b)
-						w_oth=int(bw*min(0.94,_oth_b/_tot));w_bkp=max(10,int(bw*min(1.0,_bkp_b/_tot)))if i>0 else 0
-						if w_oth>0:A.disk_bar.create_rectangle(0,0,w_oth,bh,fill=B_p[_O],outline='')
-						if w_bkp>0:x0=min(bw-w_bkp,w_oth);A.disk_bar.create_rectangle(x0,0,x0+w_bkp,bh,fill=B_p[_K],outline='')
-						_pct_u=int(round(_du.used/_tot*100));_tot_g=int(round(_tot/1073741824.))
-						_lbl_d='Диск'if C=='uk'else'Disk';_lbl_b='Архіви'if C=='uk'else'Backups';_lbl_f='Вільно'if C=='uk'else'Free'
-						A.disk_bar.create_text(10,bh//2,text=f"{_lbl_d}: {_pct_u}%",anchor='w',fill=B_p[_H],font=(A._base_fam,max(9,g),_C))
-						A.disk_bar.create_text(bw-10,bh//2,text=f"{_lbl_b}: {sz_s}  •  {_lbl_f}: {fr_s} / {_tot_g} {'ГБ'if C=='uk'else'GB'}",anchor='e',fill=B_p[_H],font=(A._base_fam,max(8,g-1),_C))
+						import shutil as _sh_u;_du=_sh_u.disk_usage(D.get(_R)or'.');_tot=max(1,_du.total);_bkp_b=min(_du.used,int(i*1048576));_oth_b=max(0,_du.used-_bkp_b)
+						x1=1+int(round(iw*(_bkp_b/_tot)));x2=1+int(round(iw*((_bkp_b+_oth_b)/_tot)))
+						if _bkp_b>0 and x1<=4:x1=min(bw-1,5)
+						if _oth_b>0 and x2<=x1:x2=min(bw-1,x1+3)
+						_pct_u=int(round(_du.used/_tot*100));_bcol=B_p[_T]if _pct_u>=95 else(B_p[_b]if _pct_u>=85 else B_p[_K]);_ocol='#475569'if H==_Z else'#94a3b8'
+						if x1>1:A.disk_bar.create_rectangle(1,1,x1,bh-1,fill=_bcol,outline='')
+						if x2>x1:A.disk_bar.create_rectangle(x1+(1 if x1>1 else 0),1,x2,bh-1,fill=_ocol,outline='')
+						_tot_g=round(_tot/1073741824.,1);_tot_g=int(_tot_g)if _tot_g.is_integer()else _tot_g
+						A.var_disk_pct.set(f"{_lbl_d}: {_pct_u}%");A.var_disk_det.set(f"{_lbl_b}: {sz_s}  \u2022  {_lbl_f}: {fr_s} / {_tot_g} {_ug}")
 					except Exception:
-						tot_gb=(i/1024.0)+max(0.0,float(Q));pct_f=int(round((i/1024.0)/max(0.1,tot_gb)*100))if tot_gb>0 else 0;fill_w=max(6,int(bw*min(1.0,(i/1024.0)/max(0.1,tot_gb))))if i>0 else 0
-						if fill_w>0:A.disk_bar.create_rectangle(0,0,fill_w,bh,fill=B_p[_K],outline='')
-						_lbl_b='рхіви'if C=='uk'else'Backups';_lbl_f='ільно'if C=='uk'else'Free'
-						A.disk_bar.create_text(10,bh//2,text=f"{_lbl_b}: {pct_f}%",anchor='w',fill=B_p[_H],font=(A._base_fam,max(9,g),_C))
-						A.disk_bar.create_text(bw-10,bh//2,text=f"{_lbl_b}: {sz_s}  •  {_lbl_f}: {fr_s}",anchor='e',fill=B_p[_H],font=(A._base_fam,max(8,g-1),_C))
+						tot_gb=(i/1024.0)+max(0.0,float(Q));pct_f=int(round((i/1024.0)/max(0.1,tot_gb)*100))if tot_gb>0 else 0;fill_w=max(4,int(round(iw*min(1.0,(i/1024.0)/max(0.1,tot_gb)))))if i>0 else 0
+						if fill_w>0:A.disk_bar.create_rectangle(1,1,1+fill_w,bh-1,fill=B_p[_K],outline='')
+						A.var_disk_pct.set(f"{_lbl_b}: {pct_f}%");A.var_disk_det.set(f"{_lbl_b}: {sz_s}  \u2022  {_lbl_f}: {fr_s}")
 				if hasattr(A,'lbl_spark')and hasattr(A,'spark_cv')and A.spark_cv.winfo_exists():
 					A.spark_cv.delete('all');A._spark_nodes=[];sw=max(160,A.spark_cv.winfo_width());bot_y=68
 					for gy in(14,41,bot_y):A.spark_cv.create_line(6,gy,sw-38,gy,fill=B_p[_O],dash=(2,3))

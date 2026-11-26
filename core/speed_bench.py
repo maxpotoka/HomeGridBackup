@@ -4,7 +4,9 @@ import tkinter as tk
 from core.config import SCRIPT_VER, SECURE_DIR
 
 _LAST_D1_ERR = ''
+# patch-id: live-d1-sync-3.47
 D1_API_BASE = 'https://workers.dev'
+_SYNCED_IDS_FILE = os.path.join(SECURE_DIR, 'd1_synced_ids.json')
 _CACHE_FILE = os.path.join(SECURE_DIR, 'd1_speed_cache.json')
 _LOCAL_BENCH_FILE = os.path.join(SECURE_DIR, 'local_bench_history.jsonl')
 
@@ -123,6 +125,7 @@ def fetch_global_stats(scope='ALL'):
         if 200 <= code < 300 and isinstance(raw, dict):
             items = raw.get('samples') or raw.get('summary') or raw.get('rows') or []
             if isinstance(items, list) and items:
+                items = [_norm_d1_row(x) for x in items if isinstance(x, dict)]
                 os.makedirs(SECURE_DIR, exist_ok=True)
                 try:
                     with open(_CACHE_FILE, 'w', encoding='utf-8') as wf:
@@ -135,10 +138,84 @@ def fetch_global_stats(scope='ALL'):
     if os.path.isfile(_CACHE_FILE):
         try:
             with open(_CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f) or []
+                raw_c = json.load(f) or []
+                return [_norm_d1_row(x) for x in raw_c if isinstance(x, dict)]
         except Exception:
             pass
     return []
+
+def _norm_d1_row(r):
+    d = dict(r)
+    ad = str(d.get('adapter') or '').strip()
+    if not d.get('kind'):
+        d['kind'] = 'bench' if ad.lower() == 'bench' else 'backup'
+    if not d.get('spd_mbs') and d.get('avg_spd') is not None:
+        d['spd_mbs'] = float(d.get('avg_spd') or 0)
+    if not d.get('srv_mbs') and d.get('avg_srv') is not None:
+        d['srv_mbs'] = float(d.get('avg_srv') or 0)
+    if not d.get('cpu_mbs') and d.get('avg_cpu') is not None:
+        d['cpu_mbs'] = float(d.get('avg_cpu') or 0)
+    if not d.get('disk_w_mbs') and d.get('avg_disk_w') is not None:
+        d['disk_w_mbs'] = float(d.get('avg_disk_w') or 0)
+    if not d.get('disk_r_mbs') and d.get('avg_disk_r') is not None:
+        d['disk_r_mbs'] = float(d.get('avg_disk_r') or 0)
+    return d
+
+_D1_SYNC_LOCK = threading.Lock()
+def sync_local_history_to_d1(state, ops=None):
+    if not (state or {}).get('global_speed_optin', False):
+        return
+    def _job():
+        if not _D1_SYNC_LOCK.acquire(blocking=False):
+            return
+        try:
+            os.makedirs(SECURE_DIR, exist_ok=True)
+            seen = set()
+            if os.path.isfile(_SYNCED_IDS_FILE):
+                try:
+                    seen = set(json.load(open(_SYNCED_IDS_FILE, encoding='utf-8')) or [])
+                except Exception:
+                    seen = set()
+            aid = _anon_id(state)
+            changed = False
+            for b in load_local_benchmarks()[-15:]:
+                bid = f"b_{round(float(b.get('ts') or 0), 2)}"
+                if bid in seen or float(b.get('disk_w_mbs') or 0) <= 0:
+                    continue
+                pl = {'anon_id': aid, 'os_label': str(b.get('os_label') or _os_tag())[:64],
+                      'hw_tag': _hw_tag(), 'kind': 'bench', 'adapter': 'Bench',
+                      'sha_mbs': float(b.get('sha_mbs') or 0), 'scope': 'LAN',
+                      'spd_mbs': float(b.get('disk_w_mbs') or 0),
+                      'cpu_mbs': float(b.get('cpu_mbs') or 0),
+                      'disk_w_mbs': float(b.get('disk_w_mbs') or 0),
+                      'disk_r_mbs': float(b.get('disk_r_mbs') or 0), 'app_ver': SCRIPT_VER}
+                try:
+                    c, d = _cf_http('/submit', method='POST', payload=pl)
+                    if 200 <= c < 300 and isinstance(d, dict) and d.get('ok'):
+                        seen.add(bid); changed = True
+                except Exception:
+                    break
+            for o in (ops or [])[:25]:
+                oid = str(o.get('operation_id') or o.get('timestamp') or '')
+                sp = float(o.get('spd_f') or o.get('download_speed_mbps') or 0)
+                if not oid or f"o_{oid}" in seen or sp <= 0 or o.get('spd_approx'):
+                    continue
+                os_v = f"{o.get('platform', '')} {str(o.get('platform_version', '')).partition('-')[0]}".strip() or _os_tag()
+                ad_v = o.get('net_adapter_label') or o.get('net_adapter_type') or 'Backup'
+                ok = push_backup_speed(
+                    state, os_v, ad_v, o.get('scope_norm') or o.get('net_scope') or 'LAN',
+                    o.get('mb_f') or o.get('size_mb') or 0, o.get('dur_f') or o.get('duration_sec') or 0,
+                    sp, str(o.get('app_version') or SCRIPT_VER),
+                    float(o.get('srv_speed_mbps') or 0), int(o.get('net_link_mbps') or 0),
+                    str(o.get('srv_host') or o.get('srv_norm') or ''), int(o.get('buf_kb') or 64))
+                if ok:
+                    seen.add(f"o_{oid}"); changed = True
+            if changed:
+                with open(_SYNCED_IDS_FILE, 'w', encoding='utf-8') as wf:
+                    json.dump(sorted(seen)[-300:], wf)
+        finally:
+            _D1_SYNC_LOCK.release()
+    threading.Thread(target=_job, daemon=True).start()
 
 def open_compact_bench_popup(parent, state, palette, fs, fam, get_dir_cb, on_done=None):
     lang = (state or {}).get('lang', 'en')
