@@ -1,3 +1,4 @@
+# patch-id: d1-mine-backup-safe-3.68
 # patch-id: d1-sync-keys-fix-3.61
 # patch-id: d1-cache-toggle-setting-3.58
 # patch-id: owner-prefix-anon-3.56
@@ -378,6 +379,46 @@ def build_three_section_stats(engine, refresh=True):
             return ra.split(':')[0] == own_p
         return ra == aid
     d1 = [r for r in all_d1 if not _is_mine(r)]
+    my_d1_b = [r for r in all_d1 if _is_mine(r) and str(r.get('kind') or '') == 'backup']
+    if my_d1_b:
+        _loc_os = {str(x.get('system_info') or x.get('platform') or '').partition('(').__getitem__(0).strip() for x in ops if x.get('system_info') or x.get('platform')}
+        for _mr in my_d1_b:
+            _mos_full = str(_mr.get('os_label') or '').strip()
+            _mos_base = _mos_full.partition('(').__getitem__(0).strip()
+            if _mos_base and _mos_base not in _loc_os:
+                _sz = float(_mr.get('size_mb') or 100.0)
+                _sp = float(_mr.get('spd_mbs') or 0.0)
+                _sv = float(_mr.get('srv_mbs') or 0.0)
+                if _sp <= 0 and _sv <= 0:
+                    continue
+                _dur = round(_sz / _sp, 2) if _sp > 0 else 1.0
+                _sh = _canon_srv_label(_mr.get('srv_host'), st)
+                _sc = str(_mr.get('scope') or 'LAN')
+                _ad = str(_mr.get('adapter') or 'Backup')
+                ops.append({
+                    'event': 'success',
+                    'system_info': _mos_full,
+                    'platform': _mos_base,
+                    'srv_host': _sh,
+                    'srv_norm': _sh,
+                    'net_adapter_label': _ad,
+                    'net_adapter_type': _ad,
+                    'net_lbl': _ad,
+                    'net_link_mbps': int(_mr.get('link_mbps') or 0),
+                    'scope_norm': _sc,
+                    'net_scope': _sc,
+                    'dev_label': _mos_full,
+                    'buf_kb': int(_mr.get('buf_kb') or 64),
+                    'mb_f': _sz,
+                    'size_mb': _sz,
+                    'dur_f': _dur,
+                    'duration_sec': _dur,
+                    'spd_f': _sp,
+                    'net_spd_f': _sp,
+                    'download_speed_mbps': _sp,
+                    'srv_speed_mbps': _sv,
+                    'spd_approx': False,
+                })
     srv_my = {}
     for o in ops:
         sv = float(o.get('srv_speed_mbps') or 0)
