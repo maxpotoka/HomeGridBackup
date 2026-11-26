@@ -1,3 +1,4 @@
+# patch-id: strict-ssl-verify-3.75
 # patch-id: main-nuitka-global-ssl-3.73
 # patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
@@ -20,8 +21,8 @@ try:
 	if _ca_p and os.path.isfile(_ca_p):
 		os.environ.setdefault('SSL_CERT_FILE',_ca_p);os.environ.setdefault('REQUESTS_CA_BUNDLE',_ca_p)
 		ssl._create_default_https_context=lambda *_a,**_kw:ssl.create_default_context(cafile=_ca_p)
-	elif sys.platform=='darwin':
-		ssl._create_default_https_context=ssl._create_unverified_context
+	else:
+		sys.stderr.write('[HomeGridBackup] WARNING: CA bundle not found, strict SSL verification kept\n')
 except Exception:0
 try:import faulthandler;_crash_dir=os.path.join(os.path.expanduser('~'),'.backup_hgm');os.makedirs(_crash_dir,exist_ok=_A);_crash_fp=open(os.path.join(_crash_dir,'crash.log'),'a',encoding='utf-8');faulthandler.enable(_crash_fp)
 except Exception:0

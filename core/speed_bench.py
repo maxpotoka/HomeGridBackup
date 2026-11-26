@@ -1,3 +1,4 @@
+# patch-id: strict-ssl-verify-3.75
 # patch-id: macos-nuitka-ssl-d1-3.72
 # patch-id: d1-post-200-none-fix-3.66
 # patch-id: d1-submit-debug-ascii-3.64
@@ -88,7 +89,7 @@ def _d1_ssl_ctx():
                 return ssl.create_default_context(cafile=_ca)
             except Exception:
                 pass
-    return ssl._create_unverified_context()
+    return ssl.create_default_context()
 
 def _cf_http(path, method='GET', payload=None, timeout=8.0):
     body = json.dumps(payload, ensure_ascii=False).encode('utf-8') if payload is not None else None
