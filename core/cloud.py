@@ -1,3 +1,4 @@
+# patch-id: py38-win32-no-removesuffix-3.74
 # patch-id: cloud-union-d1-keys-3.71
 # patch-id: d1-mine-backup-safe-3.68
 # patch-id: d1-sync-keys-fix-3.61
@@ -330,7 +331,11 @@ def _os_arch_lbl(raw_sys, os_bit=''):
     return f"{base} ({b})"
 
 def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb, est=''):
-    sh = str(srv_h or '').strip().removesuffix(':443').removesuffix(':80') or 'Unknown server'
+    sh = str(srv_h or '').strip()
+    for _suf in (':443', ':80'):
+        if sh.endswith(_suf):
+            sh = sh[:-len(_suf)]
+    sh = sh or 'Unknown server'
     os_s = _os_arch_lbl(os_lbl)
     base = _grp_lbl(sc, ad, lk, est)
     b_kb = int(buf_kb or 64)

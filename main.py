@@ -1,3 +1,4 @@
+# patch-id: main-nuitka-global-ssl-3.73
 # patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
 # [ФАЙЛ: main.py (v2.04 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
@@ -7,7 +8,21 @@ _D='keyring'
 _C='send2trash'
 _B=False
 _A=True
-import ctypes,os,subprocess,sys
+import ctypes,os,ssl,subprocess,sys
+try:
+	_ca_p=''
+	try:
+		import certifi as _cert;_ca_p=_cert.where()
+	except Exception:0
+	if not(_ca_p and os.path.isfile(_ca_p)):
+		for _cand_ca in('/etc/ssl/cert.pem','/usr/local/etc/openssl@3/cert.pem','/opt/homebrew/etc/openssl@3/cert.pem','/etc/ssl/certs/ca-certificates.crt'):
+			if os.path.isfile(_cand_ca):_ca_p=_cand_ca;break
+	if _ca_p and os.path.isfile(_ca_p):
+		os.environ.setdefault('SSL_CERT_FILE',_ca_p);os.environ.setdefault('REQUESTS_CA_BUNDLE',_ca_p)
+		ssl._create_default_https_context=lambda *_a,**_kw:ssl.create_default_context(cafile=_ca_p)
+	elif sys.platform=='darwin':
+		ssl._create_default_https_context=ssl._create_unverified_context
+except Exception:0
 try:import faulthandler;_crash_dir=os.path.join(os.path.expanduser('~'),'.backup_hgm');os.makedirs(_crash_dir,exist_ok=_A);_crash_fp=open(os.path.join(_crash_dir,'crash.log'),'a',encoding='utf-8');faulthandler.enable(_crash_fp)
 except Exception:0
 from core.config import IS_ANDROID

@@ -1,3 +1,4 @@
+# patch-id: macos-nuitka-ssl-d1-3.72
 # patch-id: d1-post-200-none-fix-3.66
 # patch-id: d1-submit-debug-ascii-3.64
 # patch-id: d1-upload-refresh-true-3.63
@@ -8,7 +9,7 @@
 # patch-id: auto-owner-canon-srv-3.50
 # patch-id: d1-always-send-3.48
 # patch-id: client-os-binding-3.58
-import hashlib, json, os, platform, struct, tempfile, threading, time, urllib.request, zlib
+import hashlib, json, os, platform, ssl, struct, tempfile, threading, time, urllib.request, zlib
 import tkinter as tk
 from core.config import SCRIPT_VER, SECURE_DIR
 
@@ -29,8 +30,8 @@ def _os_tag():
     s = platform.system()
     r = str(platform.release() or '').partition('-')[0].strip()
     if s == 'Darwin':
-        mv = platform.mac_ver()[0] if platform.mac_ver() else r
-        return f"macOS {mv[0].partition('.')[0][0]}" if mv else 'macOS'
+        mv = str((platform.mac_ver()[0] if platform.mac_ver() else '') or r).strip()
+        return f"macOS {mv}" if mv else 'macOS'
     b_str = f'{struct.calcsize("P")*8}-bit'
     if s == 'Linux':
         dist = ''
@@ -73,13 +74,29 @@ def _owner_id(st):
         return hashlib.sha256(f'hgm-owner:{tok}'.encode('utf-8')).hexdigest()[:32]
     return _anon_id(d)
 
+def _d1_ssl_ctx():
+    try:
+        import certifi
+        ca = certifi.where()
+        if ca and os.path.isfile(ca):
+            return ssl.create_default_context(cafile=ca)
+    except Exception:
+        pass
+    for _ca in ('/etc/ssl/cert.pem', '/usr/local/etc/openssl@3/cert.pem', '/opt/homebrew/etc/openssl@3/cert.pem'):
+        if os.path.isfile(_ca):
+            try:
+                return ssl.create_default_context(cafile=_ca)
+            except Exception:
+                pass
+    return ssl._create_unverified_context()
+
 def _cf_http(path, method='GET', payload=None, timeout=8.0):
     body = json.dumps(payload, ensure_ascii=False).encode('utf-8') if payload is not None else None
     hdrs = {'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'}
     if body is not None:
         hdrs['Content-Type'] = 'application/json'
     req = urllib.request.Request(f"{D1_API_BASE}{path}", data=body, headers=hdrs, method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=_d1_ssl_ctx()) as resp:
         txt = resp.read().decode('utf-8', errors='replace').strip()
         return resp.status, (json.loads(txt) if txt.startswith('{') else None)
 
