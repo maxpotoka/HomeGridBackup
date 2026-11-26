@@ -1,3 +1,4 @@
+# patch-id: backup-logs-uk-consistency-3.98
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: tar-zst-verify-and-i18n-3.89
 # patch-id: tar-zst-log-label-3.88
@@ -8,7 +9,7 @@
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.31 | 27.11.2026 01:08) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.32 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -302,7 +303,7 @@ def _copy_to_mirror(engine,out_file,sha_file):
 					if os.path.exists(O):os.remove(O)
 				except OSError:0
 			I+=1
-		if I:B.log(f"Network rotation: removed {I} oldest archive(s).",_H)
+		if I:B.log(f"\u0420\u043e\u0442\u0430\u0446\u0456\u044f \u043c\u0435\u0440\u0435\u0436\u0456: \u0432\u0438\u0434\u0430\u043b\u0435\u043d\u043e {I} \u0441\u0442\u0430\u0440\u0438\u0445 \u0430\u0440\u0445\u0456\u0432\u0456\u0432.",_H)
 		shutil.copy2(D,os.path.join(A,os.path.basename(D)))
 		if os.path.exists(F):shutil.copy2(F,os.path.join(A,os.path.basename(F)))
 		B.log(f"Дзеркальну копію збережено у: {A}",_F)
@@ -447,8 +448,8 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 	A.set_pill('Резервне копіювання...','work');F=time.time();i=datetime.now().strftime(AB);from core.cloud import new_operation_id as AJ;C=AJ();B='';D=_C;_record_cloud_event(A,C,'started',stage='server_connection',archive_sequence=max(0,int(A.state.get(f,0)))+1)
 	try:
 		L=_A;R=_B;A.state[_O]=_A;A.state[_T]=_B
-		if not L and not R:raise RuntimeError('No storage enabled (Local and Network are both OFF).')
-		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"Local: {j}"]if L else[])+([f"Network: {A.state.get(_K)}"]if R else[]);A.log('Targets: '+' | '.join(AL),_H)
+		if not L and not R:raise RuntimeError('\u041d\u0435 \u0443\u0432\u0456\u043c\u043a\u043d\u0435\u043d\u043e \u0436\u043e\u0434\u043d\u043e\u0433\u043e \u0441\u0445\u043e\u0432\u0438\u0449\u0430 (\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0435 \u0442\u0430 \u041c\u0435\u0440\u0435\u0436\u0435\u0432\u0435 \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e).')
+		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u043e: {j}"]if L else[])+([f"\u041c\u0435\u0440\u0435\u0436\u0430: {A.state.get(_K)}"]if R else[]);A.log('\u041f\u0440\u0438\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044f: '+' | '.join(AL),_H)
 		if L and R:A.log('Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.',_H)
 		AM=time.time();_record_cloud_event(A,C,_M,stage=AC);k,AN,AO=_backup_stage1_prepare(A,raw_url,force_skip);_record_cloud_event(A,C,_J,stage=AC,duration_sec=time.time()-AM,result=g);AP=time.time();_record_cloud_event(A,C,'milestone',stage='server_job_ready');AQ,H,l=_download_backup_zip(A,k,AN,AO,j,C);B=AQ;S=time.time();M=os.path.getsize(B);D=M/1048576.;_record_cloud_event(A,C,_M,stage=AD,archive=B);_record_cloud_event(A,C,_M,stage=AE,archive=B);m,AR=(1,97);A.set_progress(m,f"Перевірка CRC32 + SHA-256: 0.0 / {D:.1f} МБ");AS=0;n=time.time()
 		_vbuf=262144 if _IS_32BIT else 1048576
@@ -501,7 +502,7 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 				try:
 					if X and os.path.exists(X):os.remove(X)
 				except OSError:0
-			A.log('Temp local archive removed (Local storage is OFF).',_H)
+			A.log('\u0422\u0438\u043c\u0447\u0430\u0441\u043e\u0432\u0438\u0439 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0438\u0439 \u0430\u0440\u0445\u0456\u0432 \u0432\u0438\u0434\u0430\u043b\u0435\u043d\u043e (\u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0435 \u0441\u0445\u043e\u0432\u0438\u0449\u0435 \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e).',_H)
 		if A.state[_Z]:commit_state(A.state);A.log('Налаштування та ключі захищено збережено.',_F)
 		from core.gfs import apply_gfs_cleanup as Ac,compute_gfs_plan as Ad;A.set_progress(98,'Ротація бекапів за обраною стратегією...');Ae=time.time();_record_cloud_event(A,C,_M,stage=AG,archive=B);Y,Y,A2=Ad(A.state);A3=len(A2);A4=_B
 		if not skip_cleanup and not NO_CLEAN and(h or bool(A.state.get('silent_cleanup',_B))):Af,Y,Y=Ac(A,skip_prompt=_A,sync_cloud=_B);A4=Af==len(A2)

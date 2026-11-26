@@ -1,8 +1,9 @@
+# patch-id: no-pip-auto-install-and-uk-tray-hints-3.96
 # patch-id: strict-ssl-verify-3.75
 # patch-id: main-nuitka-global-ssl-3.73
 # patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
-# [ФАЙЛ: main.py (v2.04 | 23.11.2026 16:35) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v2.07 | 27.11.2026 01:25) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 #!/usr/bin/env python3
 _E='pystray'
 _D='keyring'
@@ -56,11 +57,10 @@ if not is_compiled_app()and not IS_ANDROID:
 		try:__import__(_mod)
 		except ImportError:_missing_pkgs.append(_pkg)
 	if _missing_pkgs:
-		print(f"[HomeGrid Backup] Устанавливаю недостающие пакеты: {', '.join(_missing_pkgs)} ...",flush=_A)
-		try:
-			_res=subprocess.run([sys.executable,'-m','pip','install','--user']+_missing_pkgs,timeout=300)
-			if _res.returncode!=0:print(f"[HomeGrid Backup] Ошибка установки (код {_res.returncode}). Установите вручную: pip install {' '.join(_missing_pkgs)}",flush=_A)
-		except Exception as _e:print(f"[HomeGrid Backup] Не удалось установить пакеты: {_e}",flush=_A)
+		_apt_map={'pillow':'python3-pil','zstandard':'python3-zstandard','keyring':'python3-keyring','send2trash':'python3-send2trash'}
+		_apt_pkgs=[_apt_map[p]for p in _missing_pkgs if p in _apt_map]
+		_hint_cmd=(f"sudo apt install {' '.join(_apt_pkgs)}"if _apt_pkgs else f"pip install --break-system-packages {' '.join(_missing_pkgs)}")if sys.platform.startswith('linux')else f"pip install {' '.join(_missing_pkgs)}"
+		print(f"[HomeGrid Backup] \u0412\u0456\u0434\u0441\u0443\u0442\u043d\u0456 \u043f\u0430\u043a\u0435\u0442\u0438: {', '.join(_missing_pkgs)}. \u0412\u0441\u0442\u0430\u043d\u043e\u0432\u0456\u0442\u044c \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u044e: {_hint_cmd}",flush=_A)
 from core.backup import run_backup_task
 from core.config import CLI_MODE,GUI_MODE,HIDDEN_MODE,NO_CLEAN,SILENT_MODE
 from core.engine import BackupEngine

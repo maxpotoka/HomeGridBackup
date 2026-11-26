@@ -1,5 +1,6 @@
+# patch-id: no-pip-auto-install-and-uk-tray-hints-3.96
 # patch-id: fix-linux-tray-menu-2.76
-# [ФАЙЛ: gui/tray.py (v2.10 | 24.11.2026 09:25)
+# [ФАЙЛ: gui/tray.py (v2.11 | 27.11.2026 01:25)
 _j='✖ Вихід'
 _i='Налаштування'
 _h='Аналіз GFS / SHA-256'
@@ -108,7 +109,7 @@ _TRAY_STARTED=_C
 _TRAY_STOP=threading.Event()
 _LINUX_TRAY_MODES=_J,_L,_M,_N,_I,_E
 _MAC_TRAY_MODES=_J,_Z,_E
-TRAY_MODE_HINTS={_L:'Ubuntu/GNOME/XFCE с AppIndicator: нужен пакет gir1.2-ayatanaappindicator3-0.1. Значок должен появиться в верхней панели.',_M:'Wayland или панель StatusNotifier без доступного gi: используется системный /usr/bin/python3. Смотрите строку «AppIndicator bridge» в логе.',_N:'X11: Tkinter-меню внутри окна/панели, запасной вариант, если нет AppIndicator.',_I:'Классический XEmbed-трей: работает только на панелях с X11 System Tray.',_E:'Трей выключен, программа работает без значка.',_Z:'macOS: значок в верхнем Menu Bar через pystray. Если значка нет, смотрите «[TRAY DETAIL]» в логе.'}
+TRAY_MODE_HINTS={_L:'Ubuntu/GNOME/XFCE \u0437 AppIndicator: \u043f\u043e\u0442\u0440\u0456\u0431\u0435\u043d \u043f\u0430\u043a\u0435\u0442 gir1.2-ayatanaappindicator3-0.1. \u0417\u043d\u0430\u0447\u043e\u043a \u043c\u0430\u0454 \u0437\u0427\u044f\u0432\u0438\u0442\u0438\u0441\u044f \u0443 \u0432\u0435\u0440\u0445\u043d\u0456\u0439 \u043f\u0430\u043d\u0435\u043b\u0456.',_M:'Wayland \u0430\u0431\u043e \u043f\u0430\u043d\u0435\u043b\u044c StatusNotifier \u0431\u0435\u0437 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0433\u043e gi: \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u043e\u0432\u0443\u0454\u0442\u044c\u0441\u044f \u0441\u0438\u0441\u0442\u0435\u043c\u043d\u0438\u0439 /usr/bin/python3. \u0414\u0438\u0432\u0456\u0442\u044c\u0441\u044f \u0440\u044f\u0434\u043e\u043a \u00abAppIndicator bridge\u00bb \u0443 \u0436\u0443\u0440\u043d\u0430\u043b\u0456.',_N:'X11: Tkinter-\u043c\u0435\u043d\u044e \u0432\u0441\u0435\u0440\u0435\u0434\u0438\u043d\u0456 \u0432\u0456\u043a\u043d\u0430/\u043f\u0430\u043d\u0435\u043b\u0456, \u0437\u0430\u043f\u0430\u0441\u043d\u0438\u0439 \u0432\u0430\u0440\u0456\u0430\u043d\u0442, \u044f\u043a\u0449\u043e \u043d\u0435\u043c\u0430\u0454 AppIndicator.',_I:'\u041a\u043b\u0430\u0441\u0438\u0447\u043d\u0438\u0439 XEmbed-\u0442\u0440\u0435\u0439: \u043f\u0440\u0430\u0446\u044e\u0454 \u043b\u0438\u0448\u0435 \u043d\u0430 \u043f\u0430\u043d\u0435\u043b\u044f\u0445 \u0437 X11 System Tray.',_E:'\u0422\u0440\u0435\u0439 \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e, \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u0430 \u043f\u0440\u0430\u0446\u044e\u0454 \u0431\u0435\u0437 \u0437\u043d\u0430\u0447\u043a\u0430.',_Z:'macOS: \u0437\u043d\u0430\u0447\u043e\u043a \u0443 \u0432\u0435\u0440\u0445\u043d\u044c\u043e\u043c\u0443 Menu Bar \u0447\u0435\u0440\u0435\u0437 pystray. \u042f\u043a\u0449\u043e \u0437\u043d\u0430\u0447\u043a\u0430 \u043d\u0435\u043c\u0430\u0454, \u0434\u0438\u0432\u0456\u0442\u044c\u0441\u044f \u00ab[TRAY DETAIL]\u00bb \u0443 \u0436\u0443\u0440\u043d\u0430\u043b\u0456.'}
 def _requested_tray_backend(engine):
 	B=engine;A=str(B.state.get('tray_backend',_J)or _J).strip().lower();C=_LINUX_TRAY_MODES if os.sys.platform.startswith(_F)else _MAC_TRAY_MODES
 	if A in('',_J):return''

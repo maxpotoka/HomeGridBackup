@@ -1,3 +1,6 @@
+# patch-id: backup-logs-uk-consistency-3.98
+# patch-id: about-repo-url-3.97
+# patch-id: no-pip-auto-install-and-uk-tray-hints-3.96
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: confirm-modal-inverter-image-left-3.94
 # patch-id: server-inverter-image-fix-display-3.93
@@ -137,8 +140,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.95'
-BUILD_DATE='27.11.2026 01:18'
+SCRIPT_VER='3.98'
+BUILD_DATE='27.11.2026 01:35'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)

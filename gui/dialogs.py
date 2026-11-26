@@ -1,3 +1,5 @@
+# patch-id: about-repo-url-3.97
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.49 | 27.11.2026 01:30)
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: confirm-modal-inverter-image-left-3.94
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.48 | 27.11.2026 01:18)
@@ -585,7 +587,7 @@ class DialogsMixin:
 			self.engine.op_history=[];self.engine.state[_AG]=[];commit_state(self.engine.state);_populate()
 		tk.Button(bf,text='🗑 Очистити журнал'if lang==_B else'🗑 Clear History',command=_clear_ops,bg=p[_A],fg=p[_V],font=(_N,fs),padx=12,pady=5,cursor=_R).pack(side=_J);tk.Button(bf,text=tr(_w,lang),command=dlg.destroy,bg=p[_A],fg=p[_D],font=(_N,fs),padx=14,pady=5,cursor=_R).pack(side=_K)
 	def open_about(self):
-		A='https://github.com';import webbrowser;from core.config import BUILD_DATE;fs=self.metrics[_k];k=self.metrics[_a];lang=self.engine.state.get(_F,_E);fam=_A9 if self.engine.state.get(_A8,_S)else self._get_palette().get('font',_N);dlg,p,_=self._make_dialog(f"{tr('Про програму',lang)} — HomeGrid Backup v{SCRIPT_VER}",560,320)
+		A='https://github.com/maxpotoka/HomeGridBackup';import webbrowser;from core.config import BUILD_DATE;fs=self.metrics[_k];k=self.metrics[_a];lang=self.engine.state.get(_F,_E);fam=_A9 if self.engine.state.get(_A8,_S)else self._get_palette().get('font',_N);dlg,p,_=self._make_dialog(f"{tr('Про програму',lang)} — HomeGrid Backup v{SCRIPT_VER}",560,320)
 		if lang==_B:info=f"HomeGrid Backup  •  Версія v{SCRIPT_VER} (збірка від {BUILD_DATE})\n\n• Нативне резервне копіювання даних та налаштувань інвертора без браузера.\n• Перевірка цілісності архівів за CRC32 + SHA-256 та дзеркалювання.\n• Автоматична GFS-ротація копій та запуск за розкладом.";repo_lbl='Репозиторій проєкту:'
 		else:info=f"HomeGrid Backup  •  Version v{SCRIPT_VER} (build {BUILD_DATE})\n\n• Native backup of inverter data and settings without a browser.\n• Archive integrity verification via CRC32 + SHA-256 and mirroring.\n• Automatic GFS backup rotation and scheduled execution.";repo_lbl='Project repository:'
 		tk.Label(dlg,text=info,bg=p[_G],fg=p[_D],justify=_J,wraplength=int(510*k),font=(fam,fs)).pack(padx=18,pady=(16,8),anchor=_L,fill=_C);rf=tk.Frame(dlg,bg=p[_G]);rf.pack(fill=_C,padx=18,pady=(0,8));tk.Label(rf,text=repo_lbl,bg=p[_G],fg=p[_O],font=(fam,fs)).pack(side=_J);lnk=tk.Label(rf,text=A,bg=p[_G],fg=p[_Q],font=(fam,fs,'underline'),cursor=_R);lnk.pack(side=_J,padx=(6,0));lnk.bind(_AO,lambda _e:webbrowser.open(A));dlg.bind(_AJ,lambda _e:dlg.destroy());dlg.bind(_A7,lambda _e:dlg.destroy());tk.Button(dlg,text=tr(_w,lang),command=dlg.destroy,bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=int(22*k),pady=int(7*k),cursor=_R).pack(side=_Z,anchor=_i,padx=18,pady=14);self._fit_dialog(dlg)
