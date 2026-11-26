@@ -40,9 +40,12 @@ __pycache__/
 !/wlsconsol.bat
 !/icon.png
 
+
 !/console/__init__.py
 !/console/terminal.py
 
+!/gui/stats_view.py
+!/core/speed_bench.py
 !/core/__init__.py
 !/core/backup.py
 !/core/cloud.py
