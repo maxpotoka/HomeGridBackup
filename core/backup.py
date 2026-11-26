@@ -1,8 +1,11 @@
+# patch-id: keep-part-on-stream-eof-3.87
+# patch-id: http-range-resume-polish-3.86
+# patch-id: http-range-resume-download-3.85
 # patch-id: independent-1-100-per-stage-3.84
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.25 | 26.11.2026 18:50) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.28 | 27.11.2026 00:22) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -352,40 +355,58 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		except OSError:AB=0
 		AW=int(H*1.25)+104857600 if H>0 else 536870912
 		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='увімкнено тільки мережеву папку'if AA else'папка знаходиться у хмарному або мережевому сховищі';A.log(f"Режим ({AX}): спершу завантажу та перевірю у тимчасовій папці на SSD, а потім перенесу в папку призначення.",_E)
-	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження ZIP-архіву з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25
+	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження ZIP-архіву з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25;_saved_r=(D.get('sha256')or'').strip().lower();_dl_base=0
 	for O in range(1,N+1):
-		if os.path.exists(G):os.remove(G)
+		_ex_sz=os.path.getsize(G)if os.path.exists(G)else 0
+		if H>0 and _ex_sz>=H:
+			try:os.remove(G)
+			except OSError:0
+			_ex_sz=0
 		p=time.time();P=_B;X='';e=_D
 		for Ab in(_A,_B):
 			try:
+				_cur_ex=os.path.getsize(G)if os.path.exists(G)else 0
+				_pre_h=hashlib.sha256()
+				if _cur_ex>0:
+					with open(G,'rb')as _pf:
+						for _ch in iter(lambda:_pf.read(1048576),b''):_pre_h.update(_ch)
 				q=A.state.get('_jar')or http.cookiejar.CookieJar();_seed_cookie(q,n,'hg_client',AC);_seed_cookie(q,n,'homegrid_dash_session',AY);AE=[urllib.request.HTTPCookieProcessor(q)]
 				if Ab:AE.append(urllib.request.ProxyHandler({}))
-				Ac=urllib.request.build_opener(*AE);Ad=urllib.request.Request(n,headers={'User-Agent':BROWSER_UA,'Accept-Encoding':'identity'})
-				with Ac.open(Ad,timeout=300)as AF,open(G,'wb',buffering=1048576)as Ae:
-					r=(AF.headers.get('X-Checksum-Sha256')or D.get('sha256')or'').strip().lower();e=hashlib.sha256();Y=0;_net_t=_C;AG=time.time();AH=p;AI=0;Q=_D;Af=max(16384,int(A.state.get(_l,64)or 64)*1024)
-					while _A:
-						_rt0=time.perf_counter();f=AF.read(Af);_net_t+=time.perf_counter()-_rt0
-						if not f:break
-						Ae.write(f);e.update(f);Y+=len(f);g=time.time()
-						if g-AG>=1.:
-							AG=g;AJ=Y/1048576.;Ag=max(.001,g-AH);AK=(Y-AI)/1048576./Ag;Q=AK if Q is _D else .35*AK+.65*Q;AH=g;AI=Y;AL=f"{Q:.2f} МБ/с"if Q>=1. else f"{Q*1024:.0f} КБ/с";AM=f" [спроба {O}/{N}]"if O>1 else''
-							if o>0:Ah=min(99,int(Y/o*100));Ai,Aj=(1,99);A.set_progress(Ai+int(Ah*(Aj/1e2)),f"Завантаження{AM}: {AJ:.1f}/{o/1048576.:.1f} МБ | Швидкість: {AL}")
-							else:A.set_progress(50,f"Завантаження{AM}: {AJ:.1f} МБ | Швидкість: {AL}")
+				Ac=urllib.request.build_opener(*AE);_hdrs={'User-Agent':BROWSER_UA,'Accept-Encoding':'identity'}
+				if _cur_ex>0:_hdrs['Range']=f'bytes={_cur_ex}-'
+				Ad=urllib.request.Request(n,headers=_hdrs)
+				with Ac.open(Ad,timeout=300)as AF:
+					_st_code=getattr(AF,'status',200)or AF.getcode()or 200
+					if _cur_ex>0 and _st_code==206:
+						_fmode='ab';Y=_cur_ex;e=_pre_h;A.log(f'\u0414\u043e\u043a\u0430\u0447\u0443\u0432\u0430\u043d\u043d\u044f \u0437 {_cur_ex/1048576.:.1f} \u041c\u0411 (HTTP 206)...',_H)
+					else:
+						_fmode='wb';Y=0;e=hashlib.sha256()
+					r=(AF.headers.get('X-Checksum-Sha256')or _saved_r or D.get('sha256')or'').strip().lower();_saved_r=r or _saved_r;_dl_base=Y;_net_t=_C;AG=time.time();AH=p;AI=Y;Q=_D;Af=max(16384,int(A.state.get(_l,64)or 64)*1024)
+					with open(G,_fmode,buffering=1048576)as Ae:
+						while _A:
+							_rt0=time.perf_counter();f=AF.read(Af);_net_t+=time.perf_counter()-_rt0
+							if not f:break
+							Ae.write(f);e.update(f);Y+=len(f);g=time.time()
+							if g-AG>=1.:
+								AG=g;AJ=Y/1048576.;Ag=max(.001,g-AH);AK=(Y-AI)/1048576./Ag;Q=AK if Q is _D else .35*AK+.65*Q;AH=g;AI=Y;AL=f"{Q:.2f} \u041c\u0411/\u0441"if Q>=1. else f"{Q*1024:.0f} \u041a\u0411/\u0441";AM=f" [\u0441\u043f\u0440\u043e\u0431\u0430 {O}/{N}]"if O>1 else''
+								if o>0:Ah=min(99,int(Y/o*100));Ai,Aj=(1,99);A.set_progress(Ai+int(Ah*(Aj/1e2)),f"\u0417\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043d\u044f{AM}: {AJ:.1f}/{o/1048576.:.1f} \u041c\u0411 | \u0428\u0432\u0438\u0434\u043a\u0456\u0441\u0442\u044c: {AL}")
+								else:A.set_progress(50,f"\u0417\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043d\u044f{AM}: {AJ:.1f} \u041c\u0411 | \u0428\u0432\u0438\u0434\u043a\u0456\u0441\u0442\u044c: {AL}")
 				P=_A;break
 			except Exception as Ak:
 				X=str(Ak)
-				if os.path.exists(G):os.remove(G)
+				if '416' in X and os.path.exists(G):
+					try:os.remove(G)
+					except OSError:0
 		L=os.path.getsize(G)if os.path.exists(G)else 0;s=L>=int(H*.99)if H>0 else L>=1024;AN=e.hexdigest().lower()if P and e is not _D else''
 		if P and s and r and len(r)==64 and AN!=r:
 			P=_B;X='SHA-256 не збігається з контрольним хешем сервера'
 			if os.path.exists(G):os.remove(G)
 		if P and s:
-			os.replace(G,m);t=max(.05,_net_t if _net_t>.05 else time.time()-p)
+			os.replace(G,m);t=max(.05,_net_t if _net_t>.05 else time.time()-p);_dl_got=max(1,L-_dl_base)
 			if hasattr(A,_z):A._last_srv_timings[_j]=t
-			A.log(f"Архів завантажено: {L/1048576.:.2f} МБ за {round(t,1)} с",_F);_record_cloud_event(A,S,_J,stage=AQ,archive=M,size_mb=L/1048576.,size_bytes=L,duration_sec=t,speed_mbps=L/1048576./max(t,.001));return m,M,AN
+			A.log(f"Архів завантажено: {L/1048576.:.2f} МБ за {round(t,1)} с",_F);_record_cloud_event(A,S,_J,stage=AQ,archive=M,size_mb=L/1048576.,size_bytes=L,duration_sec=t,speed_mbps=_dl_got/1048576./max(t,.001));return m,M,AN
 		if P and not s:
 			X=f"завантажено лише {L/1048576.:.1f} із {H/1048576.:.1f} МБ (обрив потоку)"
-			if os.path.exists(G):os.remove(G)
 		if O<N:
 			AO=AD[min(O-1,len(AD)-1)];A.log(f"Збій завантаження ({X}). Повтор {O+1}/{N} через {AO} с...",_E)
 			for i in range(AO,0,-1):A.set_progress(75,f"Очікування мережі: повтор {O+1}/{N} через {i} с...");time.sleep(1.)
