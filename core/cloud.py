@@ -121,7 +121,7 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 	if B is not _D:B=max(_A,float(B));A[_S]=round(B,3);A['duration_ms']=round(B*1000)
 	_srv_t=float(A.get(_Y)or A.get('server_packing_sec')or 0)
 	if float(A.get('srv_speed_mbps')or 0)<=0 and _srv_t>0 and float(A.get(_R)or 0)>0:A['srv_speed_mbps']=round(float(A[_R])/_srv_t,2)
-	T={_X,'archive_sequence','srv_speed_mbps',_d,_U,_T,_Y,'server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec',_Z,_a,'mirror_enabled',_b,'net_enabled',_e,_f,'gfs_removed_count','system_info','net_scope','srv_conn_est','net_adapter_name','net_adapter_type','net_link_mbps','net_adapter_label',_c,'result','error_type'}
+	T={_X,'archive_sequence','srv_speed_mbps',_d,_U,_T,_Y,'server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec',_Z,_a,'mirror_enabled',_b,'net_enabled',_e,_f,'gfs_removed_count','system_info','net_scope','srv_conn_est','net_adapter_name','net_adapter_type','net_link_mbps','net_adapter_label','srv_host','os_bit','buf_kb',_c,'result','error_type'}
 	for N in T.intersection(C):
 		O=C[N]
 		if O is not _D:A[N]=O
@@ -289,21 +289,22 @@ def _med(v):
     return round(_st.median(x), 1) if x else 0.0
 
 def _grp_lbl(sc, ad, lk):
-    s = 'Internet' if str(sc).lower() == 'internet' else 'LAN'
-    a = str(ad or '').strip()
-    if a.lower() in ('', 'backup', 'bench'):
-        a = 'Ethernet' if s == 'LAN' else 'WAN'
+    if str(sc).lower() == 'internet':
+        return 'Internet (WAN)'
+    a_low = str(ad or '').lower()
+    is_wifi = any(w in a_low for w in ('wi-fi', 'wifi', 'wlan', 'wireless', '802.11'))
+    kind = 'Wi-Fi' if is_wifi else 'Ethernet'
     m = int(lk or 0)
     l = f'{round(m/1000.,1):g} Gbps' if m >= 1000 else (f'{m} Mbps' if m > 0 else '')
-    return f'{s}, {a} {l}'.strip() if l else f'{s}, {a}'
+    return f'LAN • {kind} ({l})' if l else f'LAN • {kind}'
 
 def _os_arch_lbl(raw_sys, os_bit=''):
     t = str(raw_sys or '').strip()
-    if '(' in t and '-bit)' in t:
+    if '-bit)' in t:
         return t
     import platform as _pl, struct as _st
     b = str(os_bit or '').strip() or f"{_st.calcsize('P')*8}-bit"
-    base = t.split('|')[0].strip() if '|' in t else (t or f"{_pl.system()} {_pl.release()}".strip())
+    base = t.split('[')[0].split('|')[0].strip() if ('[' in t or '|' in t) else (t or f"{_pl.system()} {_pl.release()}".strip())
     return f"{base} ({b})"
 
 def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb):
@@ -327,7 +328,7 @@ def build_three_section_stats(engine, refresh=True):
         rw = float(o.get('srv_raw_mb') or 0)
         if rw > 0 and tm > 0:
             sv = round(rw / tm, 2)
-        if sv <= 0 or (rw <= 0 and sv < 10):
+        if sv <= 0:
             continue
         h = str(o.get('srv_host') or o.get('srv_norm') or '').strip()
         if not h or h == 'Server':
@@ -377,7 +378,21 @@ def build_three_section_stats(engine, refresh=True):
                 continue
             dm.append(float(r.get('spd_mbs')))
         net_rows.append({'group': g, 'my': _med(v), 'd1': _med(dm), 'n_my': len(v), 'n_d1': len(dm)})
+    import platform as _pl
+    from core.speed_bench import load_local_benchmarks, _hw_tag
+    def_pc = f"{_pl.node()} ({_hw_tag()})"[:48]
     d1_b = [r for r in d1 if r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0]
-    my_b = [r for r in all_d1 if str(r.get('anon_id') or '') == aid and (r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0)]
-    hw_rows = [{'metric': m, 'my': _med([x.get(k) for x in my_b]), 'd1': _med([x.get(k) for x in d1_b]), 'n_my': len([x for x in my_b if float(x.get(k) or 0) > 0]), 'n_d1': len([x for x in d1_b if float(x.get(k) or 0) > 0])} for k, m in (('cpu_mbs', 'CPU (CRC32)'), ('sha_mbs', 'SHA-256'), ('disk_w_mbs', 'Disk Write'), ('disk_r_mbs', 'Disk Read'))]
+    my_b = load_local_benchmarks() + [r for r in all_d1 if str(r.get('anon_id') or '') == aid and (r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0)]
+    by_pc = {}
+    for x in my_b:
+        pc_n = str(x.get('pc') or def_pc).strip() or def_pc
+        by_pc.setdefault(pc_n, []).append(x)
+    if not by_pc:
+        by_pc[def_pc] = []
+    hw_rows = []
+    for pc_n, items in by_pc.items():
+        for k, m in (('cpu_mbs', 'CPU (CRC32)'), ('sha_mbs', 'SHA-256'), ('disk_w_mbs', 'Disk Write'), ('disk_r_mbs', 'Disk Read')):
+            v_my = [x.get(k) for x in items if float(x.get(k) or 0) > 0]
+            v_d1 = [x.get(k) for x in d1_b if float(x.get(k) or 0) > 0]
+            hw_rows.append({'pc': pc_n, 'metric': f"{pc_n} • {m}", 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
     return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows}

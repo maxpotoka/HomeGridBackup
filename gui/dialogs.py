@@ -425,90 +425,12 @@ class DialogsMixin:
 			_refresh()
 		btn_verify=tk.Button(bf,text=M,command=_verify,bg=p[_A],fg=p[_Q],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_verify.pack(side=_J,padx=(0,6));tk.Label(bf,text='Буфер:',bg=p[_G],fg=p[_O],font=(fam,fs)).pack(side=_J,padx=(4,4));cb_buf=ttk.Combobox(bf,textvariable=v_buf,values=list(buf_options.keys()),width=7,state=_e,font=(fam,fs));cb_buf.pack(side=_J,padx=(0,8));btn_del_bad=tk.Button(bf,text=L,command=_clean_corrupted,state=F,bg=p[_A],fg=p[_O],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_del_bad.pack(side=_J,padx=4);btn_clean_exp=tk.Button(bf,text='Очистити застарілі зараз',command=_clean,bg=p[_b],fg=p[I],disabledforeground=p[_O],font=(fam,fs,_I),padx=bpx,pady=bpy,cursor=_R);btn_clean_exp.pack(side=_J,padx=4);tk.Button(bf,text=_w,command=dlg.destroy,bg=p[_A],fg=p[_D],font=(fam,fs),padx=bpx,pady=bpy,cursor=_R).pack(side=_K);_refresh();apply_widget_i18n(dlg,self.engine.state.get(_F,_E));self._fit_dialog(dlg)
 	def open_cloud_stats_modal(self):
-		import threading
 		fs, k, lang, fam = self.metrics[_k], self.metrics[_a], self.engine.state.get(_F, _E), self._ui_fam()
-		_rw, _rh = max(640, self.root.winfo_width()), max(460, self.root.winfo_height())
-		dlg, p, _ = self._make_dialog('⚡ Статистика швидкості роботи' if lang == _B else '⚡ Work Speed Statistics', min(1040, int((_rw - 12) / max(.5, k))), min(680, int((_rh - 12) / max(.5, k))))
+		_rw, _rh = max(680, self.root.winfo_width()), max(480, self.root.winfo_height())
+		dlg, p, _ = self._make_dialog('⚡ Статистика швидкості роботи' if lang == _B else '⚡ Work Speed Statistics', min(980, int((_rw - 24) / max(.5, k))), min(640, int((_rh - 24) / max(.5, k))))
 		dlg.maxsize(_rw, _rh)
-		bf = tk.Frame(dlg, bg=p[_G])
-		bf.pack(side=_Z, fill=_C, padx=14, pady=(4, 10))
-		tk.Button(bf, text=_w if lang == _B else 'Close', command=dlg.destroy, bg=p[_A], fg=p[_D], font=(fam, fs, _I), padx=18, pady=5, cursor=_R).pack(side=_K)
-		top_bar = tk.Frame(dlg, bg=p[_G])
-		top_bar.pack(fill=_C, padx=14, pady=(8, 4))
-		lbl_st = tk.Label(top_bar, text='', bg=p[_G], fg=p[_O], font=(fam, max(8, fs - 1)))
-		lbl_st.pack(side=_K)
-		def _fmt_v(val, n):
-			u = _AB if lang == _B else _AC
-			low = 'мало даних' if lang == _B else 'low data'
-			if n <= 0 or float(val or 0) <= 0:
-				return _X
-			return f"{val} {u}" + (f" ({low})" if n < 3 else "")
-		st_tv = ttk.Style()
-		try:
-			st_tv.theme_use('clam')
-		except Exception:
-			pass
-		st_tv.configure('HGB3.Treeview', background=p[_f], foreground=p[_D], fieldbackground=p[_f], rowheight=max(26, int((fs + 16) * k)), font=(fam, fs))
-		st_tv.configure('HGB3.Treeview.Heading', background=p[_A], foreground=p[_Q], font=(fam, max(8, fs - 1), _I))
-		def _mk_sec(title_uk, title_en, col1_uk, col1_en, h_rows):
-			box = tk.Frame(dlg, bg=p[_A], bd=1, relief=_Y, padx=10, pady=6)
-			box.pack(fill=_W, expand=_H, padx=14, pady=4)
-			tk.Label(box, text=title_uk if lang == _B else title_en, bg=p[_A], fg=p[_Q], font=(fam, fs, _I)).pack(anchor=_L, pady=(0, 4))
-			tv = ttk.Treeview(box, columns=('c1', 'my', 'd1', 'n'), show='headings', height=h_rows, style='HGB3.Treeview')
-			heads = (('c1', col1_uk if lang == _B else col1_en, 210, _L), ('my', 'Мої (медіана)' if lang == _B else 'Mine (median)', 155, _g), ('d1', 'Чужі D1 (медіана)' if lang == _B else 'Others D1 (median)', 155, _g), ('n', 'n (мої / D1)' if lang == _B else 'n (mine / D1)', 95, _g))
-			for cid, ht, wc, anc in heads:
-				tv.heading(cid, text=ht)
-				tv.column(cid, width=int(wc * k), minwidth=80, anchor=anc, stretch=(cid == 'c1'))
-			tv.tag_configure('own', background='#132a3a', foreground='#38bdf8')
-			tv.pack(fill=_W, expand=_H)
-			return tv
-		tv_srv = _mk_sec('1. СЕРВЕР (швидкість збірки на HGM)', '1. SERVER (HGM build speed)', 'Сервер', 'Server', 2)
-		tv_net = _mk_sec('2. МЕРЕЖА (чисте скачування архіву, ±20% розмір)', '2. NETWORK (pure download, ±20% size)', "Тип зв'язку", 'Connection', 3)
-		tv_hw = _mk_sec('3. ЗАЛІЗО (тест ПК / диска)', '3. HARDWARE (PC / disk benchmark)', 'Метрика', 'Metric', 4)
-		def _load(refresh=_H):
-			lbl_st.configure(text='Оновлення...' if lang == _B else 'Refreshing...', fg=p[_Q])
-			def _w_fn():
-				try:
-					from core.cloud import build_three_section_stats
-					res, err = build_three_section_stats(self.engine, refresh=refresh), ''
-				except Exception as ex:
-					res, err = None, str(ex)
-				def _u():
-					if not dlg.winfo_exists():
-						return
-					if err:
-						lbl_st.configure(text=err, fg=p[_V])
-						return
-					for tv in (tv_srv, tv_net, tv_hw):
-						for rid in tv.get_children():
-							tv.delete(rid)
-					for r in res.get('server', []):
-						tags = ('own',) if r.get('n_my', 0) > 0 else ()
-						tv_srv.insert('', 'end', values=(r['name'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
-					for r in res.get('network', []):
-						tags = ('own',) if r.get('n_my', 0) > 0 else ()
-						tv_net.insert('', 'end', values=(r['group'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
-					for r in res.get('hardware', []):
-						tags = ('own',) if r.get('n_my', 0) > 0 else ()
-						tv_hw.insert('', 'end', values=(r['metric'], _fmt_v(r['my'], r['n_my']), _fmt_v(r['d1'], r['n_d1']), f"{r['n_my']} / {r['n_d1']}"), tags=tags)
-					_d1_e = getattr(__import__('core.speed_bench', fromlist=['_LAST_D1_ERR']), '_LAST_D1_ERR', '')
-					if _d1_e:
-						lbl_st.configure(text=f"D1: {_d1_e}", fg=p[_V])
-					else:
-						lbl_st.configure(text='Оновлено ✔' if lang == _B else 'Updated ✔', fg=p[_U])
-				self.root.after(0, _u)
-			threading.Thread(target=_w_fn, daemon=_H).start()
-		tk.Button(top_bar, text='🔄 Оновити' if lang == _B else '🔄 Refresh', command=lambda: _load(_H), bg=p[_A], fg=p[_Q], font=(fam, fs), padx=10, pady=2, cursor=_R).pack(side=_J, padx=(0, 8))
-		def _open_bpop():
-			from core.speed_bench import open_compact_bench_popup as _ocbp
-			_ocbp(dlg, self.engine.state, p, fs, fam, lambda: self.engine.state.get(_p, ''), on_done=lambda: _load(_H))
-		tk.Button(top_bar, text='⚡ Тест ПК/Диска' if lang == _B else '⚡ PC/Disk Test', command=_open_bpop, bg=p[_A], fg=p[_b], font=(fam, fs, _I), padx=10, pady=2, cursor=_R).pack(side=_J, padx=(0, 8))
-		def _open_ab():
-			from core.speed_bench import open_buffer_ab_popup as _oab
-			_oab(dlg, self.engine.state, p, fs, fam)
-		tk.Button(top_bar, text='🧪 Буфер 16 vs 256 КБ' if lang == _B else '🧪 Buffer 16 vs 256 KB', command=_open_ab, bg=p[_A], fg=p[_Q], font=(fam, fs), padx=10, pady=2, cursor=_R).pack(side=_J)
-		_load(_S)
-		dlg.after(40, lambda: dlg.winfo_exists() and _load(_H))
+		from gui.stats_view import show_three_tab_stats
+		show_three_tab_stats(dlg, self.root, self.engine, p, k, fs, fam, lang, _w, _p)
 	def open_stats_modal(self):
 		F='dur_cnt';E='total_dur_sec';D='avg_dur_sec';C='month_cnt';B='week_cnt';A='today_cnt';fs=self.metrics[_k];lng_c=self.engine.state.get(_F,_E);dlg,p,_=self._make_dialog('Статистика резервного копіювання',820,690);st=self.engine.get_detailed_stats()if hasattr(self.engine,'get_detailed_stats')else{};tk.Button(dlg,text=tr(_w,lng_c),command=dlg.destroy,bg=p[_A],fg=p[_D],font=(self._ui_fam(),fs,_I),padx=int(24*self.metrics[_a]),pady=int(6*self.metrics[_a])).pack(side=_Z,anchor=_i,padx=16,pady=(6,12));tk.Label(dlg,text=tr('Зведена аналітика за періодами та станом локального сховища:',lng_c),bg=p[_G],fg=p[_O],font=(self._ui_fam(),fs)).pack(anchor=_L,padx=14,pady=(10,6));grid_f=tk.Frame(dlg,bg=p[_G]);grid_f.pack(fill=_C,padx=14,pady=4)
 		for c_i in range(4):grid_f.columnconfigure(c_i,weight=1)
