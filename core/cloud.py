@@ -1,3 +1,6 @@
+# patch-id: canon-srv-lan-wan-label-3.51
+# patch-id: auto-owner-canon-srv-3.50
+# patch-id: d1-always-send-3.48
 # patch-id: live-d1-sync-3.47
 # patch-id: client-os-binding-3.58
 import stat, tempfile, threading
@@ -145,7 +148,7 @@ def record_operation_event(engine,operation_id,event,stage='',archive='',size_mb
 			if G.endswith(_O)and G!=R:os.remove(os.path.join(D,G))
 		with open(E,'r',encoding=_I)as V:P=[A for A in V if A.strip()]
 		try:
-			if str(I)=='success' and F.state.get('global_speed_optin'):
+			if str(I)=='success':
 				from core.speed_bench import push_backup_speed
 				_spd_v = float(A.get(_U) or A.get(_d) or 0)
 				if _spd_v <= 0 and float(A.get(_R) or 0) > 0 and float(A.get(_S) or 0) > 0:
@@ -338,14 +341,38 @@ def _os_base_norm(val):
         return f"Linux {pts[1].split('.')[0]}"
     return s.lower()
 
+def _canon_srv_label(raw_host, st):
+    h = str(raw_host or '').strip().replace('http://', '').replace('https://', '').split('/')[0].strip()
+    h_no_port = h.split(':')[0].strip()
+    if not h_no_port or h_no_port == 'Server':
+        h_no_port = str((st or {}).get('server') or '').replace('http://', '').replace('https://', '').split('/')[0].split(':')[0].strip()
+    cands = [str((st or {}).get('server') or '')] + list((st or {}).get('server_history') or [])
+    dom = ''
+    for c in cands:
+        ch = str(c).replace('http://', '').replace('https://', '').split('/')[0].split(':')[0].strip()
+        if ch and not ch.replace('.', '').isdigit() and ch != 'localhost':
+            dom = ch; break
+    has_lan = any(str(c).replace('http://', '').replace('https://', '').startswith(('192.168.', '10.', '172.', '127.', 'localhost')) for c in cands)
+    is_lan_ip = h_no_port.startswith(('192.168.', '10.', '172.', '127.')) or h_no_port == 'localhost'
+    if dom and (is_lan_ip or h_no_port == dom):
+        return f"{dom} (LAN + WAN)" if (has_lan or is_lan_ip) else dom
+    return h_no_port or 'Unknown server'
+
 def build_three_section_stats(engine, refresh=True):
-    from core.speed_bench import _anon_id, fetch_global_stats, sync_local_history_to_d1
+    from core.speed_bench import _anon_id, _owner_id, fetch_global_stats, sync_local_history_to_d1
     st = getattr(engine, 'state', {}) or {}
     aid = _anon_id(st)
+    oid = _owner_id(st)
     ops = fetch_cloud_speed_stats(engine, refresh=False).get('ops', [])
     sync_local_history_to_d1(st, ops)
     all_d1 = fetch_global_stats('ALL')
-    d1 = [r for r in all_d1 if not r.get('anon_id') or str(r.get('anon_id')) != aid]
+    def _is_mine(r):
+        r_oid = str(r.get('owner_id') or '')
+        r_aid = str(r.get('anon_id') or '')
+        if r_oid and oid:
+            return r_oid == oid
+        return bool(r_aid and r_aid == aid)
+    d1 = [r for r in all_d1 if not _is_mine(r)]
     srv_my = {}
     for o in ops:
         sv = float(o.get('srv_speed_mbps') or 0)
@@ -359,10 +386,7 @@ def build_three_section_stats(engine, refresh=True):
             sv = round(rw_fall / tm, 2)
         if sv <= 0:
             continue
-        h_base = str(o.get('srv_host') or o.get('srv_norm') or '').strip().removesuffix(':443').removesuffix(':80')
-        if not h_base or h_base == 'Server':
-            _hh = (st.get('server') or (st.get('server_history') or [''])[0]).replace('http://', '').replace('https://', '').strip().rstrip('/')
-            h_base = _hh or 'Unknown server'
+        h_base = _canon_srv_label(o.get('srv_host') or o.get('srv_norm'), st)
         os_c = _os_arch_lbl(o.get('system_info'), o.get('os_bit'))
         h = f"{h_base} • {os_c}"
         srv_my.setdefault(h, []).append((sv, float(o.get('srv_raw_mb') or 0) > 0, os_c))
@@ -388,9 +412,7 @@ def build_three_section_stats(engine, refresh=True):
         sp, sz = float(o.get('spd_f') or 0), float(o.get('mb_f') or 0)
         if sp <= 0 or o.get('spd_approx'):
             continue
-        sh = str(o.get('srv_host') or o.get('srv_norm') or '').strip()
-        if not sh or sh == 'Server':
-            sh = 'Unknown server'
+        sh = _canon_srv_label(o.get('srv_host') or o.get('srv_norm'), st)
         os_s = _os_arch_lbl(o.get('system_info'), o.get('os_bit'))
         b_kb = int(o.get('buf_kb') or 64)
         g = _net_pair_key(sh, os_s, o.get('scope_norm'), o.get('net_adapter_type') or o.get('net_adapter_label'), o.get('net_link_mbps'), b_kb, o.get('srv_conn_est'))
@@ -421,7 +443,7 @@ def build_three_section_stats(engine, refresh=True):
     from core.speed_bench import load_local_benchmarks, _hw_tag
     def_pc = f"{_pl.node()} ({_hw_tag()})"[:48]
     d1_b = [r for r in d1 if r.get('kind') == 'bench' or str(r.get('adapter') or '').lower() == 'bench' or float(r.get('cpu_mbs') or r.get('avg_cpu') or 0) > 0]
-    my_b = load_local_benchmarks() + [r for r in all_d1 if str(r.get('anon_id') or '') == aid and (r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0)]
+    my_b = load_local_benchmarks() + [r for r in all_d1 if _is_mine(r) and (r.get('kind') == 'bench' or float(r.get('cpu_mbs') or 0) > 0)]
     by_pc = {}
     for x in my_b:
         pc_n = str(x.get('pc') or def_pc).strip() or def_pc

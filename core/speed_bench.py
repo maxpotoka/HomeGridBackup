@@ -1,3 +1,5 @@
+# patch-id: auto-owner-canon-srv-3.50
+# patch-id: d1-always-send-3.48
 # patch-id: client-os-binding-3.58
 import hashlib, json, os, platform, struct, tempfile, threading, time, urllib.request, zlib
 import tkinter as tk
@@ -38,6 +40,16 @@ def _os_tag():
 def _anon_id(st):
     raw = str((st or {}).get('device_id') or '').strip() or f"{platform.node()}:{platform.machine()}:{platform.system()}"
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:32]
+
+def _owner_id(st):
+    d = st or {}
+    pin = str(d.get('login_pin') or '').strip()
+    if pin:
+        return hashlib.sha256(f'hgm-pin:{pin}'.encode('utf-8')).hexdigest()[:32]
+    tok = str(d.get('client_token') or '').strip()
+    if tok and tok != 'default':
+        return hashlib.sha256(f'hgm-owner:{tok}'.encode('utf-8')).hexdigest()[:32]
+    return _anon_id(d)
 
 def _cf_http(path, method='GET', payload=None, timeout=8.0):
     body = json.dumps(payload, ensure_ascii=False).encode('utf-8') if payload is not None else None
@@ -107,9 +119,7 @@ def _unused_ret():
     return {'cpu_mbs': cpu_mbs, 'sha_mbs': sha_mbs, 'disk_w_mbs': w_mbs, 'disk_r_mbs': r_mbs}
 
 def push_backup_speed(state, os_label, adapter, scope, size_mb, dur_sec, spd_mbs, app_ver=SCRIPT_VER, srv_mbs=0.0, link_mbps=0, srv_host='', buf_kb=64):
-    if not (state or {}).get('global_speed_optin', False):
-        return False
-    p = {'anon_id': _anon_id(state), 'os_label': str(os_label or _os_tag()).strip()[:64], 'hw_tag': _hw_tag(), 'adapter': str(adapter or 'Backup').strip()[:48], 'kind': 'backup', 'srv_host': str(srv_host or '').strip()[:64], 'buf_kb': int(buf_kb or 64), 'link_mbps': int(link_mbps or 0), 'size_mb': round(float(size_mb or 0), 2), 'scope': 'Internet' if str(scope).lower() == 'internet' else 'LAN', 'spd_mbs': round(float(spd_mbs or 0), 2), 'srv_mbs': round(float(srv_mbs or 0), 2), 'cpu_mbs': 0.0, 'disk_w_mbs': 0.0, 'disk_r_mbs': 0.0, 'app_ver': str(app_ver)[:16]}
+    p = {'anon_id': _anon_id(state), 'owner_id': _owner_id(state), 'os_label': str(os_label or _os_tag()).strip()[:64], 'hw_tag': _hw_tag(), 'adapter': str(adapter or 'Backup').strip()[:48], 'kind': 'backup', 'srv_host': str(srv_host or '').strip()[:64], 'buf_kb': int(buf_kb or 64), 'link_mbps': int(link_mbps or 0), 'size_mb': round(float(size_mb or 0), 2), 'scope': 'Internet' if str(scope).lower() == 'internet' else 'LAN', 'spd_mbs': round(float(spd_mbs or 0), 2), 'srv_mbs': round(float(srv_mbs or 0), 2), 'cpu_mbs': 0.0, 'disk_w_mbs': 0.0, 'disk_r_mbs': 0.0, 'app_ver': str(app_ver)[:16]}
     try:
         code, data = _cf_http('/submit', method='POST', payload=p)
         return bool(200 <= code < 300 and isinstance(data, dict) and data.get('ok'))
@@ -163,8 +173,6 @@ def _norm_d1_row(r):
 
 _D1_SYNC_LOCK = threading.Lock()
 def sync_local_history_to_d1(state, ops=None):
-    if not (state or {}).get('global_speed_optin', False):
-        return
     def _job():
         if not _D1_SYNC_LOCK.acquire(blocking=False):
             return
@@ -182,7 +190,7 @@ def sync_local_history_to_d1(state, ops=None):
                 bid = f"b_{round(float(b.get('ts') or 0), 2)}"
                 if bid in seen or float(b.get('disk_w_mbs') or 0) <= 0:
                     continue
-                pl = {'anon_id': aid, 'os_label': str(b.get('os_label') or _os_tag())[:64],
+                pl = {'anon_id': aid, 'owner_id': _owner_id(state), 'os_label': str(b.get('os_label') or _os_tag())[:64],
                       'hw_tag': _hw_tag(), 'kind': 'bench', 'adapter': 'Bench',
                       'sha_mbs': float(b.get('sha_mbs') or 0), 'scope': 'LAN',
                       'spd_mbs': float(b.get('disk_w_mbs') or 0),
@@ -200,7 +208,7 @@ def sync_local_history_to_d1(state, ops=None):
                 sp = float(o.get('spd_f') or o.get('download_speed_mbps') or 0)
                 if not oid or f"o_{oid}" in seen or sp <= 0 or o.get('spd_approx'):
                     continue
-                os_v = f"{o.get('platform', '')} {str(o.get('platform_version', '')).partition('-')[0]}".strip() or _os_tag()
+                os_v = (str(o.get('platform') or '') + ' ' + str(o.get('platform_version') or '').partition('-')[0]).strip() or _os_tag()
                 ad_v = o.get('net_adapter_label') or o.get('net_adapter_type') or 'Backup'
                 ok = push_backup_speed(
                     state, os_v, ad_v, o.get('scope_norm') or o.get('net_scope') or 'LAN',
@@ -233,9 +241,9 @@ def open_compact_bench_popup(parent, state, palette, fs, fam, get_dir_cb, on_don
     btn_ok.pack(side='bottom', pady=14)
     def _work():
         r = run_local_benchmark(get_dir_cb() if callable(get_dir_cb) else '')
-        p = {'anon_id': _anon_id(state), 'os_label': _os_tag(), 'hw_tag': _hw_tag(), 'kind': 'bench', 'adapter': 'Bench', 'sha_mbs': r.get('sha_mbs', 0.0), 'scope': 'LAN', 'spd_mbs': r['disk_w_mbs'], 'cpu_mbs': r['cpu_mbs'], 'disk_w_mbs': r['disk_w_mbs'], 'disk_r_mbs': r['disk_r_mbs'], 'app_ver': SCRIPT_VER}
+        p = {'anon_id': _anon_id(state), 'owner_id': _owner_id(state), 'os_label': _os_tag(), 'hw_tag': _hw_tag(), 'kind': 'bench', 'adapter': 'Bench', 'sha_mbs': r.get('sha_mbs', 0.0), 'scope': 'LAN', 'spd_mbs': r['disk_w_mbs'], 'cpu_mbs': r['cpu_mbs'], 'disk_w_mbs': r['disk_w_mbs'], 'disk_r_mbs': r['disk_r_mbs'], 'app_ver': SCRIPT_VER}
         sent = False
-        if (state or {}).get('global_speed_optin', False):
+        if True:
             try:
                 c, d = _cf_http('/submit', method='POST', payload=p)
                 sent = bool(200 <= c < 300 and isinstance(d, dict) and d.get('ok'))
