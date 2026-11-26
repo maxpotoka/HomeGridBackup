@@ -1,3 +1,4 @@
+# patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
 # [ФАЙЛ: core/backup.py (v2.22 | 26.11.2026 02:25) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ ZIP, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
@@ -343,7 +344,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 	A7=format_backup_dt(datetime.now());_ext='.tar.zst';M=os.path.join(a,f"homegrid_backup_DAILY_{A7}{_ext}");A8=1
 	while os.path.exists(M):M=os.path.join(a,f"homegrid_backup_DAILY_{A7}_{A8}{_ext}");A8+=1
 	import tempfile as AV;A9=_B;k=a;AA=not bool(A.state.get(_O,_A))and bool(A.state.get(_T))and bool((A.state.get(_K)or'').strip())
-	if _is_slow_or_cloud_path(a)or AA:
+	if not bool(A.state.get('direct_cloud_write',_B))and(_is_slow_or_cloud_path(a)or AA):
 		l=AV.gettempdir()
 		try:AB=shutil.disk_usage(l).free
 		except OSError:AB=0

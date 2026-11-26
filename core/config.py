@@ -1,3 +1,4 @@
+# patch-id: direct-cloud-write-setting-3.76
 # patch-id: strict-ssl-verify-3.75
 # patch-id: py38-win32-no-removesuffix-3.74
 # patch-id: main-nuitka-global-ssl-3.73
@@ -117,8 +118,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.75'
-BUILD_DATE='26.11.2026 14:15'
+SCRIPT_VER='3.76'
+BUILD_DATE='26.11.2026 14:20'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
