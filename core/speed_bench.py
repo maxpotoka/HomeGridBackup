@@ -16,7 +16,7 @@ _LAST_D1_ERR = ''
 _LAST_D1_CNT = 0
 _LAST_D1_SRC = 'none'
 # patch-id: live-d1-sync-3.47
-D1_API_BASE = 'https://workers.dev'
+D1_API_BASE = 'https://solitary-dream-3517.anyk0995.workers.dev'
 _SYNCED_IDS_FILE = os.path.join(SECURE_DIR, 'd1_synced_ids.json')
 _CACHE_FILE = os.path.join(SECURE_DIR, 'd1_speed_cache.json')
 _LOCAL_BENCH_FILE = os.path.join(SECURE_DIR, 'local_bench_history.jsonl')
