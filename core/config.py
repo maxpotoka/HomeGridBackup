@@ -1,3 +1,10 @@
+# patch-id: d1-post-200-none-fix-3.66
+# patch-id: d1-submit-debug-ascii-3.64
+# patch-id: d1-upload-refresh-true-3.63
+# patch-id: d1-sync-keys-fix-3.61
+# patch-id: d1-log-events-3.60
+# patch-id: d1-cache-default-state-3.59
+# patch-id: d1-cache-toggle-setting-3.58
 # patch-id: owner-prefix-anon-3.56
 # patch-id: stats-full-parent-width-3.55
 # patch-id: canon-srv-lan-wan-label-3.51
@@ -102,8 +109,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.56'
-BUILD_DATE='26.11.2026 10:44'
+SCRIPT_VER='3.66'
+BUILD_DATE='26.11.2026 11:30'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
@@ -301,7 +308,7 @@ def remove_server_auth(state, srv_url):
 		state['server_pins_json'] = json.dumps(m, ensure_ascii=_B) if m else ''
 		state[_I] = _A
 def load_state():
-	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],'server_pins_json':'',_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_B,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
+	O='trash';J='pcloud';B={_E:'',_F:[],_T:[],'server_pins_json':'',_U:[],_L:0,_M:.0,_x:'',_y:'',_z:'',_A0:'',_D:DEFAULT_BACKUP_DIR,_K:'',_V:_A,_G:0,_N:'',_W:_B,_O:'',_X:_B,_Y:0,_Z:.0,_a:_A,_b:_J,_c:_B,_d:J,_A2:_A,_A3:_A,_A4:0,_P:.0,_A5:_A,_e:_A1,_Q:uuid.uuid4().hex,_A6:5,_A7:7,_A8:2,_A9:4,_AA:12,_AB:3,_f:O,_g:'en',_R:'dark',_h:_J,_H:0,_i:_A,_AC:_A,_j:_J,_s:_B,_k:_B,'hw_auto_notice':'','global_speed_optin':_B,'d1_use_cache':_A,'show_bottleneck':_A,_l:'v8','archive_format':'tar.zst',_AD:_A,_AE:_B,_t:'03:00',_m:_w,_AF:_A,_AG:_B,_n:6,_o:'none',_I:_B};K=os.path.join(DEFAULT_BACKUP_DIR,_AK);E=CFG_FILE if os.path.exists(CFG_FILE)else K if os.path.exists(K)else''
 	if E:
 		try:
 			with open(E,'r',encoding=_C)as P:A=json.load(P)
@@ -337,7 +344,7 @@ def load_state():
 			B['archive_format']='tar.zst'
 			if A.get(_f)in(O,'direct','permanent'):B[_f]=A[_f]
 			if A.get(_j)in VALID_TRAY_BACKENDS:B[_j]=A[_j]
-			for F in(_s,_k,_AD,_AE,_AF,_AG,_AC,_A2,_A3,_A5,'global_speed_optin','show_bottleneck'):
+			for F in(_s,_k,_AD,_AE,_AF,_AG,_AC,_A2,_A3,_A5,'global_speed_optin', 'd1_use_cache','show_bottleneck'):
 				if isinstance(A.get(F),bool):B[F]=A[F]
 			L=str(A.get(_t)or'').strip()
 			if':'in L:
@@ -387,7 +394,7 @@ def commit_state(state):
 	try:os.makedirs(A[_D],exist_ok=_A)
 	except PermissionError:A[_D]=os.path.join(os.path.expanduser('~'),_q);os.makedirs(A[_D],exist_ok=_A)
 	if A.get(_E):record_server_history(A,A[_E])
-	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,'archive_format',_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin','show_bottleneck';G={B:A[B]for B in F};G['server_pins']=get_server_pins_map(A);D=CFG_FILE+'.tmp'
+	F=_E,_F,_T,_U,_L,_M,_D,_V,_G,_K,_N,_W,_O,_X,_Y,_Z,_a,_b,_c,_d,_A2,_A3,_A4,_P,_A5,_e,_Q,_A6,_A7,_A8,_A9,_AA,_AB,_f,_g,_R,_h,_H,_i,_AC,_j,_s,_k,_l,'archive_format',_AD,_AE,_t,_m,_AF,_AG,_n,'global_speed_optin', 'd1_use_cache','show_bottleneck';G={B:A[B]for B in F};G['server_pins']=get_server_pins_map(A);D=CFG_FILE+'.tmp'
 	with open(D,'w',encoding=_C)as H:json.dump(G,H,indent=2,ensure_ascii=_B)
 	os.replace(D,CFG_FILE);B=_B
 	if HAS_KEYRING:

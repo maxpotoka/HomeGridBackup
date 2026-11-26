@@ -1,3 +1,7 @@
+# patch-id: d1-sync-keys-fix-3.61
+# patch-id: d1-log-events-3.60
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.20 | 26.11.2026 11:20)
+# patch-id: d1-cache-toggle-setting-3.58
 # patch-id: stats-full-parent-width-3.55
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.18 | 26.11.2026 10:36)
 # patch-id: stats-short-x-os-3.54
@@ -237,8 +241,17 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
                 cb_pc.configure(values=[pc_all_lbl] + pcs)
                 _sync_filters()
                 _render_sec()
-                _d1_e = getattr(__import__('core.speed_bench', fromlist=['_LAST_D1_ERR']), '_LAST_D1_ERR', '')
-                lbl_st.configure(text=f"D1: {_d1_e}" if _d1_e else ('\u041e\u043d\u043e\u0432\u043b\u0435\u043d\u043e \u2714' if lang == 'uk' else 'Updated \u2714'), fg=p['red'] if _d1_e else p['green'])
+                _sb_m = __import__('core.speed_bench', fromlist=['_LAST_D1_ERR', '_LAST_D1_CNT', '_LAST_D1_SRC'])
+                _d1_e = getattr(_sb_m, '_LAST_D1_ERR', '')
+                _d1_n = getattr(_sb_m, '_LAST_D1_CNT', 0)
+                _d1_s = getattr(_sb_m, '_LAST_D1_SRC', 'none')
+                _ok_t = (f'\u041e\u043d\u043e\u0432\u043b\u0435\u043d\u043e \u2714 (D1: {_d1_n} \u2022 {_d1_s})' if lang == 'uk' else f'Updated \u2714 (D1: {_d1_n} \u2022 {_d1_s})')
+                lbl_st.configure(text=f"D1: {_d1_e}" if _d1_e else _ok_t, fg=p['red'] if _d1_e else p['green'])
+                if hasattr(engine, 'log'):
+                    if _d1_e:
+                        engine.log(f'[D1] омилка читання з хмари: {_d1_e}', 'err')
+                    else:
+                        engine.log(f'[D1] \u0427\u0438\u0442\u0430\u043d\u043d\u044f \u0437 \u0445\u043c\u0430\u0440\u0438: отримано {_d1_n} записів (джерело: {_d1_s})', 'ok')
             root.after(0, _u)
         threading.Thread(target=_w_fn, daemon=True).start()
 

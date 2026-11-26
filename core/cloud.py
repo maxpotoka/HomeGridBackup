@@ -1,3 +1,5 @@
+# patch-id: d1-sync-keys-fix-3.61
+# patch-id: d1-cache-toggle-setting-3.58
 # patch-id: owner-prefix-anon-3.56
 # patch-id: canon-srv-lan-wan-label-3.51
 # patch-id: auto-owner-canon-srv-3.50
@@ -365,8 +367,8 @@ def build_three_section_stats(engine, refresh=True):
     aid = _anon_id(st)
     oid = _owner_id(st)
     ops = fetch_cloud_speed_stats(engine, refresh=False).get('ops', [])
-    sync_local_history_to_d1(st, ops)
-    all_d1 = fetch_global_stats('ALL')
+    sync_local_history_to_d1(st, ops, log_fn=getattr(engine, 'log', None))
+    all_d1 = fetch_global_stats('ALL', use_cache=bool(st.get('d1_use_cache', True)))
     own_p = aid.split(':')[0] if ':' in aid else ''
     def _is_mine(r):
         ra = str(r.get('anon_id') or '')

@@ -1,4 +1,10 @@
-﻿# patch-id: owner-prefix-anon-3.56
+# patch-id: d1-post-200-none-fix-3.66
+# patch-id: d1-submit-debug-ascii-3.64
+# patch-id: d1-upload-refresh-true-3.63
+# patch-id: d1-manual-upload-btn-3.62
+# patch-id: d1-sync-keys-fix-3.61
+# patch-id: d1-cache-toggle-setting-3.58
+# patch-id: owner-prefix-anon-3.56
 # patch-id: auto-owner-canon-srv-3.50
 # patch-id: d1-always-send-3.48
 # patch-id: client-os-binding-3.58
@@ -7,6 +13,8 @@ import tkinter as tk
 from core.config import SCRIPT_VER, SECURE_DIR
 
 _LAST_D1_ERR = ''
+_LAST_D1_CNT = 0
+_LAST_D1_SRC = 'none'
 # patch-id: live-d1-sync-3.47
 D1_API_BASE = 'https://workers.dev'
 _SYNCED_IDS_FILE = os.path.join(SECURE_DIR, 'd1_synced_ids.json')
@@ -135,12 +143,20 @@ def _unused_ret():
 def push_backup_speed(state, os_label, adapter, scope, size_mb, dur_sec, spd_mbs, app_ver=SCRIPT_VER, srv_mbs=0.0, link_mbps=0, srv_host='', buf_kb=64):
     p = {'anon_id': _anon_id(state), 'owner_id': _owner_id(state), 'os_label': str(os_label or _os_tag()).strip()[:64], 'hw_tag': _hw_tag(), 'adapter': str(adapter or 'Backup').strip()[:48], 'kind': 'backup', 'srv_host': str(srv_host or '').strip()[:64], 'buf_kb': int(buf_kb or 64), 'link_mbps': int(link_mbps or 0), 'size_mb': round(float(size_mb or 0), 2), 'scope': 'Internet' if str(scope).lower() == 'internet' else 'LAN', 'spd_mbs': round(float(spd_mbs or 0), 2), 'srv_mbs': round(float(srv_mbs or 0), 2), 'cpu_mbs': 0.0, 'disk_w_mbs': 0.0, 'disk_r_mbs': 0.0, 'app_ver': str(app_ver)[:16]}
     try:
+        global _LAST_D1_ERR
         code, data = _cf_http('/submit', method='POST', payload=p)
-        return bool(200 <= code < 300 and isinstance(data, dict) and data.get('ok'))
-    except Exception:
+        ok = bool(200 <= code < 300 and (not isinstance(data, dict) or data.get('ok') is not False))
+        if not ok:
+            _LAST_D1_ERR = f'submit HTTP {code}: {data}'[:90]
+        return ok
+    except Exception as _se:
+        globals()['_LAST_D1_ERR'] = f'submit err: {_se}'[:90]
         return False
 
-def fetch_global_stats(scope='ALL'):
+def fetch_global_stats(scope='ALL', use_cache=True):
+    global _LAST_D1_CNT, _LAST_D1_SRC
+    _LAST_D1_CNT = 0
+    _LAST_D1_SRC = 'none'
     global _LAST_D1_ERR
     _LAST_D1_ERR = ''
     sc = scope if scope in ('LAN', 'Internet') else 'ALL'
@@ -148,22 +164,27 @@ def fetch_global_stats(scope='ALL'):
         code, raw = _cf_http(f"/stats?scope={sc}", method='GET')
         if 200 <= code < 300 and isinstance(raw, dict):
             items = raw.get('samples') or raw.get('summary') or raw.get('rows') or []
-            if isinstance(items, list) and items:
+            if isinstance(items, list):
                 items = [_norm_d1_row(x) for x in items if isinstance(x, dict)]
-                os.makedirs(SECURE_DIR, exist_ok=True)
-                try:
-                    with open(_CACHE_FILE, 'w', encoding='utf-8') as wf:
-                        json.dump(items, wf, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
+                _LAST_D1_CNT = len(items)
+                _LAST_D1_SRC = 'live'
+                if items:
+                    os.makedirs(SECURE_DIR, exist_ok=True)
+                    try:
+                        with open(_CACHE_FILE, 'w', encoding='utf-8') as wf:
+                            json.dump(items, wf, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
                 return items
     except Exception as _e:
         _LAST_D1_ERR = str(_e)[:80]
-    if os.path.isfile(_CACHE_FILE):
+    if use_cache and os.path.isfile(_CACHE_FILE):
         try:
             with open(_CACHE_FILE, 'r', encoding='utf-8') as f:
                 raw_c = json.load(f) or []
-                return [_norm_d1_row(x) for x in raw_c if isinstance(x, dict)]
+                res_c = [_norm_d1_row(x) for x in raw_c if isinstance(x, dict)]
+                globals().update({'_LAST_D1_CNT': len(res_c), '_LAST_D1_SRC': 'cache'})
+                return res_c
         except Exception:
             pass
     return []
@@ -186,25 +207,27 @@ def _norm_d1_row(r):
     return d
 
 _D1_SYNC_LOCK = threading.Lock()
-def sync_local_history_to_d1(state, ops=None):
+def sync_local_history_to_d1(state, ops=None, log_fn=None, force=False, on_done=None):
     def _job():
         if not _D1_SYNC_LOCK.acquire(blocking=False):
+            if callable(on_done):
+                on_done(-1)
             return
+        sent_cnt = 0
         try:
             os.makedirs(SECURE_DIR, exist_ok=True)
             seen = set()
-            if os.path.isfile(_SYNCED_IDS_FILE):
+            if not force and os.path.isfile(_SYNCED_IDS_FILE):
                 try:
                     seen = set(json.load(open(_SYNCED_IDS_FILE, encoding='utf-8')) or [])
                 except Exception:
                     seen = set()
             aid = _anon_id(state)
-            changed = False
             for b in load_local_benchmarks()[-15:]:
                 bid = f"b_{round(float(b.get('ts') or 0), 2)}"
                 if bid in seen or float(b.get('disk_w_mbs') or 0) <= 0:
                     continue
-                pl = {'anon_id': aid, 'owner_id': _owner_id(state), 'os_label': str(b.get('os_label') or _os_tag())[:64],
+                pl = {'anon_id': aid, 'os_label': str(b.get('os_label') or _os_tag())[:64],
                       'hw_tag': _hw_tag(), 'kind': 'bench', 'adapter': 'Bench',
                       'sha_mbs': float(b.get('sha_mbs') or 0), 'scope': 'LAN',
                       'spd_mbs': float(b.get('disk_w_mbs') or 0),
@@ -213,30 +236,45 @@ def sync_local_history_to_d1(state, ops=None):
                       'disk_r_mbs': float(b.get('disk_r_mbs') or 0), 'app_ver': SCRIPT_VER}
                 try:
                     c, d = _cf_http('/submit', method='POST', payload=pl)
-                    if 200 <= c < 300 and isinstance(d, dict) and d.get('ok'):
-                        seen.add(bid); changed = True
+                    if 200 <= c < 300 and (not isinstance(d, dict) or d.get('ok') is not False):
+                        seen.add(bid); sent_cnt += 1
                 except Exception:
                     break
             for o in (ops or [])[:25]:
-                oid = str(o.get('operation_id') or o.get('timestamp') or '')
-                sp = float(o.get('spd_f') or o.get('download_speed_mbps') or 0)
-                if not oid or f"o_{oid}" in seen or sp <= 0 or o.get('spd_approx'):
+                oid = str(o.get('operation_id') or o.get('ts') or o.get('started_at') or o.get('timestamp') or '').strip()
+                sp = float(o.get('spd_f') or o.get('download_speed_mbps') or o.get('speed_mbps') or 0)
+                if sp <= 0 and float(o.get('mb_f') or 0) > 0 and float(o.get('dur_f') or 0) > 0:
+                    sp = round(float(o['mb_f']) / float(o['dur_f']), 2)
+                if not oid or f"o_{oid}" in seen or sp <= 0 or (o.get('spd_approx') and not force):
                     continue
-                os_v = (str(o.get('platform') or '') + ' ' + str(o.get('platform_version') or '').partition('-')[0]).strip() or _os_tag()
+                os_raw = str(o.get('system_info') or o.get('platform') or '').strip()
+                os_v = os_raw.split('(', 1)[0].strip() if os_raw else _os_tag()
                 ad_v = o.get('net_adapter_label') or o.get('net_adapter_type') or 'Backup'
-                ok = push_backup_speed(
+                ok_p = push_backup_speed(
                     state, os_v, ad_v, o.get('scope_norm') or o.get('net_scope') or 'LAN',
                     o.get('mb_f') or o.get('size_mb') or 0, o.get('dur_f') or o.get('duration_sec') or 0,
                     sp, str(o.get('app_version') or SCRIPT_VER),
                     float(o.get('srv_speed_mbps') or 0), int(o.get('net_link_mbps') or 0),
                     str(o.get('srv_host') or o.get('srv_norm') or ''), int(o.get('buf_kb') or 64))
-                if ok:
-                    seen.add(f"o_{oid}"); changed = True
-            if changed:
+                if ok_p:
+                    seen.add(f"o_{oid}"); sent_cnt += 1
+            if sent_cnt > 0:
                 with open(_SYNCED_IDS_FILE, 'w', encoding='utf-8') as wf:
                     json.dump(sorted(seen)[-300:], wf)
+                if callable(log_fn):
+                    log_fn(f'[D1] \u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0456\u0437\u043e\u0432\u0430\u043d\u043e \u0443 \u0445\u043c\u0430\u0440\u0443: {sent_cnt} \u0437\u0430\u043f\u0438\u0441\u0456\u0432', 'ok')
+            elif force and callable(log_fn):
+                if _LAST_D1_ERR:
+                    log_fn(f'[D1] омилка вивантаження: {_LAST_D1_ERR}', 'err')
+                else:
+                    log_fn('[D1] \u041d\u0435\u043c\u0430\u0454 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0438\u0445 \u0437\u0430\u043c\u0456\u0440\u0456\u0432 \u0434\u043b\u044f \u0432\u0438\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043d\u044f', 'warn')
         finally:
             _D1_SYNC_LOCK.release()
+            if callable(on_done):
+                try:
+                    on_done(sent_cnt)
+                except Exception:
+                    pass
     threading.Thread(target=_job, daemon=True).start()
 
 def open_compact_bench_popup(parent, state, palette, fs, fam, get_dir_cb, on_done=None):
@@ -260,13 +298,13 @@ def open_compact_bench_popup(parent, state, palette, fs, fam, get_dir_cb, on_don
         if True:
             try:
                 c, d = _cf_http('/submit', method='POST', payload=p)
-                sent = bool(200 <= c < 300 and isinstance(d, dict) and d.get('ok'))
+                sent = bool(200 <= c < 300 and (not isinstance(d, dict) or d.get('ok') is not False))
             except Exception:
                 pass
         def _fin():
             if not win.winfo_exists():
                 return
-            sfx = (' • D1 ✔' if sent else ' • D1 opt-in вимк.' if lang == 'uk' else ' • D1 opt-in off')
+            sfx = (' - D1 ✔' if sent else ' - D1 opt-in вимк.' if lang == 'uk' else ' - D1 opt-in off')
             lbl.configure(text=('✔ Тест завершено!' if lang == 'uk' else '✔ Benchmark complete!') + sfx, fg=palette['green'])
             res_lbl.configure(text=f"CPU: {r['cpu_mbs']} MB/s  |  Write: {r['disk_w_mbs']} MB/s  |  Read: {r['disk_r_mbs']} MB/s")
             btn_ok.configure(state='normal')
