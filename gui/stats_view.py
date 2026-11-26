@@ -1,3 +1,7 @@
+# patch-id: stats-short-x-os-3.54
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.17 | 26.11.2026 10:33)
+# patch-id: stats-cols-widen-3.53
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.16 | 26.11.2026 10:28)
 # patch-id: ubuntu-stats-repaint-3.61
 import threading, tkinter as tk
 from tkinter import ttk
@@ -45,7 +49,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
     st_tv.configure('HGB3.Treeview', background=p['log_bg'], foreground=p['text'], fieldbackground=p['log_bg'], rowheight=max(26, int((fs + 16) * k)), font=(fam, fs))
     st_tv.configure('HGB3.Treeview.Heading', background=p['panel'], foreground=p['cyan'], font=(fam, max(8, fs - 1), 'bold'))
     tv = ttk.Treeview(tbl_f, columns=('c1', 'my', 'd1', 'n'), show='headings', height=6, style='HGB3.Treeview')
-    for cid, ht, wc, anc in (('c1', '\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440', 360, 'w'), ('my', '\u041c\u043e\u0457 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Mine (median)', 195, 'center'), ('d1', '\u0427\u0443\u0436\u0456 D1 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Others D1 (median)', 195, 'center'), ('n', 'n (\u043c\u043e\u0457 / D1)' if lang == 'uk' else 'n (mine / D1)', 110, 'center')):
+    for cid, ht, wc, anc in (('c1', '\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440', 460, 'w'), ('my', '\u041c\u043e\u0457 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Mine (median)', 165, 'center'), ('d1', '\u0427\u0443\u0436\u0456 D1 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Others D1 (median)', 165, 'center'), ('n', 'n (\u043c\u043e\u0457 / D1)' if lang == 'uk' else 'n (mine / D1)', 95, 'center')):
         tv.heading(cid, text=ht)
         tv.column(cid, width=int(wc * k), minwidth=80, anchor=anc, stretch=(cid == 'c1'))
     tv.tag_configure('own', background='#132a3a', foreground='#38bdf8')
@@ -54,16 +58,21 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
     def _short_x(raw):
         parts = [x.strip() for x in str(raw or '').split(chr(8226))]
         if len(parts) >= 2:
-            p0 = parts[0].split(':')[0].replace('://homegridmonitor.com', 'homegridmonitor')
-            p0 = p0.split('(')[0].strip()[:15]
+            p0 = parts[0].split(':')[0].split('(')[0].strip()
+            if len(p0) > 24:
+                p0 = p0[:23] + chr(8230)
             mid = ' '.join(parts[1:-1])
             net_t = 'WAN' if 'Internet' in mid else ('Wi-Fi' if 'Wi-Fi' in mid else ('Eth 1G' if '1 Gbps' in mid else ('Ethernet' if 'Ethernet' in mid else '')))
             p1 = parts[-1].replace('buf ', '').strip()[:12]
-            os_p = parts[1].split('(')[0].strip()[:12] if len(parts) >= 2 else ''
-            top = f"{net_t} \u2022 {p1}" if net_t else (os_p or p1)
+            os_raw = parts[1].split('(')[0].strip()
+            os_s = os_raw.replace('Windows ', 'W').replace('Linux', 'Lin').replace('macOS', 'Mac').split()[0][:10] if os_raw else ''
+            if net_t:
+                top = f"{net_t} {p1} ({os_s})" if os_s else f"{net_t} \u2022 {p1}"
+            else:
+                top = os_raw[:16] or p1
             return f"{top}\n({p0})"
         t = str(raw or '')
-        return (t[:17] + chr(8230)) if len(t) > 18 else t
+        return (t[:24] + chr(8230)) if len(t) > 25 else t
 
     def _fmt_v(val, n):
         u = '\u041c\u0411/\u0441' if lang == 'uk' else 'MB/s'
@@ -169,7 +178,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
             srvs = sorted({next(iter(str(r.get('group') or '').split('\u2022'))).strip() for r in state_data.get('network', []) if nf in str(r.get('group') or '') and r.get('group')})
         else:
             srvs = sorted({str(r.get('name') or '').split('\u2022')[0].strip() for r in state_data.get('server', []) if r.get('name')} | {str(r.get('group') or '').split('\u2022')[0].strip() for r in state_data.get('network', []) if r.get('group')})
-        cb_srv.configure(values=[all_lbl] + srvs)
+        cb_srv.configure(values=[all_lbl] + srvs, width=max(26, min(44, max((len(x) for x in [all_lbl] + srvs), default=26) + 2)))
         if sf != 'ALL' and sf not in srvs:
             srv_var.set('ALL'); cb_srv.set(all_lbl); sf = 'ALL'
         if sk == 'network':
@@ -240,7 +249,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         who_btns[wk] = bw_btn
 
     all_lbl = '\u0423\u0441\u0456 \u0441\u0435\u0440\u0432\u0435\u0440\u0438' if lang == 'uk' else 'All servers'
-    cb_srv = ttk.Combobox(flt_bar, state='readonly', width=24, font=(fam, max(8, fs - 1)), values=[all_lbl])
+    cb_srv = ttk.Combobox(flt_bar, state='readonly', width=36, font=(fam, max(8, fs - 1)), values=[all_lbl])
     cb_srv.set(all_lbl)
     cb_srv.pack(side='left', padx=(8, 4))
     def _on_srv(e=None):
