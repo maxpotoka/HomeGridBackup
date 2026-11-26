@@ -1,3 +1,4 @@
+# patch-id: actionable-errors-and-terms-3.99c
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: server-inverter-image-auth-3.92
@@ -342,12 +343,12 @@ def normalize_server_url(raw):
 def verify_host_and_hgm(engine,srv_url):
 	E=srv_url;C=engine;D=urlparse(E);A=D.hostname or'';B=D.port or(443 if D.scheme==_M else 80)
 	try:socket.getaddrinfo(A,B)
-	except socket.gaierror:return _B,'DNS_FAIL',f"Сайт/домен '{A}' не знайдено (помилка DNS).",_D,_D
+	except socket.gaierror:return _B,'DNS_FAIL',f"\u0421\u0430\u0439\u0442/\u0434\u043e\u043c\u0435\u043d '{A}' \u043d\u0435 \u0437\u043d\u0430\u0439\u0434\u0435\u043d\u043e (\u043f\u043e\u043c\u0438\u043b\u043a\u0430 DNS). \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0430\u0434\u0440\u0435\u0441\u0443, \u0432\u0456\u0434\u0441\u0443\u0442\u043d\u0456\u0441\u0442\u044c \u043e\u043f\u0438\u0441\u043e\u043a \u0430\u0431\u043e \u043c\u0435\u0440\u0435\u0436\u0443.",_D,_D
 	F,G=ping_host(A,2000)
 	if F:C.log(f"ICMP Ping до {A}: {G} мс",_R)
 	else:C.log(f"ICMP Ping до {A} без відповіді, перевірка з'єднання ({B})...",_O)
 	I,H=test_tcp_port(A,B,3.5)
-	if not I:return _B,'TCP_FAIL',f"Хост '{A}' існує, але порт {B} закритий або недоступний.",_D,_D
+	if not I:return _B,'TCP_FAIL',f"\u0425\u043e\u0441\u0442 '{A}' \u0456\u0441\u043d\u0443\u0454, \u0430\u043b\u0435 \u043f\u043e\u0440\u0442 {B} \u0437\u0430\u043a\u0440\u0438\u0442\u0438\u0439 \u0430\u0431\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0438\u0439. \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043f\u043e\u0440\u0442, \u043c\u0435\u0440\u0435\u0436\u0443 \u0430\u0431\u043e \u0447\u0438 \u0437\u0430\u043f\u0443\u0449\u0435\u043d\u043e \u0441\u0435\u0440\u0432\u0435\u0440 HGM.",_D,_D
 	J,K=test_hgm_stage2(E,C.state,7.)
 	if not J:return _B,_W,f"Сайт '{A}' доступний, але це НЕ сервер HomeGrid Monitor!",H,_D
 	return _A,'OK',f"{A}:{B}",G if F else H,K

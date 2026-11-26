@@ -1,3 +1,4 @@
+# patch-id: actionable-errors-and-terms-3.99c
 # patch-id: backup-logs-uk-consistency-3.98
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: tar-zst-verify-and-i18n-3.89
@@ -160,7 +161,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
 			raise RuntimeError('Сервер не повернув cookie сесії.')
 	else:A.log('Активну сесію підтверджено.',_F)
-	A.set_progress(_D,'Запит на підготовку бекапу...');from core.network import fetch_server_inverter_image as _fsi;_fsi(A,C);fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
+	A.set_progress(_D,'\u0417\u0430\u043f\u0438\u0442 \u043d\u0430 \u043f\u0456\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0443 \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u043e\u0457 \u043a\u043e\u043f\u0456\u0457...');from core.network import fetch_server_inverter_image as _fsi;_fsi(A,C);fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
 	while D and _o in D:
 		if A.state[_V]:G=A.state[_V]
 		elif not M and A.state[_Q]:G=A.state[_Q];M=_A
@@ -178,7 +179,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 		fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.)
 	if not D or not D.strip():raise RuntimeError(f"Помилка підготовки (порожня відповідь сервера, HTTP {L}): {V}")
 	try:l=json.loads(D)
-	except Exception:m=re.sub('\\s+',' ',re.sub(_p,' ',D)).strip()[:120];raise RuntimeError(f"Сервер повернув некоректну відповідь замість JSON (HTTP {L}): {m or'порожньо'}")
+	except Exception:m=re.sub('\\s+',' ',re.sub(_p,' ',D)).strip()[:120];raise RuntimeError(f"\u0421\u0435\u0440\u0432\u0435\u0440 \u043f\u043e\u0432\u0435\u0440\u043d\u0443\u0432 \u043d\u0435\u043a\u043e\u0440\u0435\u043a\u0442\u043d\u0443 \u0432\u0456\u0434\u043f\u043e\u0432\u0456\u0434\u044c \u0437\u0430\u043c\u0456\u0441\u0442\u044c JSON (HTTP {L}): {m or '\u043f\u043e\u0440\u043e\u0436\u043d\u044c\u043e'}. \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0430\u0434\u0440\u0435\u0441\u0443, \u043f\u043e\u0440\u0442 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0430\u0431\u043e \u043c\u0435\u0440\u0435\u0436\u0443.")
 	Y=l.get(_q)
 	if not Y:raise RuntimeError(f"Сервер не створив завдання експорту: {D[:160]}")
 	n=f"{E}:{F}"if F not in(80,443)else E;return C,n,Y
@@ -504,7 +505,7 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 				except OSError:0
 			A.log('\u0422\u0438\u043c\u0447\u0430\u0441\u043e\u0432\u0438\u0439 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0438\u0439 \u0430\u0440\u0445\u0456\u0432 \u0432\u0438\u0434\u0430\u043b\u0435\u043d\u043e (\u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0435 \u0441\u0445\u043e\u0432\u0438\u0449\u0435 \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e).',_H)
 		if A.state[_Z]:commit_state(A.state);A.log('Налаштування та ключі захищено збережено.',_F)
-		from core.gfs import apply_gfs_cleanup as Ac,compute_gfs_plan as Ad;A.set_progress(98,'Ротація бекапів за обраною стратегією...');Ae=time.time();_record_cloud_event(A,C,_M,stage=AG,archive=B);Y,Y,A2=Ad(A.state);A3=len(A2);A4=_B
+		from core.gfs import apply_gfs_cleanup as Ac,compute_gfs_plan as Ad;A.set_progress(98,'\u0420\u043e\u0442\u0430\u0446\u0456\u044f \u0430\u0440\u0445\u0456\u0432\u0456\u0432 \u0437\u0430 \u043e\u0431\u0440\u0430\u043d\u043e\u044e \u0441\u0442\u0440\u0430\u0442\u0435\u0433\u0456\u0454\u044e...');Ae=time.time();_record_cloud_event(A,C,_M,stage=AG,archive=B);Y,Y,A2=Ad(A.state);A3=len(A2);A4=_B
 		if not skip_cleanup and not NO_CLEAN and(h or bool(A.state.get('silent_cleanup',_B))):Af,Y,Y=Ac(A,skip_prompt=_A,sync_cloud=_B);A4=Af==len(A2)
 		_record_cloud_event(A,C,_J,stage=AG,archive=B,duration_sec=time.time()-Ae);Ag=time.time()
 		def Ah(cpct,cinfo):B=73+int((cpct or 0)/1e2*26);A.set_progress(min(99,B),f"pCloud: {cinfo}")
@@ -513,7 +514,7 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 		_record_cloud_event(A,C,g,archive=Q,size_mb=D,size_bytes=M,files_count=G,duration_sec=N-F,speed_mbps=D/max(N-F,.001),download_speed_mbps=e,download_duration_sec=O,server_duration_sec=A6,srv_speed_mbps=_sspd,srv_raw_mb=_rmb,server_preparing_sec=Z,server_copying_sec=a,server_processing_sec=c,server_packing_sec=b,server_checking_sec=d,crc_duration_sec=w,sha256_duration_sec=x,mirror_enabled=V,mirror_duration_sec=W,gfs_removed_count=A3,system_info=A7,net_scope=ni.get('scope',''),srv_host=(ni.get('srv_host') or urlparse(k).netloc or ''),os_bit=('32-bit' if _IS_32BIT else '64-bit'),buf_kb=int(A.state.get(_l,64) or 64),srv_conn_est=ni.get('srv_conn_est',''),net_adapter_name=ni.get('desc')or ni.get('name',''),net_adapter_type=ni.get('type',''),net_link_mbps=ni.get('link_mbps',0),net_adapter_label=ni.get('label',''),summary=A8);_sync_cloud_reports(A)
 		if not SILENT_MODE and not h:An,Ao,Ap=A.get_storage_stats();Aq={'file':Q,'srv':k,'size_mb':round(D,2),'files_cnt':G,'ts_start':i,'ts_end':A5,'total_sec':P,'srv_db_sec':adb,'srv_prep_sec':Z,'srv_copy_sec':a,'srv_hist_sec':ah,'srv_proc_sec':c,'srv_pack_sec':b,'srv_chk_sec':d,'dl_sec':O,'buf_kb':int(A.state.get(_l,64)or 64),'spd_mbs':e,'srv_spd_mbs':_sspd,'srv_raw_mb':_rmb,'crc_sec':w,'sha_sec':x,'mir_active':V,'mir_sec':W,'net_active':A1,'net_sec':Ab,'z_cnt':An,'z_mb':Ao,'free_gb':Ap,'old_cnt':A3,'net_scope':ni.get('scope',''),'srv_conn_est':ni.get('srv_conn_est',''),'net_adapter_label':ni.get('label',''),'net_adapter_name':ni.get('desc')or ni.get('name','')};A.ask_modal('backup_report','Звіт про резервне копіювання',json.dumps(Aq,ensure_ascii=_B))
 	except Exception as J:
-		A.exit_code=1;A.log(f"ПОМИЛКА: {J}",_I);from core.i18n import tr as Ar;_desktop_notify(Ar('HomeGrid Backup: помилка',A.state.get(_R,_S)),str(J)[:200]);A.set_pill('Помилка бекапу',_I)
+		A.exit_code=1;A.log(f"ПОМИЛКА: {J}",_I);from core.i18n import tr as Ar;_desktop_notify(Ar('HomeGrid Backup: помилка',A.state.get(_R,_S)),str(J)[:200]);A.set_pill('\u041f\u043e\u043c\u0438\u043b\u043a\u0430 \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u043e\u0433\u043e \u043a\u043e\u043f\u0456\u044e\u0432\u0430\u043d\u043d\u044f',_I)
 		if hasattr(A,AI):A9=time.time();A.record_op_event('Помилка',str(J),_C,dur_sec=round(A9-F,1),started_at=F,finished_at=A9)
 		_record_cloud_event(A,C,_X,archive=B,size_mb=D,duration_sec=time.time()-F,result=_X,error_type=type(J).__name__);_sync_cloud_reports(A);A.set_progress(0,f"Помилка: {J}")
 		if not SILENT_MODE:A.ask_modal('alert','Помилка резервного копіювання',str(J))
