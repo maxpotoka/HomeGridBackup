@@ -1,3 +1,5 @@
+# patch-id: owner-prefix-anon-3.56
+# patch-id: stats-full-parent-width-3.55
 # patch-id: canon-srv-lan-wan-label-3.51
 # patch-id: auto-owner-canon-srv-3.50
 # patch-id: d1-always-send-3.48
@@ -100,8 +102,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='3.54'
-BUILD_DATE='26.11.2026 10:33'
+SCRIPT_VER='3.56'
+BUILD_DATE='26.11.2026 10:44'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)

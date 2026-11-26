@@ -1,3 +1,5 @@
+# patch-id: stats-full-parent-width-3.55
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.41 | 26.11.2026 10:36)
 # patch-id: ubuntu-embedded-dlg-fix-3.57
 # [ФАЙЛ: gui/dialogs.py (v2.39 | 25.11.2026 15:45)
 _AU='<Double-1>'
@@ -390,7 +392,7 @@ class DialogsMixin:
 	def open_cloud_stats_modal(self):
 		fs, k, lang, fam = self.metrics[_k], self.metrics[_a], self.engine.state.get(_F, _E), self._ui_fam()
 		_rw, _rh = max(680, self.root.winfo_width()), max(480, self.root.winfo_height())
-		dlg, p, _ = self._make_dialog('⚡ Статистика швидкості роботи' if lang == _B else '⚡ Work Speed Statistics', min(980, int((_rw - 24) / max(.5, k))), min(640, int((_rh - 24) / max(.5, k))))
+		dlg, p, _ = self._make_dialog('⚡ Статистика швидкості роботи' if lang == _B else '⚡ Work Speed Statistics', int((_rw - 16) / max(.5, k)), min(640, int((_rh - 24) / max(.5, k))))
 		dlg.maxsize(_rw, _rh)
 		from gui.stats_view import show_three_tab_stats
 		try:

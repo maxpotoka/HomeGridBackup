@@ -1,3 +1,4 @@
+# patch-id: owner-prefix-anon-3.56
 # patch-id: auto-owner-canon-srv-3.50
 # patch-id: d1-always-send-3.48
 # patch-id: client-os-binding-3.58
@@ -37,9 +38,22 @@ def _os_tag():
             return f"Linux {p[0]}.{p[1]} ({b_str})"
     return f"{s} {r} ({b_str})".strip()
 
+def _owner_prefix(st):
+    d = st or {}
+    pin = str(d.get('login_pin') or '').strip()
+    if pin:
+        return hashlib.sha256(f'hgm-pin:{pin}'.encode('utf-8')).hexdigest()[:16]
+    tok = str(d.get('client_token') or '').strip()
+    if tok and tok != 'default':
+        return hashlib.sha256(f'hgm-tok:{tok}'.encode('utf-8')).hexdigest()[:16]
+    return ''
+
 def _anon_id(st):
-    raw = str((st or {}).get('device_id') or '').strip() or f"{platform.node()}:{platform.machine()}:{platform.system()}"
-    return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:32]
+    d = st or {}
+    raw = str(d.get('device_id') or '').strip() or f"{platform.node()}:{platform.machine()}:{platform.system()}"
+    dev = hashlib.sha256(raw.encode('utf-8')).hexdigest()[:15]
+    own = _owner_prefix(d)
+    return f"{own}:{dev}" if own else hashlib.sha256(raw.encode('utf-8')).hexdigest()[:32]
 
 def _owner_id(st):
     d = st or {}

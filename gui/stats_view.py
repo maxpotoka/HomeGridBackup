@@ -1,3 +1,5 @@
+# patch-id: stats-full-parent-width-3.55
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.18 | 26.11.2026 10:36)
 # patch-id: stats-short-x-os-3.54
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.17 | 26.11.2026 10:33)
 # patch-id: stats-cols-widen-3.53
@@ -49,7 +51,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
     st_tv.configure('HGB3.Treeview', background=p['log_bg'], foreground=p['text'], fieldbackground=p['log_bg'], rowheight=max(26, int((fs + 16) * k)), font=(fam, fs))
     st_tv.configure('HGB3.Treeview.Heading', background=p['panel'], foreground=p['cyan'], font=(fam, max(8, fs - 1), 'bold'))
     tv = ttk.Treeview(tbl_f, columns=('c1', 'my', 'd1', 'n'), show='headings', height=6, style='HGB3.Treeview')
-    for cid, ht, wc, anc in (('c1', '\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440', 460, 'w'), ('my', '\u041c\u043e\u0457 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Mine (median)', 165, 'center'), ('d1', '\u0427\u0443\u0436\u0456 D1 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Others D1 (median)', 165, 'center'), ('n', 'n (\u043c\u043e\u0457 / D1)' if lang == 'uk' else 'n (mine / D1)', 95, 'center')):
+    for cid, ht, wc, anc in (('c1', '\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440', 460, 'w'), ('my', '\u041c\u043e\u0457 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Mine (median)', 195, 'center'), ('d1', '\u0427\u0443\u0436\u0456 D1 (\u043c\u0435\u0434\u0456\u0430\u043d\u0430)' if lang == 'uk' else 'Others D1 (median)', 195, 'center'), ('n', 'n (\u043c\u043e\u0457 / D1)' if lang == 'uk' else 'n (mine / D1)', 95, 'center')):
         tv.heading(cid, text=ht)
         tv.column(cid, width=int(wc * k), minwidth=80, anchor=anc, stretch=(cid == 'c1'))
     tv.tag_configure('own', background='#132a3a', foreground='#38bdf8')

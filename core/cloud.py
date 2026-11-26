@@ -1,3 +1,4 @@
+# patch-id: owner-prefix-anon-3.56
 # patch-id: canon-srv-lan-wan-label-3.51
 # patch-id: auto-owner-canon-srv-3.50
 # patch-id: d1-always-send-3.48
@@ -366,12 +367,14 @@ def build_three_section_stats(engine, refresh=True):
     ops = fetch_cloud_speed_stats(engine, refresh=False).get('ops', [])
     sync_local_history_to_d1(st, ops)
     all_d1 = fetch_global_stats('ALL')
+    own_p = aid.split(':')[0] if ':' in aid else ''
     def _is_mine(r):
-        r_oid = str(r.get('owner_id') or '')
-        r_aid = str(r.get('anon_id') or '')
-        if r_oid and oid:
-            return r_oid == oid
-        return bool(r_aid and r_aid == aid)
+        ra = str(r.get('anon_id') or '')
+        if not ra:
+            return False
+        if own_p and ':' in ra:
+            return ra.split(':')[0] == own_p
+        return ra == aid
     d1 = [r for r in all_d1 if not _is_mine(r)]
     srv_my = {}
     for o in ops:
