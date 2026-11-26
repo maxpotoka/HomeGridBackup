@@ -33,7 +33,7 @@ jobs:
       - name: Install build dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install nuitka pillow pystray keyring send2trash
+          pip3 install nuitka pillow pystray keyring send2trash certifi
 
       - name: Convert icon.ico to macOS icon.icns (if exists)
         run: |
@@ -58,6 +58,8 @@ jobs:
             --noinclude-setuptools-mode=nofollow \
             --noinclude-unittest-mode=nofollow \
             --assume-yes-for-downloads \
+            --include-package=certifi \
+            --include-package-data=certifi \
             --macos-create-app-bundle \
             --macos-target-arch=x86_64 \
             --enable-plugin=tk-inter \
