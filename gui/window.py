@@ -1,3 +1,4 @@
+# patch-id: disk-gauge-win7-text-3.60
 # patch-id: rocksolid-fav-pins-3.56
 # patch-id: per-server-pins-3.50
 # patch-id: win-remove-fmt-switch-3.38
@@ -285,7 +286,7 @@ class HomeGridApp(DialogsMixin):
 		A.ent_dir=tk.Entry(C,width=1,textvariable=A.var_dir,bd=0,highlightthickness=1,font=(A._base_fam,B));A.ent_dir.grid(row=4,column=1,sticky=H,padx=(0,4),pady=3,ipady=4)
 		A.btn_dir=tk.Button(C,text='📂 Обрати',command=A.choose_dir,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_dir.grid(row=4,column=2,sticky=I,padx=2,pady=3)
 		A.var_loc_st=tk.StringVar(value='\u2014');A.lbl_loc_st=tk.Label(C,textvariable=A.var_loc_st,anchor=_J,font=(A._base_fam,max(8,B-1)),cursor=_G);A.lbl_loc_st.grid(row=4,column=3,sticky=_J,padx=(6,0),pady=3)
-		A.lbl_loc_st.bind(K,lambda _e:A.open_backup_folder());A.btn_open_dir=tk.Button(C,text='\u2197',command=A.open_backup_folder);A.disk_bar=tk.Canvas(C,height=32,bd=0,highlightthickness=1);A.disk_bar.grid(row=5,column=0,columnspan=4,sticky=H,pady=(4,2));AR_SZ=tk.Frame(C,bd=0,highlightthickness=0);AR_SZ.grid(row=6,column=0,columnspan=4,sticky=H,pady=(3,0));AR_L=tk.Frame(AR_SZ,bd=0,highlightthickness=0);AR_L.pack(side=G);A.var_k_size=tk.StringVar(value='0 MB');A.var_k_cnt=tk.StringVar(value='0');A.var_k_free=tk.StringVar(value='—');A.var_k_l1=tk.StringVar(value='Archives size');A.var_k_l2=tk.StringVar(value='Archives');A.var_k_l3=tk.StringVar(value='Free space');A._kpi_w=[];_kl=tk.Label(AR_L,textvariable=A.var_k_l1,font=(A._base_fam,max(8,B-1)));_kl.pack(side=_E,padx=(0,6));_kv=tk.Label(AR_L,textvariable=A.var_k_size,font=(A._base_fam,B,_C));_kv.pack(side=_E);A._kpi_w.append((AR_L,_kv,_kl));A.last_box=tk.Frame(AR_SZ,padx=8,pady=3,bd=0,highlightthickness=1);A.last_box.pack(side=_E);A.last_stripe=tk.Frame(A.last_box,width=3);A.last_stripe.pack(side=_E,fill='y',padx=(0,7));A.last_inner=tk.Frame(A.last_box);A.last_inner.pack(side=_E,fill=D);W=tk.Frame(A.last_inner);W.pack(fill=D);A.t3_cap=tk.Label(W,text='ОСТАННІЙ:',font=(A._base_fam,max(8,B-2),_C));A.t3_cap.pack(side=_E,padx=(0,5));A.t3_val=tk.Label(W,textvariable=A.var_last_bkp,font=(A._base_fam,max(8,B-1),_C));A.t3_val.pack(side=_E);A.t3_sub=tk.Label(A.last_inner,textvariable=A.var_last_bkp_sub,anchor=_J,font=(A._base_fam,max(8,B-2)));A.t3_sub.pack(fill=D)
+		A.lbl_loc_st.bind(K,lambda _e:A.open_backup_folder());A.btn_open_dir=tk.Button(C,text='\u2197',command=A.open_backup_folder);A.disk_bar=tk.Canvas(C,height=32,bd=0,highlightthickness=1);A.disk_bar.grid(row=5,column=0,columnspan=4,sticky=H,pady=(4,2));A.disk_bar.bind('<Configure>',lambda _e:(setattr(A,'_last_disk_sig',_B)));AR_SZ=tk.Frame(C,bd=0,highlightthickness=0);AR_SZ.grid(row=6,column=0,columnspan=4,sticky=H,pady=(3,0));AR_L=tk.Frame(AR_SZ,bd=0,highlightthickness=0);AR_L.pack(side=G);A.var_k_size=tk.StringVar(value='0 MB');A.var_k_cnt=tk.StringVar(value='0');A.var_k_free=tk.StringVar(value='—');A.var_k_l1=tk.StringVar(value='Archives size');A.var_k_l2=tk.StringVar(value='Archives');A.var_k_l3=tk.StringVar(value='Free space');A._kpi_w=[];_kl=tk.Label(AR_L,textvariable=A.var_k_l1,font=(A._base_fam,max(8,B-1)));_kl.pack(side=_E,padx=(0,6));_kv=tk.Label(AR_L,textvariable=A.var_k_size,font=(A._base_fam,B,_C));_kv.pack(side=_E);A._kpi_w.append((AR_L,_kv,_kl));A.last_box=tk.Frame(AR_SZ,padx=8,pady=3,bd=0,highlightthickness=1);A.last_box.pack(side=_E);A.last_stripe=tk.Frame(A.last_box,width=3);A.last_stripe.pack(side=_E,fill='y',padx=(0,7));A.last_inner=tk.Frame(A.last_box);A.last_inner.pack(side=_E,fill=D);W=tk.Frame(A.last_inner);W.pack(fill=D);A.t3_cap=tk.Label(W,text='ОСТАННІЙ:',font=(A._base_fam,max(8,B-2),_C));A.t3_cap.pack(side=_E,padx=(0,5));A.t3_val=tk.Label(W,textvariable=A.var_last_bkp,font=(A._base_fam,max(8,B-1),_C));A.t3_val.pack(side=_E);A.t3_sub=tk.Label(A.last_inner,textvariable=A.var_last_bkp_sub,anchor=_J,font=(A._base_fam,max(8,B-2)));A.t3_sub.pack(fill=D)
 		U=tk.Frame(C,bd=0,highlightthickness=0);A.var_net_en=tk.BooleanVar(value=bool(A.engine.state.get(_l,_F))and bool(A.var_net_dir.get().strip()))
 		A.chk_net_tog=HomeGridToggle(U,variable=A.var_net_en,command=A.toggle_net_dir,compact=_D,palette=A._get_palette(),font_sz=max(8,B-1));A.chk_net_tog.pack(side=_E,padx=(0,5))
 		A.l_net=tk.Label(U,text='\u041c\u0435\u0440\u0435\u0436\u0430',anchor=_J,font=(A._base_fam,max(8,B-1)),cursor=_G);A.l_net.pack(side=_E);A.l_net.bind(K,lambda _e:A.chk_net_tog._on_click_compact())
@@ -563,7 +564,7 @@ class HomeGridApp(DialogsMixin):
 			if f-getattr(A,'_last_disk_t',.0)>=5.5 or not A.engine.is_running:A._last_disk_t=f;A._cached_disk=A.engine.get_storage_stats()
 			C=D.get(_U,_V);H=D.get(_r,_Z);P=bool(D.get(_a,_F));g=A.metrics[_L];h,i,Q=getattr(A,'_cached_disk',(0,.0,-1));j=h,i,Q,C
 			_mser=A.engine.get_monthly_log_series()if hasattr(A.engine,'get_monthly_log_series')else()
-			j=h,i,Q,C,H,_mser
+			j=h,i,Q,C,H,_mser,(A.disk_bar.winfo_width()if hasattr(A,'disk_bar')else 0)
 			if getattr(A,'_last_disk_sig',_B)!=j:
 				A._last_disk_sig=j;sz_s=f"{round(i/1024.0,2)} {'ГБ'if C=='uk'else'GB'}"if i>=1024 else f"{round(i,1)} {'МБ'if C=='uk'else'MB'}";fr_s=f"{Q} {'ГБ'if C=='uk'else'GB'}"if Q>=0 else'—';A.var_k_size.set(sz_s);A.var_k_cnt.set(str(h));A.var_k_free.set(fr_s);A.var_k_l1.set('Обсяг архівів'if C=='uk'else'Archives size');A.var_k_l2.set('Архівів'if C=='uk'else'Archives');A.var_k_l3.set('Вільно'if C=='uk'else'Free space')
 				B_p=A._get_palette()
@@ -579,8 +580,11 @@ class HomeGridApp(DialogsMixin):
 						A.disk_bar.create_text(10,bh//2,text=f"{_lbl_d}: {_pct_u}%",anchor='w',fill=B_p[_H],font=(A._base_fam,max(9,g),_C))
 						A.disk_bar.create_text(bw-10,bh//2,text=f"{_lbl_b}: {sz_s}  •  {_lbl_f}: {fr_s} / {_tot_g} {'ГБ'if C=='uk'else'GB'}",anchor='e',fill=B_p[_H],font=(A._base_fam,max(8,g-1),_C))
 					except Exception:
-						tot_gb=(i/1024.0)+max(0.0,float(Q));fill_w=max(6,int(bw*min(1.0,(i/1024.0)/max(0.1,tot_gb))))if i>0 else 0
+						tot_gb=(i/1024.0)+max(0.0,float(Q));pct_f=int(round((i/1024.0)/max(0.1,tot_gb)*100))if tot_gb>0 else 0;fill_w=max(6,int(bw*min(1.0,(i/1024.0)/max(0.1,tot_gb))))if i>0 else 0
 						if fill_w>0:A.disk_bar.create_rectangle(0,0,fill_w,bh,fill=B_p[_K],outline='')
+						_lbl_b='рхіви'if C=='uk'else'Backups';_lbl_f='ільно'if C=='uk'else'Free'
+						A.disk_bar.create_text(10,bh//2,text=f"{_lbl_b}: {pct_f}%",anchor='w',fill=B_p[_H],font=(A._base_fam,max(9,g),_C))
+						A.disk_bar.create_text(bw-10,bh//2,text=f"{_lbl_b}: {sz_s}  •  {_lbl_f}: {fr_s}",anchor='e',fill=B_p[_H],font=(A._base_fam,max(8,g-1),_C))
 				if hasattr(A,'lbl_spark')and hasattr(A,'spark_cv')and A.spark_cv.winfo_exists():
 					A.spark_cv.delete('all');A._spark_nodes=[];sw=max(160,A.spark_cv.winfo_width());bot_y=68
 					for gy in(14,41,bot_y):A.spark_cv.create_line(6,gy,sw-38,gy,fill=B_p[_O],dash=(2,3))

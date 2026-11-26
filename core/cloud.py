@@ -1,3 +1,4 @@
+# patch-id: client-os-binding-3.58
 # patch-id: norm-default-ports-3.55
 # patch-id: fix-net-filter-wifi-gbps-3.49
 # patch-id: fix-srv-host-fallback-3.48
@@ -362,11 +363,13 @@ def build_three_section_stats(engine, refresh=True):
             sv = round(rw_fall / tm, 2)
         if sv <= 0:
             continue
-        h = str(o.get('srv_host') or o.get('srv_norm') or '').strip().removesuffix(':443').removesuffix(':80')
-        if not h or h == 'Server':
+        h_base = str(o.get('srv_host') or o.get('srv_norm') or '').strip().removesuffix(':443').removesuffix(':80')
+        if not h_base or h_base == 'Server':
             _hh = (st.get('server') or (st.get('server_history') or [''])[0]).replace('http://', '').replace('https://', '').strip().rstrip('/')
-            h = _hh or 'Unknown server'
-        srv_my.setdefault(h, []).append((sv, float(o.get('srv_raw_mb') or 0) > 0))
+            h_base = _hh or 'Unknown server'
+        os_c = _os_arch_lbl(o.get('system_info'), o.get('os_bit'))
+        h = f"{h_base} • {os_c}"
+        srv_my.setdefault(h, []).append((sv, float(o.get('srv_raw_mb') or 0) > 0, os_c))
     d1_srv_by_h = {}
     for r in d1:
         if r.get('kind') == 'bench':
@@ -374,14 +377,17 @@ def build_three_section_stats(engine, refresh=True):
         sv = float(r.get('srv_mbs') or 0)
         if sv <= 0:
             continue
-        h = str(r.get('srv_host') or '').strip() or 'Unknown server'
+        h_base = str(r.get('srv_host') or '').strip().removesuffix(':443').removesuffix(':80') or 'Unknown server'
+        os_c = _os_arch_lbl(r.get('os_label'))
+        h = f"{h_base} • {os_c}"
         d1_srv_by_h.setdefault(h, []).append(sv)
     all_hosts = list(srv_my.keys()) + [h for h in d1_srv_by_h if h not in srv_my]
     srv_rows = []
     for h in all_hosts:
         _raw_l = [s[0] for s in srv_my.get(h, []) if s[1]][:5]; v_my = _raw_l or [s[0] for s in srv_my.get(h, [])][:5]
         v_d1 = d1_srv_by_h.get(h, [])
-        srv_rows.append({'name': h, 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
+        os_tag = srv_my[h][0][2] if srv_my.get(h) else (h.split('•', 1)[1].strip() if '•' in h else '')
+        srv_rows.append({'name': h, 'os': os_tag, 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
     net_my, net_sz = {}, {}
     for o in ops:
         sp, sz = float(o.get('spd_f') or 0), float(o.get('mb_f') or 0)
@@ -410,7 +416,7 @@ def build_three_section_stats(engine, refresh=True):
             if rsz > 0 and r_sz > 0 and abs(r_sz - rsz) / rsz > 0.2:
                 continue
             dm.append(float(r.get('spd_mbs')))
-        net_rows.append({'group': g, 'my': _med(v), 'd1': _med(dm), 'n_my': len(v), 'n_d1': len(dm)})
+        net_rows.append({'group': g, 'os': g.split('•')[1].strip() if len(g.split('•')) > 1 else '', 'my': _med(v), 'd1': _med(dm), 'n_my': len(v), 'n_d1': len(dm)})
     import platform as _pl
     from core.speed_bench import load_local_benchmarks, _hw_tag
     def_pc = f"{_pl.node()} ({_hw_tag()})"[:48]
@@ -424,8 +430,9 @@ def build_three_section_stats(engine, refresh=True):
         by_pc[def_pc] = []
     hw_rows = []
     for pc_n, items in by_pc.items():
+        os_hw = next((str(x.get('os_label')) for x in items if x.get('os_label')), '') or (pc_n.split('[', 1)[1].split(']', 1)[0] if '[' in pc_n and ']' in pc_n else _os_arch_lbl(''))
         for k, m in (('cpu_mbs', 'CPU (CRC32)'), ('sha_mbs', 'SHA-256'), ('disk_w_mbs', 'Disk Write'), ('disk_r_mbs', 'Disk Read')):
             v_my = [x.get(k) for x in items if float(x.get(k) or 0) > 0]
             v_d1 = [x.get(k) for x in d1_b if float(x.get(k) or 0) > 0]
-            hw_rows.append({'pc': pc_n, 'metric': f"{pc_n} • {m}", 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
+            hw_rows.append({'pc': pc_n, 'os': os_hw, 'metric': f"{pc_n} • {m}", 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
     return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows}
