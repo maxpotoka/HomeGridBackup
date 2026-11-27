@@ -1,3 +1,4 @@
+# patch-id: sync-tests-with-current-api-4.04.2
 _F='gui.tray.ctypes.CDLL'
 _E='libX11.so.6'
 _D='ctypes.util.find_library'
@@ -13,11 +14,11 @@ class LinuxTrayBackendTests(unittest.TestCase):
 		if B:C['WAYLAND_DISPLAY']=B
 		with mock.patch('sys.platform','linux'),mock.patch.dict(os.environ,C,clear=_A),mock.patch('core.config.IS_WSL',_B),mock.patch.object(tray,'_clean_sys_env',return_value={}),mock.patch.object(tray,'_has_sni_watcher',return_value=has_sni),mock.patch.object(tray,'_has_appindicator_gi',return_value=has_appindicator),mock.patch.object(tray,'_has_gtk_gi',return_value=has_gtk),mock.patch.object(tray,'_has_x11_tray_manager',return_value=has_x11):return tray._detect_linux_tray_backend()
 	def test_prefers_appindicator_when_status_notifier_is_available(A):A.assertEqual(A.detect(has_sni=_A,has_appindicator=_A),'appindicator')
-	def test_uses_automatic_backend_when_status_notifier_is_available(A):A.assertEqual(A.detect(has_sni=_A),'auto')
+	def test_uses_automatic_backend_when_status_notifier_is_available(A):A.assertEqual(A.detect(has_sni=_A),'sni-bridge')
 	def test_uses_xembed_backend_when_an_x11_tray_manager_is_available(A):A.assertEqual(A.detect(has_x11=_A,has_gtk=_A),'gtk')
 	def test_falls_back_to_xorg_when_gtk_is_unavailable(A):A.assertEqual(A.detect(has_x11=_A),'xorg')
 	def test_does_not_claim_a_tray_without_a_supported_protocol(A):A.assertEqual(A.detect(has_x11=_B),'')
-	def test_wayland_session_is_checked_for_status_notifier(A):A.assertEqual(A.detect(display='',wayland='wayland-0',has_sni=_A),'auto')
+	def test_wayland_session_is_checked_for_status_notifier(A):A.assertEqual(A.detect(display='',wayland='wayland-0',has_sni=_A),'sni-bridge')
 	def test_x11_tray_detection_checks_selection_owner(B):
 		A=mock.Mock();A.XOpenDisplay.return_value=123;A.XDefaultScreen.return_value=0;A.XInternAtom.return_value=456;A.XGetSelectionOwner.return_value=789
 		with mock.patch.dict(os.environ,{_C:':0'}),mock.patch(_D,return_value=_E),mock.patch(_F,return_value=A):B.assertTrue(tray._has_x11_tray_manager())

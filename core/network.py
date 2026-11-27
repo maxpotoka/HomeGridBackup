@@ -1,3 +1,5 @@
+# patch-id: json-inv-id-and-raw-regex-4.04.1
+# patch-id: hide-inv-img-in-lite-and-en-hw-4.04b
 # patch-id: server-hw-status-fetch-4.03a
 # patch-id: remove-server-version-probe-4.02
 # patch-id: extract-hgm-web-version-4.01
@@ -426,17 +428,17 @@ def fetch_server_inverter_image(engine, srv_url, wait_timeout=0.0):
 					engine.state['session_token'] = ses_l
 					commit_state(engine.state)
 			inv_id = ''
-			for ep in ('/api/inverters', '/api/status', '/api/mini-dashboard'):
+			for ep in ('/api/inverters', '/api/status'):
 				ok, st_c, body, _, _, _ = invoke_http(f"{base}{ep}", engine.state, timeout=6.0)
 				if ok and st_c == 200 and body:
-					m_id = re.search(r'"(?:selected_inverter_id|inverter_id|default_inverter_id|active_inverter_id)"\s*:\s*"([0-9a-fA-F-]{8,64})"', body)
-					if not m_id:
-						m_id = re.search(r'inverter_id=([0-9a-fA-F-]{8,64})', body)
-					if not m_id:
-						m_id = re.search(r'"id"\s*:\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"', body)
-					if m_id:
-						inv_id = m_id.group(1).strip()
-						break
+					try:
+						jd = json.loads(body)
+						if isinstance(jd, dict):
+							inv_id = str(jd.get('selected_inverter_id') or jd.get('inverter_id') or '').strip()
+							if not inv_id and isinstance(jd.get('items'), list) and jd['items']:
+								inv_id = str((jd['items'][0] or {}).get('id') or '').strip()
+							if inv_id: break
+					except Exception: pass
 			img_url = f"{base}/api/mini-dashboard/inverter-image?inverter_id={inv_id}" if inv_id else f"{base}/api/mini-dashboard/inverter-image"
 			jar = engine.state.get(_P)
 			if jar is _C:
@@ -517,7 +519,7 @@ def run_connect_task(engine,raw_url,force_skip=_B):
 			A.state[_G]=B;commit_state(A.state);A.diag_net=f"{C}:{D} (ОНЛАЙН)";A.diag_ping=f"TCP {K} мс | API {G} мс";A.set_pill(f"ОНЛАЙН | {G} мс",_I);A.log(f"\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e \u0434\u043e HomeGrid Monitor: {B} (TCP: {K} \u043c\u0441, API: {G} \u043c\u0441)",_I);A.set_progress(100,'Підключення успішне');E=_A
 	finally:
 		with A.lock:A.is_running=_B;A.indeterminate=_B
-	if E:
+	if E and '--lite' not in sys.argv:
 		fetch_server_inverter_image(A,A.state[_G],wait_timeout=0.0 if SILENT_MODE else 1.8)
 	if E and not SILENT_MODE:
 		if A.ask_modal('confirm','Сервер підключено',f"Успішно підключено до {A.state[_G]}. Виконати резервне копіювання зараз?"):L(A,A.state[_G],H)

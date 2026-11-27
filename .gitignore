@@ -94,3 +94,5 @@ __pycache__/
 !/.github/workflows/build_ubuntu.yml
 !/.github/workflows/build_windows10.yml
 !/.github/workflows/build_windows7.yml
+
+patch_rules_local.md

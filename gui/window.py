@@ -1,3 +1,4 @@
+# patch-id: hide-inv-img-in-lite-and-en-hw-4.04b
 # patch-id: server-hw-status-ui-4.03b
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: server-inverter-image-preview-3.91
@@ -573,7 +574,7 @@ class HomeGridApp(DialogsMixin):
 							elif not E.get(_Q):AA=tr(E.get(A2)or'недоступно',C);S.set(AA);R.configure(fg=B[_b]if E.get(A2)else B[_T])
 							else:AB=f" — Вільно: {E[_AA]} ГБ"if E.get(_AA,-1)>=0 else'';AC=f" ({tr('в черзі',C)})"if E.get(A3)else'';S.set(tr(f"{E['count']} архівів ({E['mb']} МБ){AB}",C)+AC);R.configure(fg=B[_b]if E.get(A3)else B[_K]if K==_g else B[_P])
 			if hasattr(A,'lbl_srv_logo'):
-				_lsig=getattr(A.engine,'server_logo_sig',_B);_lcur=(A.var_srv.get()or'').strip().rstrip('!').rstrip('/')
+				_lsig=_B if 0 else getattr(A.engine,'server_logo_sig',_B);_lcur=(A.var_srv.get()or'').strip().rstrip('!').rstrip('/')
 				_lbase=_lsig if isinstance(_lsig,tuple)else'';
 				if _lbase and _lcur and not _lcur.startswith(_lbase)and not _lbase.startswith(_lcur):_lsig=_B
 				if getattr(A,'_last_srv_logo_sig',_B)!=_lsig:
@@ -591,7 +592,7 @@ class HomeGridApp(DialogsMixin):
 						else:A.lbl_srv_logo.grid_forget()
 					else:A.lbl_srv_logo.grid_forget()
 			if hasattr(A,'lbl_srv_hw'):
-				_hws=(getattr(A.engine,'server_hw_status','')or'')if getattr(A.engine,'server_logo_sig',_B)else''
+				_raw_hw=(getattr(A.engine,'server_hw_status','')or'')if(not 0 and getattr(A.engine,'server_logo_sig',_B))else'';_hws=tr(_raw_hw,A.state.get('lang','uk'))if _raw_hw else''
 				if getattr(A,'_last_srv_hw_s',_B)!=_hws:
 					A._last_srv_hw_s=_hws;_pal_h=A._get_palette()
 					if _hws:A.lbl_srv_hw.configure(text=_hws,bg=_pal_h[_N],fg=_pal_h[_P]);A.lbl_srv_hw.grid(row=0,column=5,rowspan=2,sticky='w',padx=(8,2),pady=2)
