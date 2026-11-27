@@ -400,7 +400,7 @@ class HomeGridApp(DialogsMixin):
 		A.last_log_len=-1
 	def do_connect(A):A._apply_srv_autofill();threading.Thread(target=run_connect_task,args=(A.engine,A.var_srv.get(),_F),daemon=_D).start()
 	def do_scan(A):threading.Thread(target=run_scan_task,args=(A.engine,),daemon=_D).start()
-	def do_backup(A):A._apply_srv_autofill();A.save_net_manual();A.save_cloud_path_manual();threading.Thread(target=run_backup_task,args=(A.engine,A.var_srv.get(),_F,_F,_F),daemon=_D).start()
+	def do_backup(A):A._apply_srv_autofill();A.save_net_manual();threading.Thread(target=run_backup_task,args=(A.engine,A.var_srv.get(),_F,_F,_F),daemon=_D).start()
 	def reset_pins(A):
 		if not A.engine.is_running:A.engine.state['session_token']=A.engine.state['login_pin']=A.engine.state['editor_pin']=A.engine.state['server_pins_json']='';commit_state(A.engine.state);A.engine.log('Збережені PIN-коди та токен сесії очищено (Keyring / .env).',_S)
 	def choose_dir(A):

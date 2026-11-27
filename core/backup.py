@@ -163,7 +163,7 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
 			raise RuntimeError('Сервер не повернув cookie сесії.')
 	else:A.log('Активну сесію підтверджено.',_F)
-	A.set_progress(_D,'\u0417\u0430\u043f\u0438\u0442 \u043d\u0430 \u043f\u0456\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0443 \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u043e\u0457 \u043a\u043e\u043f\u0456\u0457...');from core.network import fetch_server_inverter_image as _fsi;_fsi(A,C);fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
+	A.set_progress(_D,'\u0417\u0430\u043f\u0438\u0442 \u043d\u0430 \u043f\u0456\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0443 \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u043e\u0457 \u043a\u043e\u043f\u0456\u0457...');fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
 	while D and _o in D:
 		if A.state[_V]:G=A.state[_V]
 		elif not M and A.state[_Q]:G=A.state[_Q];M=_A
@@ -373,7 +373,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		else:A3=''
 		A4=A.state.get(_R,_S);A5=f"{W:.1f} {'с'if A4=='uk'else's'}"if W<60 else format_duration(W,A4).partition(' (').__getitem__(0)
 		if F==_c or'history'in str(F).lower()or'device'in str(F).lower():A.set_progress(_D,f"[{C}] {pretty_phase(F)} ({A5})...")
-		elif F!=R and D.get(R)is not _A:AU=f": {A1}%"if A1>0 else f" ({A5})";_p_srv=max(1,min(100,int(A1)))if(F==_i and A1>0)else _D;A.set_progress(_p_srv,f"[{C}] {pretty_phase(F)}{AU}{A3}")
+		elif F!=R and D.get(R)is not _A:AU=f": {A1}%"if A1>0 else f" ({A5})";_p_srv=max(1,min(100,int(A1)))if A1>0 else _D;A.set_progress(_p_srv,f"[{C}] {pretty_phase(F)}{AU}{A3}")
 		if F==R or D.get(R)is _A:
 			if E and E!=R:V=max(_C,time.time()-b);T['db'if('db'in str(E).lower()or'connect'in str(E).lower())else'history'if('history'in str(E).lower()or'device'in str(E).lower())else(E if E in T else _b)]+=V;_record_cloud_event(A,S,_J,stage=f"server_{E}",duration_sec=V)
 			A._last_srv_timings={A:round(B,1)for(A,B)in T.items()};A._last_srv_timings[_j]=time.time();A._last_srv_timings['raw_mb']=round(_pk/1048576.,2)if _pk>0 else _C;A.set_progress(1,f"[{C}] Архів готовий (1%). Завантаження...");break
