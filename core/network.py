@@ -1,3 +1,4 @@
+# patch-id: connect-2x-space-check-4.07
 # patch-id: json-inv-id-and-raw-regex-4.04.1
 # patch-id: hide-inv-img-in-lite-and-en-hw-4.04b
 # patch-id: server-hw-status-fetch-4.03a
@@ -10,7 +11,7 @@
 # patch-id: server-inverter-image-auth-3.92
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: net-scope-adapter-3.01-p1
-# [ФАЙЛ: core/network.py (v2.06 | 27.11.2026 01:18) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
+# [ФАЙЛ: core/network.py (v2.07 | 27.11.2026 01:18) — HTTP, PING, TCP, ВЕРИФИКАЦИЯ HGM И СКАНЕР LAN]
 _W='NOT_HGM'
 _V='server_history'
 _U='timeout'
@@ -522,6 +523,21 @@ def run_connect_task(engine,raw_url,force_skip=_B):
 	if E and '--lite' not in sys.argv:
 		fetch_server_inverter_image(A,A.state[_G],wait_timeout=0.0 if SILENT_MODE else 1.8)
 	if E and not SILENT_MODE:
+		try:
+			import shutil as _sh_c
+			_bd=A.state.get('backup_dir')or'.';_zc,_zm,_=A.get_storage_stats()
+			_eb=max(268435456,int((_zm/max(1,_zc))*1048576*2)if(_zc>0 and _zm>0)else 268435456)
+			if os.path.isdir(_bd)and _sh_c.disk_usage(_bd).free<_eb:
+				from core.gfs import apply_gfs_cleanup as _c_ac,compute_gfs_plan as _c_ad
+				_,_,_c_del=_c_ad(A.state)
+				if _c_del:
+					_c_rm,_,_=_c_ac(A,skip_prompt=_B,sync_cloud=_B)
+					if _c_rm>0:time.sleep(0.5);A._archive_snapshot_cache_time=0;A._chart_rev=getattr(A,'_chart_rev',0)+1
+				_fr_c=_sh_c.disk_usage(_bd).free
+				if _fr_c<_eb:
+					_m_sp=f"\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043d\u044c\u043e \u0432\u0456\u043b\u044c\u043d\u043e\u0433\u043e \u043c\u0456\u0441\u0446\u044f \u043d\u0430 \u0434\u0438\u0441\u043a\u0443 ({_fr_c/1048576.:.1f} \u041c\u0411, \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u043e ~{_eb/1048576.:.0f} \u041c\u0411). \u0420\u0435\u0437\u0435\u0440\u0432\u043d\u0435 \u043a\u043e\u043f\u0456\u044e\u0432\u0430\u043d\u043d\u044f \u0441\u043a\u0430\u0441\u043e\u0432\u0430\u043d\u043e."
+					A.log(_m_sp,_O);A.ask_modal('alert','\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043d\u044c\u043e \u043c\u0456\u0441\u0446\u044f \u043d\u0430 \u0434\u0438\u0441\u043a\u0443',_m_sp);return
+		except Exception:0
 		if A.ask_modal('confirm','Сервер підключено',f"Успішно підключено до {A.state[_G]}. Виконати резервне копіювання зараз?"):L(A,A.state[_G],H)
 def run_scan_task(engine):
 	J='backup';A=engine;from core.backup import run_backup_task as K

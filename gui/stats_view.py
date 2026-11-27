@@ -1,5 +1,6 @@
+# patch-id: smart-bottleneck-4.06
 # patch-id: stats-3d-bars-3.81
-# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.26 | 26.11.2026 17:45)
+# [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.29 | 26.11.2026 17:45)
 # patch-id: stats-compact-x-labels-3.80
 # [\u0424\u0410\u0419\u041b: gui/stats_view.py (v2.25 | 26.11.2026 17:35)
 # patch-id: stats-dynamic-cols-3.79
@@ -29,7 +30,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
     net_var = tk.StringVar(value='ALL')
     srv_var = tk.StringVar(value='ALL')
     os_var = tk.StringVar(value='ALL')
-    state_data = {'server': [], 'network': [], 'hardware': []}
+    state_data = {'server': [], 'network': [], 'hardware': [], 'bottleneck': None}
     tab_btns, who_btns = {}, {}
 
     bf = tk.Frame(dlg, bg=p['bg'])
@@ -53,7 +54,8 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
     chart_f = tk.Frame(dlg, bg=p['panel'], bd=1, relief='solid', padx=10, pady=6)
     chart_f.pack(fill='x', padx=14, pady=(2, 6))
     lbl_desc = tk.Label(chart_f, text='', bg=p['panel'], fg=p['cyan'], font=(fam, max(8, fs - 1), 'bold'))
-    lbl_desc.pack(anchor='w', pady=(0, 4))
+    lbl_desc.pack(anchor='w', pady=(0, 2))
+    lbl_bn = tk.Label(chart_f, text='', bg=p['panel'], fg=p['muted'], font=(fam, max(8, fs - 1)), justify='left', anchor='w')
     cv = tk.Canvas(chart_f, height=int(195 * k), bg=p['log_bg'], highlightthickness=1, highlightbackground='#1e293b')
     cv.pack(fill='x')
 
@@ -83,10 +85,11 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
             os_raw = parts[1].split('(')[0].strip()
             os_s = os_raw.replace('Windows ', 'W').replace('Linux', 'Lin').replace('macOS', 'Mac').split()[0][:10] if os_raw else ''
             if net_t:
-                top = f"{net_t} {p1} ({os_s})" if os_s else f"{net_t} \u2022 {p1}"
+                top = f"{net_t} ({os_s})" if os_s else net_t
             else:
-                top = (os_raw[:12] + chr(8230) if len(os_raw) > 13 else os_raw) or p1
-            return f"{top}\n({p0})"
+                top = (os_raw[:11] + chr(8230) if len(os_raw) > 12 else os_raw) or p1
+            p0_s = (p0[:9] + chr(8230)) if len(p0) > 10 else p0
+            return f"{top}\n{p0_s}"
         t = str(raw or '')
         return (t[:24] + chr(8230)) if len(t) > 25 else t
 
@@ -127,7 +130,7 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         for gi in range(4):
             gy = int(y1 - ch * gi / 3.0)
             cv.create_line(pad_l, gy, w - pad_r, gy, fill='#1e293b', dash=(2, 3))
-        max_cols = max(6, min(12, int((w - pad_l - pad_r) // max(1, int(130 * k)))))
+        max_cols = max(5, min(10, int((w - pad_l - pad_r) // max(1, int(145 * k)))))
         vis = rows[:max_cols]
         slot = (w - pad_l - pad_r) / max(1, len(vis))
         bw = max(14, min(int(38 * k), int(slot * (0.45 if len(series) == 1 else 0.27))))
@@ -185,6 +188,12 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         }
         lkey, d_txt, h1 = meta[sk]
         lbl_desc.configure(text=d_txt)
+        bn = state_data.get('bottleneck')
+        if isinstance(bn, dict) and bn.get('enabled') and bn.get('text'):
+            cm = {'ok': p['green'], 'warn': p['amber'], 'err': p['red']}
+            lbl_bn.configure(text=bn['text'], fg=cm.get(bn.get('level'), p['muted']), wraplength=max(420, (chart_f.winfo_width() or int(860 * k)) - 24))
+            if not lbl_bn.winfo_ismapped(): lbl_bn.pack(anchor='w', fill='x', pady=(0, 4))
+        elif lbl_bn.winfo_ismapped(): lbl_bn.pack_forget()
         tv.heading('c1', text=h1)
         for rid in tv.get_children(): tv.delete(rid)
         all_r = state_data.get(sk, [])
@@ -200,7 +209,19 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
         osf = os_var.get()
         if osf and osf != 'ALL':
             all_r = [r for r in all_r if str(r.get('os') or '').strip().lower() == osf.lower()]
-        rows = [r for r in all_r if r.get('n_my', 0) > 0] if who == 'MY' else ([r for r in all_r if r.get('n_d1', 0) > 0] if who == 'D1' else all_r)
+        if who == 'MY':
+            rows = [r for r in all_r if r.get('n_my', 0) > 0]
+        elif who == 'D1':
+            _d1_only = {}
+            for r in all_r:
+                if r.get('n_d1', 0) <= 0: continue
+                _raw_k = str(r.get(lkey) or '')
+                _pts = [x.strip() for x in _raw_k.split("•")]
+                _clean_k = ("Cloud D1 • " + " • ".join(_pts[1:])) if len(_pts) >= 2 else _raw_k
+                _d1_only[_clean_k] = dict(r, **{lkey: _clean_k, 'n_my': 0, 'my': 0.0})
+            rows = list(_d1_only.values())
+        else:
+            rows = all_r
         if sk != 'hardware':
             rows = sorted(rows, key=lambda r: (float(r.get('my') or 0) if who == 'MY' else (float(r.get('d1') or 0) if who == 'D1' else max(float(r.get('my') or 0), float(r.get('d1') or 0)))), reverse=True)
         for r in rows:
@@ -286,7 +307,6 @@ def show_three_tab_stats(dlg, root, engine, p, k, fs, fam, lang, _w, _p):
 
     tk.Button(act_bar, text='\U0001f504 \u041e\u043d\u043e\u0432\u0438\u0442\u0438' if lang == 'uk' else '\U0001f504 Refresh', command=lambda: _load(True), bg=p['panel'], fg=p['cyan'], font=(fam, fs), padx=10, pady=2, cursor='hand2').pack(side='left', padx=(0, 8))
     tk.Button(act_bar, text='\u26a1 \u0422\u0435\u0441\u0442 \u041f\u041a/\u0414\u0438\u0441\u043a\u0430' if lang == 'uk' else '\u26a1 PC/Disk Test', command=lambda: __import__('core.speed_bench', fromlist=['open_compact_bench_popup']).open_compact_bench_popup(dlg, engine.state, p, fs, fam, lambda: engine.state.get(_p, ''), on_done=lambda: _load(True)), bg=p['panel'], fg=p['green'], font=(fam, fs, 'bold'), padx=10, pady=2, cursor='hand2').pack(side='left', padx=(0, 8))
-    tk.Button(act_bar, text='\U0001f9ea \u0411\u0443\u0444\u0435\u0440 16 vs 256 \u041a\u0411' if lang == 'uk' else '\U0001f9ea Buffer 16 vs 256 KB', command=lambda: __import__('core.speed_bench', fromlist=['open_buffer_ab_popup']).open_buffer_ab_popup(dlg, engine.state, p, fs, fam), bg=p['panel'], fg=p['cyan'], font=(fam, fs), padx=10, pady=2, cursor='hand2').pack(side='left', padx=(0, 16))
     for wk, wuk, wen in (('ALL', '\u0423\u0441\u0456', 'All'), ('MY', '\u041c\u043e\u0457', 'Mine'), ('D1', '\u0427\u0443\u0436\u0456 D1', 'Others D1')):
         bw_btn = tk.Button(act_bar, text=wuk if lang == 'uk' else wen, command=lambda m=wk: _set_who(m), bg=p['green'] if wk == 'ALL' else p['panel'], fg='#0f172a' if wk == 'ALL' else p['text'], font=(fam, max(8, fs - 1), 'bold'), padx=9, pady=2, cursor='hand2')
         bw_btn.pack(side='left', padx=(0, 4))

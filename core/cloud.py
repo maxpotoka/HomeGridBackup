@@ -1,3 +1,4 @@
+# patch-id: smart-bottleneck-4.06
 # patch-id: py38-win32-no-removesuffix-3.74
 # patch-id: cloud-union-d1-keys-3.71
 # patch-id: d1-mine-backup-safe-3.68
@@ -339,7 +340,7 @@ def _net_pair_key(srv_h, os_lbl, sc, ad, lk, buf_kb, est=''):
     os_s = _os_arch_lbl(os_lbl)
     base = _grp_lbl(sc, ad, lk, est)
     b_kb = int(buf_kb or 64)
-    return f"{sh} • {os_s} • {base} • buf {b_kb} KB"
+    return f"{sh} • {os_s} • {base}"
 
 def _os_base_norm(val):
     s = str(val or '').strip()
@@ -541,4 +542,40 @@ def build_three_section_stats(engine, refresh=True):
             v_my = [x.get(k) for x in items if float(x.get(k) or 0) > 0]
             v_d1 = [float(x.get(k) or x.get(k_alt) or 0) for x in d1_match if float(x.get(k) or x.get(k_alt) or 0) > 0]
             hw_rows.append({'pc': pc_n, 'os': os_hw, 'metric': f"{pc_n} • {m}", 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
-    return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows}
+    bn_info = analyze_bottleneck(engine, d1_rows=d1, lang=st.get('lang', 'uk'))
+    return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows, 'bottleneck': bn_info}
+
+def analyze_bottleneck(engine, d1_rows=None, lang='uk'):
+    st = getattr(engine, 'state', {}) or {}; uk = (lang == 'uk')
+    if not bool(st.get('show_bottleneck', True)):
+        return {'enabled': False, 'level': 'off', 'text': ''}
+    try: did = _device_id(st)
+    except Exception: did = str(st.get('device_id') or '')
+    recs = _collect_report_records((_reports_base_dir(),), device_id=did or None)
+    succ = [r for r in _ordered_report_records(recs) if str(r.get('event') or '') == 'success' and float(r.get('size_mb') or 0) > 0]
+    if len(succ) < 6:
+        t_low = f"\u0412\u0443\u0437\u044c\u043a\u0435 \u043c\u0456\u0441\u0446\u0435: \u043c\u0430\u043b\u043e \u0434\u0430\u043d\u0438\u0445 (\u043f\u043e\u0442\u0440\u0456\u0431\u043d\u043e \u043c\u0456\u043d. 6 \u0431\u0435\u043a\u0430\u043f\u0456\u0432, \u0437\u0430\u0440\u0430\u0437: {len(succ)})" if uk else f"Bottleneck: low history (need 6+ backups, have {len(succ)})"
+        return {'enabled': True, 'level': 'muted', 'text': t_low}
+    cur, hist = succ[-1], succ[-21:-1]
+    def _sp(r):
+        sz = float(r.get('size_mb') or 0); rw = float(r.get('srv_raw_mb') or 0) or sz
+        srv_t = float(r.get('server_duration_sec') or 0) or sum(float(r.get(k) or 0) for k in ('server_preparing_sec','server_copying_sec','server_processing_sec','server_packing_sec','server_checking_sec'))
+        ss = float(r.get('srv_speed_mbps') or 0) or (rw / srv_t if srv_t > 0 and rw > 0 else 0.0)
+        dt = float(r.get('download_duration_sec') or 0)
+        sd = float(r.get('download_speed_mbps') or 0) or (sz / dt if dt > 0 and sz > 0 else 0.0)
+        vt = float(r.get('crc_duration_sec') or 0) + float(r.get('sha256_duration_sec') or 0)
+        mt = float(r.get('mirror_duration_sec') or 0)
+        return {'srv': round(ss,1), 'dl': round(sd,1), 'ver': round(sz/vt,1) if vt>=0.05 and sz>0 else 0.0, 'mir': round(sz/mt,1) if r.get('mirror_enabled') and mt>=0.05 and sz>0 else 0.0}
+    cs, hl = _sp(cur), [_sp(x) for x in hist]
+    nm = {'srv': '\u0441\u0435\u0440\u0432\u0435\u0440' if uk else 'server', 'dl': '\u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043d\u044f' if uk else 'download', 'ver': '\u043f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 CRC/SHA' if uk else 'CRC/SHA check', 'mir': '\u0434\u0437\u0435\u0440\u043a\u0430\u043b\u043e' if uk else 'mirror'}
+    cd = [(cs[k]/_med([x[k] for x in hl if x[k]>0]), k, cs[k], _med([x[k] for x in hl if x[k]>0])) for k in nm if cs[k]>0 and len([x[k] for x in hl if x[k]>0])>=4]
+    if not cd: return {'enabled': True, 'level': 'muted', 'text': '\u0412\u0443\u0437\u044c\u043a\u0435 \u043c\u0456\u0441\u0446\u0435: \u043c\u0430\u043b\u043e \u0456\u0441\u0442\u043e\u0440\u0456\u0457 \u0435\u0442\u0430\u043f\u0456\u0432' if uk else 'Bottleneck: low stage history'}
+    cd.sort(); sc, wk, cv, mv = next(iter(cd))
+    if sc >= 0.80: return {'enabled': True, 'level': 'ok', 'text': '\u0412\u0443\u0437\u044c\u043a\u0435 \u043c\u0456\u0441\u0446\u0435: \u0432\u0441\u0456 \u0435\u0442\u0430\u043f\u0438 \u0432 \u043c\u0435\u0436\u0430\u0445 \u043d\u043e\u0440\u043c\u0438' if uk else 'Bottleneck: all stages within normal range'}
+    dr = max(1, int(round((1.0 - sc) * 100))); un = '\u041c\u0411/\u0441' if uk else 'MB/s'; ok_os = _os_base_norm(cur.get('system_info') or cur.get('platform'))
+    dm = _med([float(r.get('srv_mbs' if wk=='srv' else 'spd_mbs') or 0) for r in (d1_rows or []) if r.get('kind')!='bench' and (not ok_os or _os_base_norm(r.get('os_label'))==ok_os)]) if wk in ('srv','dl') else 0.0
+    lvl = 'err' if (dm > 0 and cv < dm * 0.75) else 'warn'
+    tl = (f" \u041d\u0438\u0436\u0447\u0435 D1 ({dm} {un}) \u2014 \u0441\u0438\u0441\u0442\u0435\u043c\u043d\u0435 \u043e\u0431\u043c\u0435\u0436\u0435\u043d\u043d\u044f." if lvl=='err' else f" \u0412 \u043c\u0435\u0436\u0430\u0445 D1 ({dm} {un}) \u2014 \u0440\u0430\u0437\u043e\u0432\u0430 \u043f\u0440\u043e\u0441\u0430\u0434\u043a\u0430.") if (dm>0 and uk) else ((f" Below D1 ({dm} {un}) ? systemic." if lvl=='err' else f" Within D1 ({dm} {un}) ? transient.") if dm>0 else '')
+    tx = (f"\u0412\u0443\u0437\u044c\u043a\u0435 \u043c\u0456\u0441\u0446\u0435: {nm[wk]}, {cv} {un} (\u043d\u043e\u0440\u043c\u0430 {mv} {un}, -{dr}%)." if uk else f"Bottleneck: {nm[wk]}, {cv} {un} (norm {mv} {un}, -{dr}%).") + tl
+    return {'enabled': True, 'level': lvl, 'text': tx}
+

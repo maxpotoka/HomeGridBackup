@@ -5,7 +5,7 @@
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.54 | 27.11.2026 01:08) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.55 | 27.11.2026 01:08) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -229,7 +229,7 @@ class HomeGridApp(DialogsMixin):
 		S=tk.Frame(C,bd=0,highlightthickness=0);S.grid(row=0,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.ent_srv=tk.Entry(S,width=1,textvariable=A.var_srv,bd=0,highlightthickness=1,font=(A._base_fam,B));A.ent_srv.pack(side=_E,fill=D,expand=_D,ipady=4)
 		A.btn_scan=tk.Button(S,text=_A8,command=A.on_scan_btn_click,padx=8,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_scan.pack(side=_E,padx=(6,0),fill='y')
-		C.columnconfigure(4,minsize=0);A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3);A.lbl_srv_logo=tk.Label(C,bd=0,highlightthickness=1);A.lbl_srv_hw=tk.Label(C,bd=0,justify='left',anchor='w',font=(A._base_fam,max(8,B-1)));
+		C.columnconfigure(4,minsize=0);A.btn_conn=tk.Button(C,text='\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438',command=A.do_connect,font=(A._base_fam,B,_C),pady=1,bd=0,cursor=_G);A.btn_conn.grid(row=0,column=3,sticky=I,padx=(4,0),pady=3);
 		A.l_fav=tk.Label(C,text='\u041e\u0431\u0440\u0430\u043d\u0456:',anchor=_J,font=(A._base_fam,max(8,B-1)));A.l_fav.grid(row=1,column=0,sticky=_J,padx=(0,6),pady=3)
 		A.fav_bar=tk.Frame(C,bd=0,highlightthickness=0);A.fav_bar.grid(row=1,column=1,columnspan=2,sticky=H,padx=(0,4),pady=3)
 		A.btn_hist=tk.Button(C,text='\u0406\u0441\u0442\u043e\u0440\u0456\u044f',command=A.open_history_modal,pady=0,bd=1,relief=_A0,highlightthickness=1,cursor=_G);A.btn_hist.grid(row=1,column=3,sticky=I,padx=(4,0),pady=3)
@@ -262,7 +262,7 @@ class HomeGridApp(DialogsMixin):
 			N=tk.Frame(A.card_stat);b=tk.StringVar(value='—');c=tk.Label(N,text=i,font=(A._base_fam,max(8,B-2),_C));c.pack(side=_E,padx=(0,5));d=tk.Label(N,textvariable=b,font=(A._base_fam,max(8,B-1),_C));d.pack(side=_E)
 			if a==_g:A.btn_refresh_cld=tk.Button(N,text=chr(8635),command=A._force_refresh_pcloud_stats,padx=5,pady=0,bd=0,highlightthickness=1,cursor=_G);A.btn_refresh_cld.pack(side=_E,padx=(6,0));ToolTip(A.btn_refresh_cld,'Оновити статистику pCloud')
 			A.dest_rows[a]=N,c,d,b
-		A.stat_btns=tk.Frame(A.card_stat);A.stat_btns.pack(fill=D,pady=(8,0));A.stat_btns.columnconfigure(0,weight=1);A.stat_btns.columnconfigure(1,weight=1);A.btn_stats=tk.Button(A.stat_btns,text='📊 Локально',command=A.open_stats_modal,pady=4,bd=0,cursor=_G);A.btn_stats.grid(row=0,column=0,sticky=H,padx=(0,4),pady=2);A.btn_cstats=tk.Button(A.stat_btns,text='🌐 Мережа',command=A.open_cloud_stats_modal,pady=4,bd=0,cursor=_G);A.btn_cstats.grid(row=0,column=1,sticky=H,padx=(4,0),pady=2);A.btn_ops_hist=tk.Button(A.stat_btns,text='📋 Журнал',command=A.open_ops_history,pady=4,bd=0,cursor=_G);A.btn_ops_hist.grid(row=1,column=0,sticky=H,padx=(0,4),pady=2);A.btn_analyze=tk.Button(A.stat_btns,text=_AP,command=A.open_analyze,pady=4,bd=0,cursor=_G);A.btn_analyze.grid(row=1,column=1,sticky=H,padx=(4,0),pady=2);A.card_prog=tk.Frame(A.body,padx=F,pady=E,bd=0,highlightthickness=1);A.card_prog.pack(side=f,fill=D,pady=(E,0));J=tk.Frame(A.card_prog);J.pack(fill=D,pady=(0,6));J.columnconfigure((0,1,2),weight=1);A.var_sched_info=tk.StringVar(value='');A.lbl_stage=tk.Label(J,textvariable=A.var_stage,anchor=_J,font=(A._base_fam,B+1,_C));A.lbl_stage.grid(row=0,column=0,sticky=_J);A.lbl_sched_info=tk.Label(J,textvariable=A.var_sched_info,padx=10,pady=2,bd=0,highlightthickness=1,font=(A._base_fam,max(8,B-1)));A.lbl_sched_info.grid(row=0,column=1);JR=tk.Frame(J);JR.grid(row=0,column=2,sticky='e');A.lbl_load_3s=tk.Label(JR,text='CPU: --% | RAM: --%',font=(A._base_fam,max(8,B-1),_C));A.lbl_load_3s.pack(side=_E,padx=(0,8));A.lbl_pill=tk.Label(JR,text=_A9,padx=9,pady=2,bd=0,font=(A._base_fam,max(8,B-1),_C));A.lbl_pill.pack(side=_E,padx=(0,6));A.lbl_pct=tk.Label(JR,textvariable=A.var_pct,padx=9,pady=2,bd=0,highlightthickness=1,font=(A._base_fam,max(8,B-1),_C));A.lbl_pct.pack(side=_E);A.root.after(1000,A._tick_3s_loader);A.pbar=StyledProgressBar(A.card_prog,height=72);A.pbar.pack(fill=D,ipady=2);A.card_log=tk.Frame(A.body,padx=F,pady=E,bd=0,highlightthickness=1);A.card_log.pack(side=Y,fill=P,expand=_D);O=tk.Frame(A.card_log);O.pack(fill=D,pady=(0,4));A.lbl_c4=tk.Label(O,text='Системний лог',font=(A._base_fam,B,_C));A.lbl_c4.pack(side=_E);A.btn_clear_log=tk.Button(O,text='Очистити',command=A.clear_log_view,padx=8,pady=1,bd=0,cursor=_G);A.btn_clear_log.pack(side=G);A.btn_open_log=tk.Button(O,text='📄 backup.log',command=A.open_raw_log_file,padx=8,pady=1,bd=0,cursor=_G);A.btn_open_log.pack(side=G,padx=(0,6));X=tk.Frame(A.card_log);X.pack(fill=P,expand=_D);A.txt_log=tk.Text(X,height=7,wrap='word',state=_W,font=(A._base_fam,B),bd=0,highlightthickness=1,padx=10,pady=6,spacing1=1,spacing3=1);e=tk.Scrollbar(X,command=A.txt_log.yview);A.txt_log.configure(yscrollcommand=e.set);e.pack(side=G,fill='y');A.txt_log.pack(side=_E,fill=P,expand=_D);A.txt_log.bind('<Configure>',lambda _e:A._center_log_vertically(),add='+');A.btn_start=tk.Button(A.footer,text='▶ ЗАПУСТИТИ БЕКАП',command=A.do_backup,font=(A._base_fam,B,_C),padx=18,pady=5,bd=0,cursor=_G);A.btn_start.pack(side=_E,padx=(0,10));A.btn_strat=tk.Button(A.footer,text='⚙ Налаштування',command=A.open_settings,padx=12,pady=5,bd=0,cursor=_G);A.btn_strat.pack(side=_E,padx=6);A.btn_about=tk.Button(A.footer,text='ℹ Про програму',command=A.open_about,padx=12,pady=5,bd=0,cursor=_G);A.btn_about.pack(side=_E,padx=6);A.btn_exit=tk.Button(A.footer,text='✖ Вихід',command=A.confirm_exit,padx=14,pady=5,bd=0,cursor=_G);A.btn_exit.pack(side=G)
+		A.stat_btns=tk.Frame(A.card_stat);A.stat_btns.pack(fill=D,pady=(8,0));A.stat_btns.columnconfigure(0,weight=1);A.stat_btns.columnconfigure(1,weight=1);A.btn_stats=tk.Button(A.stat_btns,text='📊 Локально',command=A.open_stats_modal,pady=4,bd=0,cursor=_G);A.btn_stats.grid(row=0,column=0,sticky=H,padx=(0,4),pady=2);A.btn_cstats=tk.Button(A.stat_btns,text='🌐 Мережа',command=A.open_cloud_stats_modal,pady=4,bd=0,cursor=_G);A.btn_cstats.grid(row=0,column=1,sticky=H,padx=(4,0),pady=2);A.btn_ops_hist=tk.Button(A.stat_btns,text='📋 Журнал',command=A.open_ops_history,pady=4,bd=0,cursor=_G);A.btn_ops_hist.grid(row=1,column=0,sticky=H,padx=(0,4),pady=2);A.btn_analyze=tk.Button(A.stat_btns,text=_AP,command=A.open_analyze,pady=4,bd=0,cursor=_G);A.btn_analyze.grid(row=1,column=1,sticky=H,padx=(4,0),pady=2);A.card_prog=tk.Frame(A.body,padx=F,pady=E,bd=0,highlightthickness=1);A.card_prog.pack(side=f,fill=D,pady=(E,0));J=tk.Frame(A.card_prog);J.pack(fill=D,pady=(0,6));J.columnconfigure((0,1,2),weight=1);A.var_sched_info=tk.StringVar(value='');A.lbl_stage=tk.Label(J,textvariable=A.var_stage,anchor=_J,font=(A._base_fam,B+1,_C));A.lbl_stage.grid(row=0,column=0,sticky=_J);A.lbl_sched_info=tk.Label(J,textvariable=A.var_sched_info,padx=10,pady=2,bd=0,highlightthickness=1,font=(A._base_fam,max(8,B-1)));A.lbl_sched_info.grid(row=0,column=1);JR=tk.Frame(J);JR.grid(row=0,column=2,sticky='e');A.lbl_load_3s=tk.Label(JR,text='CPU: --% | RAM: --%',font=(A._base_fam,max(8,B-1),_C));A.lbl_load_3s.pack(side=_E,padx=(0,8));A.lbl_pill=tk.Label(JR,text=_A9,padx=9,pady=2,bd=0,font=(A._base_fam,max(8,B-1),_C));A.lbl_pill.pack(side=_E,padx=(0,6));A.lbl_pct=tk.Label(JR,textvariable=A.var_pct,padx=9,pady=2,bd=0,highlightthickness=1,font=(A._base_fam,max(8,B-1),_C));A.lbl_pct.pack(side=_E);A.root.after(1000,A._tick_3s_loader);A.pbar=StyledProgressBar(A.card_prog,height=72);A.pbar.pack(fill=D,ipady=2);A.card_log=tk.Frame(A.body,padx=F,pady=E,bd=0,highlightthickness=1);A.card_log.pack(side=Y,fill=P,expand=_D);O=tk.Frame(A.card_log);O.pack(fill=D,pady=(0,4));A.lbl_c4=tk.Label(O,text='Системний лог',font=(A._base_fam,B,_C));A.lbl_c4.pack(side=_E);A.btn_clear_log=tk.Button(O,text='Очистити',command=A.clear_log_view,padx=8,pady=1,bd=0,cursor=_G);A.btn_clear_log.pack(side=G);A.btn_open_log=tk.Button(O,text='📄 backup.log',command=A.open_raw_log_file,padx=8,pady=1,bd=0,cursor=_G);A.btn_open_log.pack(side=G,padx=(0,6));X=tk.Frame(A.card_log);X.pack(fill=P,expand=_D);A.txt_log=tk.Text(X,height=7,wrap='word',state=_W,font=(A._base_fam,B),bd=0,highlightthickness=1,padx=10,pady=6,spacing1=1,spacing3=1);e=tk.Scrollbar(X,command=A.txt_log.yview);A.txt_log.configure(yscrollcommand=e.set);e.pack(side=G,fill='y');A.txt_log.pack(side=_E,fill=P,expand=_D);A.txt_log.bind('<Configure>',lambda _e:A._center_log_vertically(),add='+');A.btn_start=tk.Button(A.footer,text='▶ ЗАПУСТИТИ БЕКАП',command=A.do_backup,font=(A._base_fam,B,_C),padx=18,pady=5,bd=0,cursor=_G);A.btn_start.pack(side=_E,padx=(0,10));A.btn_strat=tk.Button(A.footer,text='⚙ Налаштування',command=A.open_settings,padx=12,pady=5,bd=0,cursor=_G);A.btn_strat.pack(side=_E,padx=6);A.btn_about=tk.Button(A.footer,text='ℹ Про програму',command=A.open_about,padx=12,pady=5,bd=0,cursor=_G);A.btn_about.pack(side=_E,padx=6);A.btn_exit=tk.Button(A.footer,text='✖ Вихід',command=A.confirm_exit,padx=14,pady=5,bd=0,cursor=_G);A.btn_exit.pack(side=G);A.footer_inv=tk.Frame(A.footer,bd=0,highlightthickness=0);A.lbl_srv_logo=tk.Label(A.footer_inv,bd=0,highlightthickness=1);A.lbl_srv_hw=tk.Label(A.footer_inv,bd=0,justify='left',anchor='w',font=(A._base_fam,max(8,B-1)))
 		for(j,k)in((A.btn_scan,'Автоматичний пошук серверів HomeGrid Monitor у локальній мережі'),(A.btn_hist,'Відкрити список раніше збережених адрес серверів'),(A.btn_dir,'Обрати папку'),(A.btn_open_dir,_AL),(A.btn_net,'Обрати мережеву папку'),(A.ent_cld,'Папка у хмарі pCloud (напр. HomeGridBackup)'),(A.btn_cld_cfg,h),(A.lbl_cld_st,h),(A.btn_open_log,'Відкрити текстовий файл backup.log')):ToolTip(j,k)
 	def open_raw_log_file(C):
 		import subprocess as A,sys;D=get_logs_dir(C.engine.state);os.makedirs(D,exist_ok=_D);B=os.path.join(D,'backup.log')
@@ -511,6 +511,9 @@ class HomeGridApp(DialogsMixin):
 			if A.root.state()in(_x,_y):
 				if A.engine.modal and A.engine.modal.get(O)!=A.last_modal_id:A.last_modal_id=A.engine.modal[O];A.show_window();A._show_engine_modal(A.engine.modal)
 				A.root.after(450,A._poll_ui);return
+			_bx=_W if A.engine.is_running else _Y
+			for _bu in(A.btn_scan,A.btn_hist,A.btn_conn,A.btn_open_dir,A.btn_start,A.btn_strat):
+				if str(_bu.cget('state'))!=_bx:_bu.configure(state=_bx)
 			D=A.engine.state;J=(D.get(_v)or'').strip();A6=getattr(A,'_last_synced_srv',J)
 			if J and J!=A6:
 				A._last_synced_srv=J
@@ -591,12 +594,12 @@ class HomeGridApp(DialogsMixin):
 							else:AB=f" — Вільно: {E[_AA]} ГБ"if E.get(_AA,-1)>=0 else'';AC=f" ({tr('в черзі',C)})"if E.get(A3)else'';S.set(tr(f"{E['count']} архівів ({E['mb']} МБ){AB}",C)+AC);R.configure(fg=B[_b]if E.get(A3)else B[_K]if K==_g else B[_P])
 			if hasattr(A,'lbl_srv_logo'):
 				_lsig=_B if 0 else getattr(A.engine,'server_logo_sig',_B);_lcur=(A.var_srv.get()or'').strip().rstrip('!').rstrip('/')
-				_lbase=_lsig if isinstance(_lsig,tuple)else'';
+				_lbase=next(iter(_lsig))if isinstance(_lsig,tuple)and _lsig else'';
 				if _lbase and _lcur and not _lcur.startswith(_lbase)and not _lbase.startswith(_lcur):_lsig=_B
 				if getattr(A,'_last_srv_logo_sig',_B)!=_lsig:
 					A._last_srv_logo_sig=_lsig;_lraw=getattr(A.engine,'server_logo_bytes',_B)if _lsig else _B
 					if _lraw:
-						_pimg=_B;_th_h=max(56,int(68*A.metrics.get('k',1.)))
+						_pimg=_B;_th_h=max(34,int(42*A.metrics.get('k',1.)))
 						try:
 							import io as _io;from PIL import Image as _PIL_I,ImageTk as _PIL_T
 							_im=_PIL_I.open(_io.BytesIO(_lraw));_im.thumbnail((int(_th_h*1.6),_th_h),_PIL_I.LANCZOS);_pimg=_PIL_T.PhotoImage(_im)
@@ -604,15 +607,15 @@ class HomeGridApp(DialogsMixin):
 							try:import base64 as _b64;_pimg=tk.PhotoImage(data=_b64.b64encode(_lraw))
 							except Exception:_pimg=_B
 						if _pimg is not _B:
-							_pal_l=A._get_palette();A._srv_logo_img=_pimg;A.lbl_srv_logo.configure(image=_pimg,bg=_pal_l[_N],highlightbackground=_pal_l[_O]);A.lbl_srv_logo.grid(row=0,column=4,rowspan=2,sticky='ns',padx=(8,0),pady=2)
-						else:A.lbl_srv_logo.grid_forget()
-					else:A.lbl_srv_logo.grid_forget()
+							_pal_l=A._get_palette();A._srv_logo_img=_pimg;A.lbl_srv_logo.configure(image=_pimg,bg=_pal_l[_N],highlightbackground=_pal_l[_O]);A.lbl_srv_logo.pack(side=_E,padx=(0,8))
+						else:A.lbl_srv_logo.pack_forget()
+					else:A.lbl_srv_logo.pack_forget()
 			if hasattr(A,'lbl_srv_hw'):
-				_raw_hw=(getattr(A.engine,'server_hw_status','')or'')if(not 0 and getattr(A.engine,'server_logo_sig',_B))else'';_hws=tr(_raw_hw,A.state.get('lang','uk'))if _raw_hw else''
+				_raw_hw=(getattr(A.engine,'server_hw_status','')or'')if(not 0 and getattr(A.engine,'server_logo_sig',_B))else'';_hws=tr(_raw_hw,D.get('lang','uk'))if _raw_hw else''
 				if getattr(A,'_last_srv_hw_s',_B)!=_hws:
 					A._last_srv_hw_s=_hws;_pal_h=A._get_palette()
-					if _hws:A.lbl_srv_hw.configure(text=_hws,bg=_pal_h[_N],fg=_pal_h[_P]);A.lbl_srv_hw.grid(row=0,column=5,rowspan=2,sticky='w',padx=(8,2),pady=2)
-					else:A.lbl_srv_hw.grid_forget()
+					if _hws:A.lbl_srv_hw.configure(text=_hws,bg=_pal_h[_N],fg=_pal_h[_P],padx=8,pady=2);A.footer_inv.configure(bg=_pal_h[_A]);A.footer_inv.pack(side=_E,expand=_D);A.lbl_srv_hw.pack(side=_E)
+					else:A.lbl_srv_hw.pack_forget();(not A.lbl_srv_logo.winfo_ismapped())and A.footer_inv.pack_forget()
 			if hasattr(A,'lbl_srv_badge'):
 				T=getattr(A.engine,'diag_net','')or'';U=getattr(A.engine,'diag_ping','')or'';AD_L=getattr(A.engine,'diag_adapter','')or'';m=T,U,AD_L,H
 				if getattr(A,'_last_srv_b_sig',_B)!=m:

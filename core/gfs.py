@@ -1,5 +1,5 @@
 # patch-id: gfs-scan-cache-2.07
-# [ФАЙЛ: core/gfs.py (v2.08 | 22.11.2026 09:10) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
+# [ФАЙЛ: core/gfs.py (v2.09 | 22.11.2026 09:10) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
 _I='(^|_)KEEP(_|\\.)'
 _H='new_tag'
 _G='backup_dir'
@@ -78,7 +78,7 @@ def apply_gfs_cleanup(engine,skip_prompt=_C,sync_cloud=_B):
 					P+=1
 	J=0;M=round(sum(A['size']for A in B)/1048576.,1);T=not B
 	if B:
-		Z='Видалити назавжди з диска'if G==W else'Перемістити у Кошик';a=_B if skip_prompt else A.ask_modal('confirm','Очищення старих бекапів',f"{Z} {len(B)} застарілих копій ({M} МБ)?")
+		Z='Видалити назавжди з диска'if G in(W,'direct') else'Перемістити у Кошик';a=_B if skip_prompt else A.ask_modal('confirm','Очищення старих бекапів',f"{Z} {len(B)} застарілих копій ({M} МБ)?")
 		if a:
 			U=25
 			for D in range(0,len(B),U):
@@ -88,7 +88,7 @@ def apply_gfs_cleanup(engine,skip_prompt=_C,sync_cloud=_B):
 						J+=1;V=C[_A]+_D
 						if os.path.exists(V):remove_backup_file(V,G)
 				A.set_progress(min(100,int((D+len(F))*100/len(B))),f"Ротація GFS: {min(D+len(F),len(B))}/{len(B)}")
-			T=J==len(B);b='Видалено з диска назавжди'if G==W else'Переміщено у Кошик';A.log(f"{b}: {J} файл(ів) ({M} МБ).",'ok')
+			T=J==len(B);b='Видалено з диска назавжди'if G in(W,'direct') else'Переміщено у Кошик';A.log(f"{b}: {J} файл(ів) ({M} МБ).",'ok')
 		else:A.log('Очищення застарілих архівів пропущено.','info')
 	if sync_cloud and A.state.get('cloud_enabled'):
 		try:from core.cloud import sync_cloud_backups as c;c(A,prune=T)

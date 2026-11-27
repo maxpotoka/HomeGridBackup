@@ -1,3 +1,4 @@
+# patch-id: disk-check-and-gfs-prompt-4.07
 # patch-id: remove-server-version-probe-4.02
 # patch-id: health-endpoint-and-srv-version-4.00
 # patch-id: actionable-errors-and-terms-3.99c
@@ -12,7 +13,7 @@
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.32 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.38 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -163,6 +164,19 @@ def _backup_stage1_prepare(engine,raw_url,force_skip):
 			if re.search('"ok"\\s*:\\s*true',K):A.log('Авторизацію підтверджено сервером!',_F);break
 			raise RuntimeError('Сервер не повернув cookie сесії.')
 	else:A.log('Активну сесію підтверджено.',_F)
+	try:
+		_zc,_zm,_=A.get_storage_stats();_est_b=int((_zm/max(1,_zc))*1048576*2)if(_zc>0 and _zm>0)else 268435456;_est_b=max(268435456,_est_b)
+		if shutil.disk_usage(b).free<_est_b:
+			from core.gfs import apply_gfs_cleanup as _p_ac,compute_gfs_plan as _p_ad
+			_,_,_p_del=_p_ad(A.state)
+			if _p_del:
+				_p_rm,_,_=_p_ac(A,skip_prompt=bool(SILENT_MODE),sync_cloud=_B)
+				if _p_rm>0:time.sleep(0.5);A._archive_snapshot_cache_time=0;A._chart_rev=getattr(A,'_chart_rev',0)+1
+				if _p_rm<=0:raise RuntimeError("\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u0435 \u043a\u043e\u043f\u0456\u044e\u0432\u0430\u043d\u043d\u044f \u0441\u043a\u0430\u0441\u043e\u0432\u0430\u043d\u043e: \u043d\u0435 \u0437\u0432\u0456\u043b\u044c\u043d\u0435\u043d\u043e \u043c\u0456\u0441\u0446\u0435 \u043d\u0430 \u0434\u0438\u0441\u043a\u0443.")
+			_fr0=shutil.disk_usage(b).free
+			if _fr0<_est_b:raise RuntimeError(f"\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043d\u044c\u043e \u0432\u0456\u043b\u044c\u043d\u043e\u0433\u043e \u043c\u0456\u0441\u0446\u044f \u043d\u0430 \u0434\u0438\u0441\u043a\u0443 ({_fr0/1048576.:.1f} \u041c\u0411, \u043f\u043e\u0442\u0440\u0456\u0431\u043d\u043e ~{_est_b/1048576.:.0f} \u041c\u0411).")
+	except RuntimeError:raise
+	except Exception:0
 	A.set_progress(_D,'\u0417\u0430\u043f\u0438\u0442 \u043d\u0430 \u043f\u0456\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0443 \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u043e\u0457 \u043a\u043e\u043f\u0456\u0457...');fmt_q='tar.zst';B,L,D,B,V,B=invoke_http(f"{C}/api/migration/export/prepare?format={fmt_q}",A.state,_L,json.dumps({'format':fmt_q}),timeout=15.);M=_B
 	while D and _o in D:
 		if A.state[_V]:G=A.state[_V]
@@ -207,7 +221,7 @@ class _HashingReader:
 			B=A._f.read(buf_size)
 			if not B:break
 			A.hasher.update(B);A.hashed_pos+=len(B)
-def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_total=0,buf_size=1048576,cancel_flag=_D,io_pause=_C):
+def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_total=0,buf_size=65536,cancel_flag=_D,io_pause=_C):
 	T=io_pause;S=cancel_flag;R=overall_total;Q=progress_callback;D=zip_path;C='detail';B='name';A=os.path.basename(D)
 	if not os.path.isfile(D):return{B:A,_G:_I,C:'Файл не знайдено'}
 	U=D+_W;E=os.path.exists(U);G=''
@@ -269,7 +283,7 @@ def verify_single_archive(zip_path,progress_callback=_D,overall_start=0,overall_
 	if not E:return{B:A,_G:_E,C:f"ZIP OK ({N} файлів), але файл .sha256 відсутній"}
 	if M.hasher.hexdigest().lower()==G and G:return{B:A,_G:_F,C:f"Цілісність 100% підтверджена ({N} файлів)"}
 	return{B:A,_G:_I,C:'УВАГА! Контрольна сума SHA-256 не збігається'}
-def verify_all_archives(state,progress_callback=_D,buf_size=1048576,cancel_flag=_D):
+def verify_all_archives(state,progress_callback=_D,buf_size=65536,cancel_flag=_D):
 	G=state;D=progress_callback;B=cancel_flag;S=time.time();T=VERIFY_PAUSE_LITE if(G.get('lite_mode')or _IS_32BIT)else _C;buf_size=min(int(buf_size),262144)if _IS_32BIT else buf_size;E=G[_e];os.makedirs(E,exist_ok=_A);C=[]
 	for H in os.listdir(E):
 		if H.lower().endswith(_g):
@@ -378,6 +392,19 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 			if E and E!=R:V=max(_C,time.time()-b);T['db'if('db'in str(E).lower()or'connect'in str(E).lower())else'history'if('history'in str(E).lower()or'device'in str(E).lower())else(E if E in T else _b)]+=V;_record_cloud_event(A,S,_J,stage=f"server_{E}",duration_sec=V)
 			A._last_srv_timings={A:round(B,1)for(A,B)in T.items()};A._last_srv_timings[_j]=time.time();A._last_srv_timings['raw_mb']=round(_pk/1048576.,2)if _pk>0 else _C;A.set_progress(1,f"[{C}] Архів готовий (1%). Завантаження...");break
 		if D.get(_G)==_X or F==_X:raise RuntimeError(f"Сервер {C} повідомив про помилку під час створення архіву!")
+	try:
+		_need_b=int(H*2)if H>0 else 268435456
+		if shutil.disk_usage(k).free<_need_b:
+			from core.gfs import apply_gfs_cleanup as _pre_ac,compute_gfs_plan as _pre_ad
+			_,_,_pre_del=_pre_ad(A.state)
+			if _pre_del:
+				_pre_rm,_,_=_pre_ac(A,skip_prompt=bool(SILENT_MODE),sync_cloud=_B)
+				if _pre_rm>0:time.sleep(0.5);A._archive_snapshot_cache_time=0;A._chart_rev=getattr(A,'_chart_rev',0)+1
+				if _pre_rm<=0:raise RuntimeError("\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u0435 \u043a\u043e\u043f\u0456\u044e\u0432\u0430\u043d\u043d\u044f \u0441\u043a\u0430\u0441\u043e\u0432\u0430\u043d\u043e: \u043d\u0435 \u0437\u0432\u0456\u043b\u044c\u043d\u0435\u043d\u043e \u043c\u0456\u0441\u0446\u0435 \u043d\u0430 \u0434\u0438\u0441\u043a\u0443.")
+			_fr_b=shutil.disk_usage(k).free
+			if _fr_b<_need_b:raise RuntimeError(f"\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043d\u044c\u043e \u0432\u0456\u043b\u044c\u043d\u043e\u0433\u043e \u043c\u0456\u0441\u0446\u044f \u043d\u0430 \u0434\u0438\u0441\u043a\u0443 ({_fr_b/1048576.:.1f} \u041c\u0411).")
+	except RuntimeError:raise
+	except Exception:0
 	A7=format_backup_dt(datetime.now());_ext='.tar.zst';M=os.path.join(a,f"homegrid_backup_DAILY_{A7}{_ext}");A8=1
 	while os.path.exists(M):M=os.path.join(a,f"homegrid_backup_DAILY_{A7}_{A8}{_ext}");A8+=1
 	import tempfile as AV;A9=_B;k=a;AA=not bool(A.state.get(_O,_A))and bool(A.state.get(_T))and bool((A.state.get(_K)or'').strip())
@@ -455,7 +482,7 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u043e: {j}"]if L else[])+([f"\u041c\u0435\u0440\u0435\u0436\u0430: {A.state.get(_K)}"]if R else[]);A.log('\u041f\u0440\u0438\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044f: '+' | '.join(AL),_H)
 		if L and R:A.log('Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.',_H)
 		AM=time.time();_record_cloud_event(A,C,_M,stage=AC);k,AN,AO=_backup_stage1_prepare(A,raw_url,force_skip);_record_cloud_event(A,C,_J,stage=AC,duration_sec=time.time()-AM,result=g);AP=time.time();_record_cloud_event(A,C,'milestone',stage='server_job_ready');AQ,H,l=_download_backup_zip(A,k,AN,AO,j,C);B=AQ;S=time.time();M=os.path.getsize(B);D=M/1048576.;_record_cloud_event(A,C,_M,stage=AD,archive=B);_record_cloud_event(A,C,_M,stage=AE,archive=B);m,AR=(1,97);A.set_progress(m,f"Перевірка CRC32 + SHA-256: 0.0 / {D:.1f} МБ");AS=0;n=time.time()
-		_vbuf=262144 if _IS_32BIT else 1048576
+		_vbuf=65536
 		with open(B,'rb',buffering=_vbuf)as AT:
 			K=_HashingReader(AT)
 			if B.lower().endswith('.tar.zst'):
