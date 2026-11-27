@@ -1,10 +1,11 @@
+# patch-id: chart-journal-only-4.05
 # patch-id: hide-inv-img-in-lite-and-en-hw-4.04b
 # patch-id: server-hw-status-ui-4.03b
 # patch-id: server-inverter-image-fix-display-3.93
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.46 | 27.11.2026 01:08) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.54 | 27.11.2026 01:08) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -256,7 +257,7 @@ class HomeGridApp(DialogsMixin):
 		A.ent_dir.bind(Q,lambda e:A.save_dir_manual());A.ent_net.bind(Q,lambda e:A.save_net_manual());A.ent_cld.bind(Q,lambda e:A.save_cloud_path_manual());A.ent_cld.bind(g,lambda e:A.save_cloud_path_manual())
 		A.card_stat=tk.Frame(A.top_split,padx=F,pady=E,bd=0,highlightthickness=1);A.card_stat.grid(row=0,column=1,sticky=I,padx=(max(6,F//2),0))
 		A.lbl_c2=tk.Label(A.card_stat,text='\u0421\u0445\u043e\u0432\u0438\u0449\u0435 \u0442\u0430 \u0430\u043d\u0430\u043b\u0456\u0442\u0438\u043a\u0430',font=(A._base_fam,B,_C),anchor=_s);A.lbl_c2.pack(fill=D,pady=(0,6))
-		A.var_spark_lbl=tk.StringVar(value='');A.lbl_spark=tk.Label(A.card_stat,textvariable=A.var_spark_lbl,anchor=_J,font=(A._base_fam,max(7,B-2)));A.lbl_spark.pack(fill=D,pady=(0,1));A.spark_cv=tk.Canvas(A.card_stat,height=86,bd=0,highlightthickness=1);A.spark_cv.pack(fill=D,pady=(0,4));A._spark_nodes=[];A._spark_base_lbl='';A.spark_cv.bind('<Motion>',A._on_spark_hover);A.spark_cv.bind('<Leave>',A._on_spark_leave);A.dest_rows={}
+		A.var_spark_lbl=tk.StringVar(value='');A.lbl_spark=tk.Label(A.card_stat,width=1,textvariable=A.var_spark_lbl,anchor=_J,font=(A._base_fam,max(7,B-2)));A.lbl_spark.pack(fill=D,pady=(0,1));A.spark_cv=tk.Canvas(A.card_stat,height=86,bd=0,highlightthickness=1);A.spark_cv.pack(fill=D,pady=(0,4));A._spark_nodes=[];A._spark_base_lbl='';A.spark_cv.bind('<Motion>',A._on_spark_hover);A.spark_cv.bind('<Leave>',A._on_spark_leave);A.dest_rows={}
 		for(a,i)in((_t,'МЕРЕЖА:'),(_g,'PCLOUD:')):
 			N=tk.Frame(A.card_stat);b=tk.StringVar(value='—');c=tk.Label(N,text=i,font=(A._base_fam,max(8,B-2),_C));c.pack(side=_E,padx=(0,5));d=tk.Label(N,textvariable=b,font=(A._base_fam,max(8,B-1),_C));d.pack(side=_E)
 			if a==_g:A.btn_refresh_cld=tk.Button(N,text=chr(8635),command=A._force_refresh_pcloud_stats,padx=5,pady=0,bd=0,highlightthickness=1,cursor=_G);A.btn_refresh_cld.pack(side=_E,padx=(6,0));ToolTip(A.btn_refresh_cld,'Оновити статистику pCloud')
@@ -405,11 +406,11 @@ class HomeGridApp(DialogsMixin):
 		if not A.engine.is_running:A.engine.state['session_token']=A.engine.state['login_pin']=A.engine.state['editor_pin']=A.engine.state['server_pins_json']='';commit_state(A.engine.state);A.engine.log('Збережені PIN-коди та токен сесії очищено (Keyring / .env).',_S)
 	def choose_dir(A):
 		B=choose_folder_native(A.engine.state[_R])
-		if B:A.engine.state[_R]=B;A.var_dir.set(B);commit_state(A.engine.state);A.engine.log(f"Папку збереження змінено на: {B}",_Q)
-	def reset_dir(A):A.engine.state[_R]=os.path.normpath(DEFAULT_BACKUP_DIR);A.var_dir.set(A.engine.state[_R]);commit_state(A.engine.state);A.engine.log(f"Папку збереження встановлено: {A.engine.state[_R]}",_Q)
+		if B:A.engine.state[_R]=B;A.var_dir.set(B);commit_state(A.engine.state);A.engine._chart_rev=getattr(A.engine,'_chart_rev',0)+1;A.engine._archive_snapshot_cache_time=0;A.engine.log(f"Папку збереження змінено на: {B}",_Q)
+	def reset_dir(A):A.engine.state[_R]=os.path.normpath(DEFAULT_BACKUP_DIR);A.var_dir.set(A.engine.state[_R]);commit_state(A.engine.state);A.engine._chart_rev=getattr(A.engine,'_chart_rev',0)+1;A.engine._archive_snapshot_cache_time=0;A.engine.log(f"Папку збереження встановлено: {A.engine.state[_R]}",_Q)
 	def save_dir_manual(A):
 		B=A.var_dir.get().strip()
-		if B:A.engine.state[_R]=os.path.normpath(os.path.expanduser(B));commit_state(A.engine.state)
+		if B:_np=os.path.normpath(os.path.expanduser(B));(_np!=A.engine.state.get(_R))and setattr(A.engine,'_chart_rev',getattr(A.engine,'_chart_rev',0)+1);A.engine.state[_R]=_np;commit_state(A.engine.state)
 	def choose_mirror(A):
 		if not bool(A.var_mir_en.get()):return
 		D=A.engine.state.get(_A3)or A.engine.state[_R];B=choose_folder_native(D)
@@ -517,8 +518,7 @@ class HomeGridApp(DialogsMixin):
 			f=time.monotonic()
 			if f-getattr(A,'_last_disk_t',.0)>=5.5 or not A.engine.is_running:A._last_disk_t=f;A._cached_disk=A.engine.get_storage_stats()
 			C=D.get(_U,_V);H=D.get(_r,_Z);P=bool(D.get(_a,_F));g=A.metrics[_L];h,i,Q=getattr(A,'_cached_disk',(0,.0,-1));j=h,i,Q,C
-			_mser=A.engine.get_monthly_log_series()if hasattr(A.engine,'get_monthly_log_series')else()
-			j=h,i,Q,C,H,_mser,(A.disk_bar.winfo_width()if hasattr(A,'disk_bar')else 0)
+			j=h,i,Q,C,H,(A.disk_bar.winfo_width()if hasattr(A,'disk_bar')else 0)
 			if getattr(A,'_last_disk_sig',_B)!=j:
 				A._last_disk_sig=j;sz_s=f"{round(i/1024.0,2)} {'ГБ'if C=='uk'else'GB'}"if i>=1024 else f"{round(i,1)} {'МБ'if C=='uk'else'MB'}";fr_s=f"{Q} {'ГБ'if C=='uk'else'GB'}"if Q>=0 else'—';A.var_k_size.set(sz_s);A.var_k_cnt.set(str(h));A.var_k_free.set(fr_s);A.var_k_l1.set('Обсяг архівів'if C=='uk'else'Archives size');A.var_k_l2.set('Архівів'if C=='uk'else'Archives');A.var_k_l3.set('Вільно'if C=='uk'else'Free space')
 				B_p=A._get_palette()
@@ -539,26 +539,42 @@ class HomeGridApp(DialogsMixin):
 						tot_gb=(i/1024.0)+max(0.0,float(Q));pct_f=int(round((i/1024.0)/max(0.1,tot_gb)*100))if tot_gb>0 else 0;fill_w=max(4,int(round(iw*min(1.0,(i/1024.0)/max(0.1,tot_gb)))))if i>0 else 0
 						if fill_w>0:A.disk_bar.create_rectangle(1,1,1+fill_w,bh-1,fill=B_p[_K],outline='')
 						A.var_disk_pct.set(f"{_lbl_b}: {pct_f}%");A.var_disk_det.set(f"{_lbl_b}: {sz_s}  \u2022  {_lbl_f}: {fr_s}")
-				if hasattr(A,'lbl_spark')and hasattr(A,'spark_cv')and A.spark_cv.winfo_exists():
-					A.spark_cv.delete('all');A._spark_nodes=[];sw=max(160,A.spark_cv.winfo_width());bot_y=68
-					for gy in(14,41,bot_y):A.spark_cv.create_line(6,gy,sw-38,gy,fill=B_p[_O],dash=(2,3))
-					if _mser:
-						vals=[x[1]for x in _mser];mx=max(vals+[0.1]);tot_m=round(sum(vals),1);tot_c=sum(x[2]for x in _mser)
-						nz=[v for v in vals if v>0];rng=f"{min(nz)}→{max(nz)} "if len(nz)>1 else(f"{nz[0]} "if nz else'0 ');A._spark_base_lbl=(f"Розмір архіву (6 міс.): {rng}МБ"if C=='uk'else f"Archive size (6 mo): {rng}MB");A.var_spark_lbl.set(A._spark_base_lbl)
-						pad_l,pad_r,top_y=16,42,7;n_p=len(_mser);coords=[]
-						for k,(ml,v_mb,cnt_a)in enumerate(_mser):
-							px=pad_l+int((sw-pad_l-pad_r)*(k/max(1,n_p-1)));py=bot_y-int((bot_y-top_y)*(v_mb/mx))if v_mb>0 else bot_y
-							coords.append((px,py));A._spark_nodes.append((px,py,v_mb,f"{ml} ({cnt_a})"))
-							A.spark_cv.create_text(px,78,text=ml,fill=B_p[_H]if k==n_p-1 else B_p[_I],font=(A._base_fam,max(7,g-3),_C if k==n_p-1 else _Y))
-						poly=[coords[0][0],bot_y]+[c for pt in coords for c in pt]+[coords[-1][0],bot_y]
+			_sp_sig=(getattr(A.engine,'_chart_rev',0),C,H,(A.spark_cv.winfo_width()if hasattr(A,'spark_cv')else 0))
+			if getattr(A,'_last_spark_sig',_B)!=_sp_sig and hasattr(A,'lbl_spark')and hasattr(A,'spark_cv')and A.spark_cv.winfo_exists():
+				A._last_spark_sig=_sp_sig;B_p=A._get_palette();_mser=A.engine.get_backup_size_series(60)if hasattr(A.engine,'get_backup_size_series')else()
+				A.spark_cv.delete('all');A._spark_nodes=[];sw=max(160,A.spark_cv.winfo_width());bot_y=68
+				for gy in(14,41,bot_y):A.spark_cv.create_line(6,gy,sw-38,gy,fill=B_p[_O],dash=(2,3))
+				if _mser:
+					vals=[v for (_,v,_,_)in _mser];mx=max(vals+[0.1]);nz=[v for v in vals if v>0];rng=f"{min(nz)}\u2192{max(nz)} "if len(nz)>1 else(f"{min(nz)} "if nz else'0 ');A._spark_base_lbl=(f"\u0420\u043e\u0437\u043c\u0456\u0440 \u0444\u0430\u0439\u043b\u0456\u0432 ({len(_mser)}): {rng}\u041c\u0411"if C=='uk'else f"File size ({len(_mser)}): {rng}MB");A.var_spark_lbl.set(A._spark_base_lbl)
+					pad_l,pad_r,top_y=12,42,16;n_p=len(_mser);plot_w=max(40,sw-pad_l-pad_r);step_x=max(1,n_p//5)
+					if n_p<=12:
+						slot_w=plot_w/max(1,n_p);bar_w=max(6,min(26,int(slot_w*0.64)))
+						for k,(ml,v_mb,det_s,ts_s)in enumerate(_mser):
+							cx=pad_l+int((k+0.5)*slot_w);bar_h=max(3,int((bot_y-top_y)*(v_mb/mx)))if v_mb>0 else 0;by=bot_y-bar_h;x1=cx-bar_w//2;x2=x1+bar_w
+							b_col=B_p[_P]if k==n_p-1 else B_p[_K]
+							if bar_h>0:A.spark_cv.create_rectangle(x1,by,x2,bot_y,fill=b_col,outline='')
+							A._spark_nodes.append((cx,by,v_mb,str(ts_s)))
+							val_s=f"{round(v_mb/1024.0,1)}G"if v_mb>=1024 else f"{int(round(v_mb))}"
+							if v_mb>0:A.spark_cv.create_text(cx,max(9,by-2),text=val_s,anchor='s',fill=B_p[_H]if k==n_p-1 else B_p[_I],font=(A._base_fam,max(6,g-4),_C if k==n_p-1 else _Y))
+							if k%step_x==0 or k==n_p-1:A.spark_cv.create_text(cx,78,text=ml,fill=B_p[_H]if k==n_p-1 else B_p[_I],font=(A._base_fam,max(7,g-3),_C if k==n_p-1 else _Y))
+					else:
+						coords=[];flat=[]
+						for k,(ml,v_mb,det_s,ts_s)in enumerate(_mser):
+							px=pad_l+int(plot_w*(k/max(1,n_p-1)));py=bot_y-int((bot_y-top_y)*(v_mb/mx))if v_mb>0 else bot_y
+							coords.append((px,py));flat.extend((px,py));A._spark_nodes.append((px,py,v_mb,str(ts_s)))
+							if k%step_x==0 or k==n_p-1:A.spark_cv.create_text(px,78,text=ml,fill=B_p[_H]if k==n_p-1 else B_p[_I],font=(A._base_fam,max(7,g-3),_C if k==n_p-1 else _Y))
+						_p0=next(iter(coords));_pl=coords[-1];x0,y0=_p0;xl,yl=_pl;poly=[x0,bot_y]+flat+[xl,bot_y]
 						A.spark_cv.create_polygon(*poly,fill=B_p[_K],stipple='gray25',outline='')
-						A.spark_cv.create_line(*[c for pt in coords for c in pt],fill=B_p[_K],width=2,smooth=True)
+						A.spark_cv.create_line(*flat,fill=B_p[_K],width=2,smooth=len(coords)>=3)
 						for idx_p,(px,py)in enumerate(coords):
-							r_p=3 if idx_p==n_p-1 else 2;col_p=B_p[_P]if idx_p==n_p-1 else B_p[_K]
-							A.spark_cv.create_oval(px-r_p,py-r_p,px+r_p,py+r_p,fill=col_p,outline=B_p[_N])
-						mx_s=f"{round(mx/1024.0,1)}G"if mx>=1024 else f"{int(round(mx))}M"
-						A.spark_cv.create_text(sw-4,7,text=mx_s,anchor='ne',fill=B_p[_I],font=(A._base_fam,max(7,g-3)))
-						A.spark_cv.create_text(sw-4,bot_y,text='0',anchor='se',fill=B_p[_I],font=(A._base_fam,max(7,g-3)))
+							if idx_p==n_p-1 or idx_p%max(1,n_p//12)==0:
+								r_p=3 if idx_p==n_p-1 else 2;col_p=B_p[_P]if idx_p==n_p-1 else B_p[_K]
+								A.spark_cv.create_oval(px-r_p,py-r_p,px+r_p,py+r_p,fill=col_p,outline=B_p[_N])
+					lv=vals[-1]if vals else 0.0;mx_s=f"{round(lv/1024.0,1)}G"if lv>=1024 else f"{int(round(lv))}M"
+					A.spark_cv.create_text(sw-2,7,text=mx_s,anchor='ne',fill=B_p[_H],font=(A._base_fam,max(7,g-3),_C))
+					A.spark_cv.create_text(sw-4,bot_y,text='0',anchor='se',fill=B_p[_I],font=(A._base_fam,max(7,g-3)))
+				else:
+					A._spark_base_lbl=('\u0420\u043e\u0437\u043c\u0456\u0440 \u0444\u0430\u0439\u043b\u0456\u0432: \u043d\u0435\u043c\u0430\u0454 \u0437\u0430\u043f\u0438\u0441\u0456\u0432'if C=='uk'else'File size: no records');A.var_spark_lbl.set(A._spark_base_lbl)
 			if hasattr(A,_AQ):
 				with A.engine.lock:A8=dict(getattr(A.engine,_A2,{})or{})
 				A9={_t:_F,_g:bool(D.get(_k))};B=A._get_palette()

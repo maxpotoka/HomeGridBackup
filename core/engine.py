@@ -1,5 +1,6 @@
+# patch-id: chart-journal-only-4.05
 # patch-id: fix-net-drive-status-and-build-retry-2.78
-# [ФАЙЛ: core/engine.py (v2.10 | 25.11.2026 14:42) — ЯДРО ДВИЖКА BACKUPENGINE]
+# [ФАЙЛ: core/engine.py (v2.14 | 25.11.2026 14:42) — ЯДРО ДВИЖКА BACKUPENGINE]
 _b='.sha256'
 _a='_dest_stats_started'
 _Z='pcloud'
@@ -40,7 +41,7 @@ def _to_con_en(txt):
 	A=re.sub('\\bМБ/с\\b','MB/s',A);A=re.sub('\\bКБ/с\\b','KB/s',A);A=re.sub('\\bМБ\\b','MB',A);A=re.sub('\\bмс\\b','ms',A);A=re.sub('(\\d+)\\s*хв\\s*([\\d.]+)\\s*с','\\1m \\2s',A);A=re.sub('(?<=\\d)\\s*с(?=\\b|\\)|\\.)',' s',A);A=re.sub('\\bза\\s+(?=\\d)','in ',A);A=re.sub('\\bіз\\s+(?=\\d)','of ',A);return A
 class BackupEngine:
 	def __init__(A):
-		A.state=load_state();A.lock=threading.Lock();A.cloud_sync_worker_lock=threading.Lock();A.is_running=_B;A.show_hw_notice=bool(A.state.get('hw_auto_notice'));A.progress=0;A.indeterminate=_B;A.sys_summary=get_fast_sysinfo();A.stage=tr('Готовий до резервного копіювання',A.state.get(_E,_H));A.pill_text=f"v{SCRIPT_VER} | {BUILD_DATE}";A.pill_type=_K;A.op_history=list(A.state.get(_I)or[]);A.diag_net='Не перевірено';A.diag_ping='— мс';A.logs=[];A._file_log_buf=[];A._file_log_last_flush=time.monotonic();atexit.register(A.flush_logs);A.modal=_A;A.modal_event=threading.Event();A.modal_result=_A;A.exit_code=0;A.tray_icon=_A;A.tray_spin_idx=0;A.app_ref=_A;A._last_cli_print=_C;A._cli_inline_active=_B;A._storage_stats_cache=_A;A._storage_stats_cache_time=_C;A._storage_stats_cache_dir=_A;A._last_backup_cache=_A;A._last_backup_cache_time=_C;A._last_backup_cache_dir=_A;A._archive_snapshot_cache=_A;A._archive_snapshot_cache_time=_C;A._archive_snapshot_cache_dir=_A;A._dest_stats={_R:_A,_S:_A,_Z:_A};A._dest_stats_event=threading.Event();A._dest_stats_started=_B;os.makedirs(A.state[_F],exist_ok=_D);B='HIDDEN'if HIDDEN_MODE else'SILENT'if SILENT_MODE else'CLI'if CLI_MODE else'APP';C='Keyring'if A.state['storage_backend']=='keyring'else'.env';A.log(f"Систему запущено (v{SCRIPT_VER} від {BUILD_DATE}, {B}, сховище: {C}). Каталог: {A.state[_F]}",_M)
+		A.state=load_state();A.lock=threading.Lock();A.cloud_sync_worker_lock=threading.Lock();A.is_running=_B;A.show_hw_notice=bool(A.state.get('hw_auto_notice'));A.progress=0;A.indeterminate=_B;A.sys_summary=get_fast_sysinfo();A.stage=tr('Готовий до резервного копіювання',A.state.get(_E,_H));A.pill_text=f"v{SCRIPT_VER} | {BUILD_DATE}";A.pill_type=_K;A.op_history=list(A.state.get(_I)or[]);A._chart_rev=0;A.diag_net='Не перевірено';A.diag_ping='— мс';A.logs=[];A._file_log_buf=[];A._file_log_last_flush=time.monotonic();atexit.register(A.flush_logs);A.modal=_A;A.modal_event=threading.Event();A.modal_result=_A;A.exit_code=0;A.tray_icon=_A;A.tray_spin_idx=0;A.app_ref=_A;A._last_cli_print=_C;A._cli_inline_active=_B;A._storage_stats_cache=_A;A._storage_stats_cache_time=_C;A._storage_stats_cache_dir=_A;A._last_backup_cache=_A;A._last_backup_cache_time=_C;A._last_backup_cache_dir=_A;A._archive_snapshot_cache=_A;A._archive_snapshot_cache_time=_C;A._archive_snapshot_cache_dir=_A;A._dest_stats={_R:_A,_S:_A,_Z:_A};A._dest_stats_event=threading.Event();A._dest_stats_started=_B;os.makedirs(A.state[_F],exist_ok=_D);B='HIDDEN'if HIDDEN_MODE else'SILENT'if SILENT_MODE else'CLI'if CLI_MODE else'APP';C='Keyring'if A.state['storage_backend']=='keyring'else'.env';A.log(f"Систему запущено (v{SCRIPT_VER} від {BUILD_DATE}, {B}, сховище: {C}). Каталог: {A.state[_F]}",_M)
 		if A.state.pop('_android_storage_fallback',_B):A.log(f"Папка резервних копій недоступна; використовується внутрішнє сховище Android: {A.state[_F]}",_N)
 		A.log(f"ОС та залізо: {A.sys_summary}",_M);from core.config import AUTO_CLI_FALLBACK as D
 		if D:A.log('Графічний сервер (DISPLAY/WSLg) недоступний — автоматично увімкнено консольний режим (--cli).',_N)
@@ -167,7 +168,7 @@ class BackupEngine:
 		for(G,E)in(('started_at',started_at),('finished_at',finished_at)):
 			if E is not _A:D[G]=C.fromtimestamp(float(E)).astimezone().isoformat(timespec='seconds')
 		if not hasattr(A,_I):A.op_history=list(A.state.get(_I)or[])
-		A.op_history.insert(0,D);A.op_history=A.op_history[:25];A.state[_I]=A.op_history;A._storage_stats_cache_time=_C;A._last_backup_cache_time=_C;A._archive_snapshot_cache_time=_C;A.request_dest_stats_refresh()
+		A.op_history.insert(0,D);A.op_history=A.op_history[:25];A.state[_I]=A.op_history;A._chart_rev=(getattr(A,'_chart_rev',0)+1 if status_lbl==_Q else getattr(A,'_chart_rev',0));A._storage_stats_cache_time=_C;A._last_backup_cache_time=_C;A._archive_snapshot_cache_time=_C;A.request_dest_stats_refresh()
 		try:F(A.state)
 		except Exception:0
 	def get_last_backup_info(A,force=_B):
@@ -190,6 +191,41 @@ class BackupEngine:
 					else:B=f"{I}\n{J} МБ{E}  •  Без .sha256",_N
 			except Exception:B='Невідомо',_K
 		A._last_backup_cache=B;A._last_backup_cache_time=G;A._last_backup_cache_dir=C;A._last_backup_cache_lang=A.state.get(_E,_H);return B
+	def get_backup_size_series(A,limit=60):
+		from core.config import get_logs_dir
+		pts=[];seen=set()
+		for it in A.get_archive_snapshot():
+			fn=it.get('name')or'';mb=round(float(it.get(_T)or 0)/1048576.0,1)
+			if not fn or fn in seen or mb<=0:continue
+			seen.add(fn);ts_v=float(it.get(_V)or 0);dt_o=datetime.fromtimestamp(ts_v)
+			pts.append((ts_v,dt_o.strftime('%d.%m'),mb,fn,dt_o.strftime(_W)))
+		for op in(getattr(A,_I,[])or[]):
+			if not isinstance(op,dict)or op.get(_L)!=_Q:continue
+			mb=float(op.get(_Y)or 0.0)
+			if mb<=0:continue
+			det=os.path.basename(str(op.get(_X)or'').partition(' (').__getitem__(0).strip())
+			if det and det in seen:continue
+			if det:seen.add(det)
+			ts=str(op.get(_O,'')).strip();lbl=ts[:5]if len(ts)>=5 else ts
+			try:ts_v=datetime.strptime(ts,_W).timestamp()
+			except Exception:ts_v=0.0
+			pts.append((ts_v,lbl,round(mb,1),det or ts,ts))
+		lp=os.path.join(get_logs_dir(A.state),'backup.log')
+		if os.path.isfile(lp):
+			try:
+				with open(lp,'r',encoding='utf-8',errors='ignore')as f:lines=f.readlines()
+				for ln in reversed(lines):
+					if '.zip'not in ln and '.tar.zst'not in ln:continue
+					m1=re.search(r'\[(\d{4}-(\d{2})-(\d{2})\s+(\d{2}:\d{2})[^\]]*)\].*?([a-za-z0-9_.-]+\.(?:zip|tar\.zst)).*?([0-9]+(?:\.[0-9]+)?)\s*(?:\u041c\u0411|mb)',ln,re.I)
+					if m1 and m1.group(5)not in seen:
+						seen.add(m1.group(5));lbl=f'{m1.group(3)}.{m1.group(2)}'
+						try:dt_l=datetime.strptime(m1.group(1)[:16],'%Y-%m-%d %H:%M');ts_v=dt_l.timestamp();ts_f=dt_l.strftime(_W)
+						except Exception:ts_v=0.0;ts_f=m1.group(1)
+						pts.append((ts_v,lbl,round(float(m1.group(6)),1),m1.group(5),ts_f))
+			except Exception:0
+		pts.sort()
+		if limit and len(pts)>limit:pts=pts[-limit:]
+		return tuple((lbl,mb,fn,ts_s)for(_,lbl,mb,fn,ts_s)in pts)
 	def get_monthly_log_series(A):
 		from datetime import datetime as _dt;from core.config import get_logs_dir
 		now=_dt.now();y,m=now.year,now.month;keys=[]
