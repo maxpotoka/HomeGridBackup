@@ -387,7 +387,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 		except OSError:AB=0
 		AW=int(H*1.25)+104857600 if H>0 else 536870912
 		if not _is_slow_or_cloud_path(l)and AB>=AW:k=os.path.join(l,_y);os.makedirs(k,exist_ok=_A);A9=_A;A.log('Спершу завантажу та перевірю у тимчасову локальну папку, а потім перенесу у папку призначення.',_E);AX='увімкнено тільки мережеву папку'if AA else'папка знаходиться у хмарному або мережевому сховищі';A.log(f"Режим ({AX}): спершу завантажу та перевірю у тимчасовій папці на SSD, а потім перенесу в папку призначення.",_E)
-	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(A.state.get(_l,0));A.log(f"Завантаження архіву TAR.ZST з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25;_saved_r=(D.get('sha256')or'').strip().lower();_dl_base=0
+	m=os.path.join(k,os.path.basename(M))if A9 else M;G=m+'.part';AC=A.state['client_token']or DEFAULT_TOK;AY=A.state[_P];AZ=D.get('download_token')or AC;n=f"{I}{D[AP]}"if D.get(AP)else f"{I}/api/migration/export?_t={int(time.time()*1000)}&job_id={Z}&_download_token={AZ}";from core.network import set_socket_buffer_kb as Aa;Aa(64);A.log(f"Завантаження архіву TAR.ZST з {C}...",_H);Al=time.time();_record_cloud_event(A,S,_M,stage=AQ);o=float(H)if H>0 else _C;N=7;AD=10,15,20,25,25,25;_saved_r=(D.get('sha256')or'').strip().lower();_dl_base=0
 	for O in range(1,N+1):
 		_ex_sz=os.path.getsize(G)if os.path.exists(G)else 0
 		if H>0 and _ex_sz>=H:
@@ -413,7 +413,7 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 						_fmode='ab';Y=_cur_ex;e=_pre_h;A.log(f'\u0414\u043e\u043a\u0430\u0447\u0443\u0432\u0430\u043d\u043d\u044f \u0437 {_cur_ex/1048576.:.1f} \u041c\u0411 (HTTP 206)...',_H)
 					else:
 						_fmode='wb';Y=0;e=hashlib.sha256()
-					r=(AF.headers.get('X-Checksum-Sha256')or _saved_r or D.get('sha256')or'').strip().lower();_saved_r=r or _saved_r;_dl_base=Y;_net_t=_C;AG=time.time();AH=p;AI=Y;Q=_D;Af=max(16384,int(A.state.get(_l,64)or 64)*1024)
+					r=(AF.headers.get('X-Checksum-Sha256')or _saved_r or D.get('sha256')or'').strip().lower();_saved_r=r or _saved_r;_dl_base=Y;_net_t=_C;AG=time.time();AH=p;AI=Y;Q=_D;Af=65536
 					with open(G,_fmode,buffering=1048576)as Ae:
 						while _A:
 							_rt0=time.perf_counter();f=AF.read(Af);_net_t+=time.perf_counter()-_rt0
