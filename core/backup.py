@@ -1,3 +1,5 @@
+# patch-id: remove-corrupt-tarzst-4.08
+# patch-id: fix-network-backup-copy-4.08
 # patch-id: disk-check-and-gfs-prompt-4.07
 # patch-id: remove-server-version-probe-4.02
 # patch-id: health-endpoint-and-srv-version-4.00
@@ -13,7 +15,7 @@
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.38 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.40 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -477,7 +479,7 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 		A.is_running=_A
 	A.set_pill('Резервне копіювання...','work');F=time.time();i=datetime.now().strftime(AB);from core.cloud import new_operation_id as AJ;C=AJ();B='';D=_C;_record_cloud_event(A,C,'started',stage='server_connection',archive_sequence=max(0,int(A.state.get(f,0)))+1)
 	try:
-		L=_A;R=_B;A.state[_O]=_A;A.state[_T]=_B
+		L=bool(A.state.get(_O,_A));R=bool(A.state.get(_T,_B))and bool((A.state.get(_K)or'').strip())
 		if not L and not R:raise RuntimeError('\u041d\u0435 \u0443\u0432\u0456\u043c\u043a\u043d\u0435\u043d\u043e \u0436\u043e\u0434\u043d\u043e\u0433\u043e \u0441\u0445\u043e\u0432\u0438\u0449\u0430 (\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0435 \u0442\u0430 \u041c\u0435\u0440\u0435\u0436\u0435\u0432\u0435 \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e).')
 		AK=bool(A.state.get(_O,_A));j=A.state[_e]if AK else os.path.expanduser((A.state.get(_K)or'').strip())if L else __import__('tempfile').gettempdir();AL=([f"\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u043e: {j}"]if L else[])+([f"\u041c\u0435\u0440\u0435\u0436\u0430: {A.state.get(_K)}"]if R else[]);A.log('\u041f\u0440\u0438\u0437\u043d\u0430\u0447\u0435\u043d\u043d\u044f: '+' | '.join(AL),_H)
 		if L and R:A.log('Режим 2 сховищ: 1) завантаження локально → 2) копіювання у мережу.',_H)
@@ -496,9 +498,15 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 								_fc+=1;_fo=_tar.extractfile(_tm)
 								if _fo:
 									while _fo.read(_vbuf):0
-					G=max(1,_fc)
+					if _fc<1:raise RuntimeError('TAR.ZST-????? ????????!')
+					G=_fc
 				except ImportError:
 					while K.read(_vbuf):0
+				except Exception as _ze:
+					try:
+						if os.path.exists(B):os.remove(B)
+					except OSError:0
+					raise RuntimeError(f"?????????? ????? TAR.ZST (????????): {_ze}")
 				s=time.time();K.finalize_tail(_vbuf)
 			else:
 				with zipfile.ZipFile(K,'r')as o:
@@ -522,7 +530,8 @@ def run_backup_task(engine,raw_url=_D,force_skip=_B,skip_cleanup=_B,auto_quiet=_
 			B=H;E=z;A.log(f"Архів та .sha256 перенесено у папку призначення: {os.path.dirname(B)}",_F)
 		A.log(f"Цілісність перевірено в 1 прохід ({G} файлів) за {AW} с. Збережено {os.path.basename(E)}",_F);_record_cloud_event(A,C,_J,stage=AE,archive=B,size_mb=D,duration_sec=v,files_count=G,size_bytes=M);V=bool(A.state.get(_r,_B))and bool((A.state.get(_s)or'').strip());W=_C
 		if V:AZ=time.time();_record_cloud_event(A,C,_M,stage=AF,archive=B);_copy_to_mirror(A,B,E);A0=max(.001,time.time()-AZ);W=round(max(.1,A0),1);_record_cloud_event(A,C,_J,stage=AF,archive=B,duration_sec=A0)
-		A1=_B;Aa=time.time()
+		A1=bool(R);Aa=time.time()
+		if A1:_copy_to_network(A,B,E)
 		Ab=round(max(.1,time.time()-Aa),1)if A1 else _C
 		with A.lock:
 			if hasattr(A,'_dest_stats'):A._dest_stats[_m]=_D
