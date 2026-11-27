@@ -1,3 +1,4 @@
+# patch-id: cache-3sec-stats-90s-4.09
 # patch-id: smart-bottleneck-4.06
 # patch-id: py38-win32-no-removesuffix-3.74
 # patch-id: cloud-union-d1-keys-3.71
@@ -370,6 +371,12 @@ def _canon_srv_label(raw_host, st):
     return h_no_port or 'Unknown server'
 
 def build_three_section_stats(engine, refresh=True):
+    import time as _tm_c
+    _st_c = getattr(engine, 'state', {}) or {}
+    _csig = (_st_c.get('lang', 'uk'), bool(_st_c.get('show_bottleneck', True)), getattr(engine, '_chart_rev', 0))
+    if not refresh and getattr(engine, '_3sec_cache_sig', None) == _csig and (_tm_c.time() - getattr(engine, '_3sec_cache_t', 0.0)) < 90.0:
+        _cached = getattr(engine, '_3sec_cache_val', None)
+        if isinstance(_cached, dict): return dict(_cached)
     from core.speed_bench import _anon_id, _owner_id, fetch_global_stats, sync_local_history_to_d1
     st = getattr(engine, 'state', {}) or {}
     aid = _anon_id(st)
@@ -543,7 +550,10 @@ def build_three_section_stats(engine, refresh=True):
             v_d1 = [float(x.get(k) or x.get(k_alt) or 0) for x in d1_match if float(x.get(k) or x.get(k_alt) or 0) > 0]
             hw_rows.append({'pc': pc_n, 'os': os_hw, 'metric': f"{pc_n} • {m}", 'my': _med(v_my), 'd1': _med(v_d1), 'n_my': len(v_my), 'n_d1': len(v_d1)})
     bn_info = analyze_bottleneck(engine, d1_rows=d1, lang=st.get('lang', 'uk'))
-    return {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows, 'bottleneck': bn_info}
+    _res = {'server': srv_rows, 'network': net_rows, 'hardware': hw_rows, 'bottleneck': bn_info}
+    try: engine._3sec_cache_sig = _csig; engine._3sec_cache_t = _tm_c.time(); engine._3sec_cache_val = dict(_res)
+    except Exception: pass
+    return _res
 
 def analyze_bottleneck(engine, d1_rows=None, lang='uk'):
     st = getattr(engine, 'state', {}) or {}; uk = (lang == 'uk')

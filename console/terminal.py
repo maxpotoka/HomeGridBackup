@@ -1,5 +1,6 @@
+# patch-id: regex-stage-tr-4.09
 # patch-id: stage-window-2.21
-# [ФАЙЛ: console/terminal.py (v2.02 | 22.11.2026 09:10) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
+# [ФАЙЛ: console/terminal.py (v2.03 | 22.11.2026 09:10) — ВЫВОД В КОНСОЛЬ WINDOWS 7/10/11]
 _C=False
 _B='replace'
 _A='\r'
@@ -7,10 +8,11 @@ import ctypes,os,re,sys,time
 from datetime import datetime
 from core.config import BUILD_DATE,CLI_MODE,HIDDEN_MODE,SCRIPT_VER,SILENT_MODE
 _STAGE_TR_MAP=('Обробка на сервері','Processing on server'),('Перевірка сайту та сервера HGM...','Checking HGM host and server...'),('Перевірка сесії та авторизація...','Checking session and auth...'),('Запит на підготовку бекапу...','Requesting backup preparation...'),('Підготовка на сервері','Preparing on server'),('Копіювання бази та файлів','Copying DB & files'),('Перевірка файлів','Checking files'),('Стиснення ZIP-архіву','Packing ZIP'),('Архів готовий (75%). Завантаження...','Archive ready (75%). Downloading...'),('Архів готовий','Archive ready'),('Обробка','Processing'),('Збірка архіву на сервері','Building archive on server'),('Етап сервера','Server stage'),('Сервер HGM онлайн','HGM server online'),('Сервер http','Server http'),('Сервер ','Server '),('Завантаження','Downloading'),('Швидкість:','Speed:'),('МБ/с','MB/s'),('КБ/с','KB/s'),('МБ','MB'),('Перевірка CRC32','Verifying CRC32'),('Розрахунок SHA-256:','Calculating SHA-256:'),('Старі копії збережено (авторежим без видалення)...','Old backups kept (no-clean mode)...'),('Ротація бекапів за обраною стратегією...','Running GFS backup rotation...'),('Готово! Архів збережено','Done! Archive saved'),('Помилка:','Error:')
+_STAGE_TR_DICT=dict(_STAGE_TR_MAP)
+_STAGE_TR_RE=re.compile('|'.join(re.escape(k)for k in sorted(_STAGE_TR_DICT,key=len,reverse=True)))
 def _stage_to_en(txt):
 	A=re.sub('^\\[[^\\]]+\\]\\s*','',(txt or'').strip())
-	for(B,C)in _STAGE_TR_MAP:A=A.replace(B,C)
-	return A
+	return _STAGE_TR_RE.sub(lambda m:_STAGE_TR_DICT[m.group(0)],A)
 def _safe_con_write(text):
 	A=text
 	if not A:return
