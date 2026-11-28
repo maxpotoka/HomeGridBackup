@@ -110,6 +110,7 @@ jobs:
           fi
           rm -rf "$DEST"
           ditto "$APP_SOURCE" "$DEST"
+          xattr -dr com.apple.quarantine "$DEST" || true
           printf 'HomeGrid Backup installed to %s\n' "$DEST"
           INSTALL_EOF
           chmod +x "dist_mac/pack/Install HomeGridBackup.command"
