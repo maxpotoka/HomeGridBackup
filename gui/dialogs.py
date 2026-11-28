@@ -1,3 +1,4 @@
+# patch-id: linux-embedded-dlg-auto-fit-4.15
 # patch-id: lan-found-right-column-btns-4.14
 # patch-id: lan-found-dialog-buttons-visible-4.12
 # patch-id: py311-fstring-dialogs-4.11.2
@@ -5,7 +6,7 @@
 # patch-id: report-pct-sync-4.07
 # patch-id: i18n-dialogs-3.99a
 # patch-id: about-repo-url-3.97
-# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.55 | 28.11.2026 09:15)
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.56 | 28.11.2026 09:55)
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: confirm-modal-inverter-image-left-3.94
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.48 | 27.11.2026 01:18)
@@ -257,7 +258,7 @@ class DialogsMixin:
 			else:w_box,h_box=max(360,cur_w,req_w),max(160,cur_h,req_h)
 			p_ref=getattr(dlg,'_parent_ref',self.root);x,y=self._calc_parent_center(p_ref,w_box,h_box)
 			if not sys.platform.startswith(_n):dlg.geometry(f"{w_box}x{h_box}+{x}+{y}");dlg.transient(p_ref);dlg.deiconify();dlg.grab_set()
-			else:rw=max(420,self.root.winfo_width()-24);rh=max(220,self.root.winfo_height()-24);dlg.place_configure(width=min(max(w_box,req_w+16),rw),height=min(max(h_box,req_h+16),rh));dlg.update_idletasks();dlg.lift()
+			else:rw=max(420,self.root.winfo_width()-16);rh=max(240,self.root.winfo_height()-16);dlg.place_configure(width=min(max(w_box,req_w+24),rw),height=min(max(h_box,req_h+28),rh));dlg.update_idletasks();dlg.lift()
 			fix_mac_buttons(dlg,self._get_palette())
 			if not sys.platform.startswith(_n):dlg.focus_force()
 		except Exception:0
@@ -289,7 +290,9 @@ class DialogsMixin:
 		dlg.bind(_AP,_on_dlg_destroy);dlg.title(tr(title,self.engine.state.get(_F,_E)));dlg.configure(bg=p[_G]);dlg._parent_ref=parent_win;dlg._init_wh=dlg_w,dlg_h;dlg._fit_flag=_S;dlg.geometry(f"{dlg_w}x{dlg_h}+{px}+{py}");dlg.maxsize(min(m[_t],int(round(max(w,760)*k*1.15))),min(m[_u],int(round(max(h,520)*k*1.15))));dlg.after_idle(lambda:self._finalize_dialog(dlg))
 		if not scrollable:return dlg,p,dlg
 		wrap=tk.Frame(dlg,bg=p[_G]);wrap.pack(fill=_W,expand=_H);canvas=tk.Canvas(wrap,bg=p[_G],highlightthickness=0,bd=0);vbar=tk.Scrollbar(wrap,orient=_z,command=canvas.yview);inner=tk.Frame(canvas,bg=p[_G]);inner.bind(_d,lambda e:canvas.configure(scrollregion=canvas.bbox(_A0)));win_id=canvas.create_window((0,0),window=inner,anchor='nw');canvas.bind(_d,lambda e:canvas.itemconfigure(win_id,width=e.width));canvas.configure(yscrollcommand=vbar.set);vbar.pack(side=_K,fill=_o);canvas.pack(side=_J,fill=_W,expand=_H);dlg.bind(_AQ,lambda ev:canvas.yview_scroll(int(-1*(ev.delta/120)),'units'));return dlg,p,inner
-	def _fit_dialog(self,dlg):dlg._fit_flag=_H
+	def _fit_dialog(self,dlg):
+		dlg._fit_flag=_H
+		if isinstance(dlg,_EmbeddedDialog):dlg.after_idle(lambda:self._finalize_dialog(dlg))
 	def confirm_exit(self):
 		import sys;fs=max(10,self.metrics[_k]);fam=_AI if sys.platform.startswith(_n)else _N;lang=self.engine.state.get(_F,_E);dlg,p,_=self._make_dialog(tr('Підтвердження виходу',lang),520,225);bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14));tk.Label(dlg,text=tr('Ви дійсно бажаєте завершити роботу HomeGrid Backup та закрити програму?',lang),bg=p[_G],fg=p[_D],wraplength=int(460*self.metrics[_a]),font=(fam,fs)).pack(pady=(18,10),padx=18,expand=_H);tk.Button(bf,text=tr(_A6,lang),command=dlg.destroy,bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
 		def _do_exit(_e=_M):
@@ -381,6 +384,7 @@ class DialogsMixin:
 				tk.Label(_bf_body,text=m[_D],bg=p[_G],fg=p[_D],justify=_J,anchor=_L,wraplength=int(420*k),font=(fam,fs)).pack(side=_J,expand=_H,fill=_C)
 			else:tk.Label(dlg,text=m[_D],bg=p[_G],fg=p[_D],justify=_g,anchor=_g,wraplength=int(460*k),font=(fam,fs)).pack(pady=(18,10),padx=18,expand=_H,fill=_C)
 		bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14))
+		bf.lift()
 		if m[_j]==E:v_pin=tk.StringVar();ent=tk.Entry(dlg,textvariable=v_pin,show='\u2022',bg=p[_c],fg=p[_D],insertbackground=p[_D],font=(fam,fs+2),justify=_g);ent.pack(padx=40,fill=_C,ipady=5);ent.focus_set();ent.bind(_A7,lambda e:_done(v_pin.get().strip()));dlg.bind(_AJ,lambda _e:_done(''));tk.Button(bf,text=tr(_A6,lang),command=lambda:_done(''),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);tk.Button(bf,text=tr('\u041f\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438',lang),command=lambda:_done(v_pin.get().strip()),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
 		elif m[_j]=='confirm':dlg.bind(_AJ,lambda _e:_done(_S));dlg.bind(_A7,lambda _e:_done(_H));tk.Button(bf,text=tr(_A6,lang),command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);tk.Button(bf,text=tr('\u0422\u0430\u043a, \u0432\u0438\u043a\u043e\u043d\u0430\u0442\u0438',lang),command=lambda:_done(_H),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
 		else:dlg.bind(_AJ,lambda _e:_done(_H));dlg.bind(_A7,lambda _e:_done(_H));tk.Button(bf,text=tr('\u041e\u041a',lang),command=lambda:_done(_H),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=18,pady=6,cursor=_R).pack(side=_K,padx=6)
