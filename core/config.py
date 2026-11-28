@@ -1,3 +1,4 @@
+# patch-id: auto-gui-mode-with-display-4.11
 # patch-id: smart-bottleneck-4.06
 # patch-id: chart-journal-only-4.05
 # patch-id: json-inv-id-and-raw-regex-4.04.1
@@ -149,8 +150,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='4.10.0'
-BUILD_DATE='28.11.2026 07:30'
+SCRIPT_VER='4.11.0'
+BUILD_DATE='28.11.2026 08:00'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
@@ -164,6 +165,8 @@ SILENT_MODE=HIDDEN_MODE or any(A in('--silent','-s','/silent','/s')for A in ARGS
 CLI_MODE=any(A in('--cli','--console','-c','/console')for A in ARGS_LOW)
 IS_LINUX_NATIVE=sys.platform.startswith(_u)and not IS_WSL and not IS_ANDROID
 HAS_DISPLAY=IS_WINDOWS or IS_MAC or IS_ANDROID or bool(os.environ.get('DISPLAY')or os.environ.get('WAYLAND_DISPLAY'))
+GUI_EXPLICIT=GUI_MODE
+if HAS_DISPLAY and not(SILENT_MODE or CLI_MODE or HIDDEN_MODE):GUI_MODE=_A
 AUTO_CLI_FALLBACK=_B
 if not HAS_DISPLAY and not HIDDEN_MODE:
 	if GUI_MODE or not(SILENT_MODE or CLI_MODE):AUTO_CLI_FALLBACK=_A
