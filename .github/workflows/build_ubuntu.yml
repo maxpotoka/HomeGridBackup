@@ -1,4 +1,4 @@
-name: Build HomeGrid Backup for Ubuntu (Linux x86_64)
+name: Build HomeGrid Backup for Ubuntu (Linux x86_64, folder)
 
 on:
   workflow_dispatch:
@@ -65,7 +65,7 @@ jobs:
           grep -q "AyatanaOnly" "$PYSTRAY_AI" || { echo "ERROR: патч pystray не застосувався"; exit 1; }
           echo "pystray patch OK"
 
-      - name: Build with Nuitka (onefile)
+      - name: Build with Nuitka (standalone folder)
         env:
           CFLAGS: "-O3 -mtune=generic -pipe"
           CXXFLAGS: "-O3 -mtune=generic -pipe"
@@ -73,7 +73,7 @@ jobs:
         run: |
           TYPELIB_DIR="/usr/lib/x86_64-linux-gnu/girepository-1.0"
           python -m nuitka \
-            --onefile \
+            --standalone \
             --enable-plugin=tk-inter \
             --disable-plugin=gi \
             --clang \
@@ -107,15 +107,21 @@ jobs:
             --output-filename=homegrid-backup \
             main.py
 
-      - name: Verify build output and create shortcut helper
+      - name: Verify build output and assemble folder
         run: |
-          test -f build/homegrid-backup || { echo "ERROR: Nuitka не створив виконуваний файл build/homegrid-backup"; exit 1; }
-          mkdir -p dist
-          mv build/homegrid-backup dist/homegrid-backup
-          chmod +x dist/homegrid-backup
-          file dist/homegrid-backup
+          set -euo pipefail
+          SRC="build/main.dist"
+          test -d "$SRC" || { echo "ERROR: Nuitka не створив папку $SRC"; ls -la build || true; exit 1; }
+          test -f "$SRC/homegrid-backup" || { echo "ERROR: немає бінарника $SRC/homegrid-backup"; exit 1; }
 
-          cat << 'EOF' > dist/install_shortcut.sh
+          DEST="dist/HomeGridBackup"
+          rm -rf dist
+          mkdir -p "$DEST"
+          cp -a "$SRC/." "$DEST/"
+          chmod +x "$DEST/homegrid-backup"
+          file "$DEST/homegrid-backup"
+
+          cat << 'EOF' > "$DEST/install_shortcut.sh"
           #!/usr/bin/env bash
           set -e
           APP_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -140,14 +146,15 @@ jobs:
           fi
           echo "[OK] Shortcut created: $DESKTOP_FILE"
           EOF
-          sed -i 's/^          //' dist/install_shortcut.sh
-          chmod +x dist/install_shortcut.sh
+          sed -i 's/^          //' "$DEST/install_shortcut.sh"
+          chmod +x "$DEST/install_shortcut.sh"
 
-      - name: Package application into single .7z
+          test -f "$DEST/install_shortcut.sh" || exit 1
+          du -sh "$DEST"
+
+      - name: Package folder into single .7z
         run: |
-          cd dist
-          7z a -t7z -mx=9 ../homegrid-backup-ubuntu-x86_64.7z homegrid-backup install_shortcut.sh
-          cd ..
+          7z a -t7z -mx=9 homegrid-backup-ubuntu-x86_64.7z dist/HomeGridBackup
           ls -lh homegrid-backup-ubuntu-x86_64.7z
 
       - name: Strip raw .py sources before packaging
@@ -166,10 +173,10 @@ jobs:
         with:
           tag_name: ubuntu-x64-latest
           target_commitish: ${{ github.sha }}
-          name: HomeGrid Backup 3.04 — Ubuntu (Linux x86_64)
+          name: HomeGrid Backup 4.10 — Ubuntu (Linux x86_64, folder)
           body: |
-            Одиничний виконуваний файл **homegrid-backup** (onefile) для Linux x86_64.
-            - Запуск: `chmod +x homegrid-backup && ./homegrid-backup`
+            Папка **HomeGridBackup/** з виконуваним файлом **homegrid-backup** для Linux x86_64 (режим standalone).
+            - Розпакуйте архів, перейдіть у папку `HomeGridBackup` і запустіть: `./homegrid-backup --gui`
             - Створити ярлик у меню програм та на робочому столі: `./install_shortcut.sh`
             Вимоги: Ubuntu 24.04 або новіша, для іконки в треї потрібен AppIndicator.
           files: homegrid-backup-ubuntu-x86_64.7z
