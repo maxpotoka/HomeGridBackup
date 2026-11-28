@@ -150,8 +150,8 @@ try:
 	if IS_MAC and not os.environ.get('HGB_MAC_KEYCHAIN'):raise RuntimeError('macOS unsigned binary uses .env 0600')
 	import keyring;KEYRING_SERVICE=_AI;keyring.get_keyring();HAS_KEYRING=_A
 except Exception:keyring=_S;KEYRING_SERVICE=_AI;HAS_KEYRING=_B
-SCRIPT_VER='4.12.0'
-BUILD_DATE='28.11.2026 08:50'
+SCRIPT_VER='4.13.0'
+BUILD_DATE='28.11.2026 09:00'
 DEFAULT_TOK='pK5hquN9wdrSgIr55FR0WyL16qnpC_cEf1Y6jUjyd14'
 IS_ANDROID='ANDROID_ARGUMENT'in os.environ or'ANDROID_ROOT'in os.environ or os.path.exists('/system/build.prop')
 if IS_ANDROID:_and_dl='/storage/emulated/0/Download';_and_base=_and_dl if os.path.isdir(_and_dl)else os.path.expanduser('~');DEFAULT_BACKUP_DIR=os.path.join(_and_base,_q);SECURE_DIR=os.path.join(os.path.expanduser('~'),_AJ)
@@ -373,7 +373,7 @@ def load_state():
 			if isinstance(A.get(_a),bool):B[_a]=A[_a]
 			B[_X]=_B;B[_O]=''
 			B[_b]=_J
-			if not IS_ANDROID and isinstance(A.get(_c),bool):B[_c]=A[_c]
+			B[_c]=_B
 			if isinstance(A.get(_d),str):B[_d]=A[_d].strip()or J
 			if isinstance(A.get(_e),str):B[_e]=A[_e].strip()or _A1
 			if isinstance(A.get(_Q),str)and re.fullmatch('[0-9a-f]{32}',A[_Q]):B[_Q]=A[_Q]

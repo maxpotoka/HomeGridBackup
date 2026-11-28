@@ -1,3 +1,4 @@
+# patch-id: hide-pcloud-status-row-4.13
 # patch-id: py311-fstring-no-backslash-4.11.1
 # patch-id: storage-analytics-chart-polish-4.07
 # patch-id: chart-journal-only-4.05
@@ -7,7 +8,7 @@
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.57 | 28.11.2026 08:25) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.58 | 28.11.2026 09:00) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -595,7 +596,7 @@ class HomeGridApp(DialogsMixin):
 					A._spark_base_lbl=('\u0420\u043e\u0437\u043c\u0456\u0440 \u0444\u0430\u0439\u043b\u0456\u0432: \u043d\u0435\u043c\u0430\u0454 \u0437\u0430\u043f\u0438\u0441\u0456\u0432'if C=='uk'else'File size: no records');A.var_spark_lbl.set(A._spark_base_lbl)
 			if hasattr(A,_AQ):
 				with A.engine.lock:A8=dict(getattr(A.engine,_A2,{})or{})
-				A9={_t:_F,_g:bool(D.get(_k))};B=A._get_palette()
+				A9={_t:_F,_g:_F};B=A._get_palette()
 				for K in(_t,_g):
 					I,AJ,R,S=A.dest_rows[K];k=A9[K];E=A8.get(K);l=k,repr(E),C,H
 					if getattr(I,'_dsig',_B)!=l:
