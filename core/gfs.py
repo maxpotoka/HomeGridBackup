@@ -1,5 +1,6 @@
+# patch-id: compact-archive-name-hgb-4.10
 # patch-id: gfs-scan-cache-2.07
-# [ФАЙЛ: core/gfs.py (v2.09 | 22.11.2026 09:10) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
+# [ФАЙЛ: core/gfs.py (v2.10 | 28.11.2026 07:30) — ПЛАНИРОВЩИК GFS, ЗАЩИТА KEEP И РОТАЦИЯ КОПИЙ]
 _I='(^|_)KEEP(_|\\.)'
 _H='new_tag'
 _G='backup_dir'
@@ -19,7 +20,7 @@ def compute_gfs_plan(state):
 		with os.scandir(F)as Q:
 			for B in Q:
 				if B.name.startswith('.')or not B.name.lower().endswith(('.zip','.tar.zst')):continue
-				if not(B.is_file(follow_symlinks=_C)and re.search('backup|KEEP',B.name)):continue
+				if not(B.is_file(follow_symlinks=_C)and(B.name.startswith('hgb_')or'KEEP'in B.name)):continue
 				J=B.stat(follow_symlinks=_C);D.append((B.name,J.st_size,J.st_mtime_ns))
 	except Exception:D=[]
 	D.sort(key=lambda item:item[0]);K=os.path.normcase(os.path.abspath(F)),I,tuple(D);L=_GFS_PLAN_CACHE.get(K)
@@ -39,13 +40,11 @@ def compute_gfs_plan(state):
 	if len(_GFS_PLAN_CACHE)>16:_GFS_PLAN_CACHE.pop(next(iter(_GFS_PLAN_CACHE)))
 	return P
 def toggle_keep_tag(state,filename):
-	I='_(DAILY|WEEKLY|MONTHLY|YEARLY)(?=_|\\.)';G=state[_G];A=os.path.basename(filename or'');C=os.path.join(G,A)
+	G=state[_G];A=os.path.basename(filename or'');C=os.path.join(G,A)
 	if not A or not os.path.isfile(C):return _C,''
-	if re.search(_I,A):
-		B=re.sub('_KEEP(?=_|\\.)','_DAILY',A,count=1)
-		if B==A:B=A.replace('KEEP_','DAILY_',1)
-	elif re.search(I,A):B=re.sub(I,'_KEEP',A,count=1)
-	else:B='homegrid_backup_KEEP_'+A
+	if A.startswith('hgb_KEEP_'):B='hgb_'+A[9:]
+	elif A.startswith('hgb_'):B='hgb_KEEP_'+A[4:]
+	else:B='hgb_KEEP_'+A
 	D=os.path.join(G,B)
 	if D!=C and not os.path.exists(D):
 		os.replace(C,D);E=C+_D
@@ -63,9 +62,9 @@ def apply_gfs_cleanup(engine,skip_prompt=_C,sync_cloud=_B):
 	for D in range(0,len(N),25):
 		F=N[D:D+25]
 		for C in F:
-			K=C[_A];H=K+_D;Q=C[_H];R=format_backup_dt(C['dt']);ext_f='.tar.zst'if C[_E].lower().endswith('.tar.zst')else'.zip';E=f"homegrid_backup_{Q}_{R}{ext_f}";I=os.path.join(O,E)
+			K=C[_A];H=K+_D;Q=C[_H];R=format_backup_dt(C['dt']);ext_f='.tar.zst'if C[_E].lower().endswith('.tar.zst')else'.zip';_pfx='hgb_KEEP_'if Q=='KEEP'else'hgb_';E=f"{_pfx}{R}{ext_f}";I=os.path.join(O,E)
 			if C[_E]!=E:
-				if os.path.exists(I):X=datetime.fromtimestamp(os.path.getmtime(K)).strftime('%S');E=f"homegrid_backup_{Q}_{R}_{X}{ext_f}";I=os.path.join(O,E)
+				if os.path.exists(I):X=datetime.fromtimestamp(os.path.getmtime(K)).strftime('%f')[:2];E=f"{_pfx}{R}_{X}{ext_f}";I=os.path.join(O,E)
 				if C[_E]!=E:
 					os.replace(K,I)
 					if os.path.exists(H):

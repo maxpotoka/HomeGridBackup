@@ -1,3 +1,4 @@
+# patch-id: compact-archive-name-hgb-4.10
 # patch-id: remove-corrupt-tarzst-4.08
 # patch-id: fix-network-backup-copy-4.08
 # patch-id: disk-check-and-gfs-prompt-4.07
@@ -15,7 +16,7 @@
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: direct-cloud-write-setting-3.76
 # patch-id: per-server-pins-3.50
-# [ФАЙЛ: core/backup.py (v2.40 | 27.11.2026 01:35) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
+# [ФАЙЛ: core/backup.py (v2.41 | 28.11.2026 07:30) — АВТОРИЗАЦИЯ, СКАЧИВАНИЕ TAR.ZST, CRC32/SHA-256 В 1 ПРОХОД И ЗЕРКАЛО]
 _z='_last_srv_timings'
 _y='HomeGridBackup_stage'
 _x='copying'
@@ -407,8 +408,8 @@ def _download_backup_zip(engine,srv,srv_label,job_id,bdir,operation_id):
 			if _fr_b<_need_b:raise RuntimeError(f"\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043d\u044c\u043e \u0432\u0456\u043b\u044c\u043d\u043e\u0433\u043e \u043c\u0456\u0441\u0446\u044f \u043d\u0430 \u0434\u0438\u0441\u043a\u0443 ({_fr_b/1048576.:.1f} \u041c\u0411).")
 	except RuntimeError:raise
 	except Exception:0
-	A7=format_backup_dt(datetime.now());_ext='.tar.zst';M=os.path.join(a,f"homegrid_backup_DAILY_{A7}{_ext}");A8=1
-	while os.path.exists(M):M=os.path.join(a,f"homegrid_backup_DAILY_{A7}_{A8}{_ext}");A8+=1
+	A7=format_backup_dt(datetime.now());_ext='.tar.zst';M=os.path.join(a,f"hgb_{A7}{_ext}");A8=1
+	while os.path.exists(M):M=os.path.join(a,f"hgb_{A7}_{A8}{_ext}");A8+=1
 	import tempfile as AV;A9=_B;k=a;AA=not bool(A.state.get(_O,_A))and bool(A.state.get(_T))and bool((A.state.get(_K)or'').strip())
 	if not bool(A.state.get('direct_cloud_write',_B))and(_is_slow_or_cloud_path(a)or AA):
 		l=AV.gettempdir()
