@@ -1,10 +1,11 @@
+# patch-id: safe-tkinter-fallback-and-apt-hint-4.09
 # patch-id: linux-single-instance-exit-4.09
 # patch-id: no-pip-auto-install-and-uk-tray-hints-3.96
 # patch-id: strict-ssl-verify-3.75
 # patch-id: main-nuitka-global-ssl-3.73
 # patch-id: main-zstd-dep-3.37
 #!/usr/bin/env python3
-# [ФАЙЛ: main.py (v2.09 | 27.11.2026 01:25) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
+# [ФАЙЛ: main.py (v2.10 | 28.11.2026 07:05) — ТОЧКА ВХОДА, MUTEX, CRASH-ЛОГ И ЛЕНИВЫЙ ЗАПУСК РЕЖИМОВ]
 #!/usr/bin/env python3
 _E='pystray'
 _D='keyring'
@@ -56,11 +57,12 @@ if not _IS_PY_CONSOLE_LAUNCHER:
 		except Exception:0
 if not is_compiled_app()and not IS_ANDROID:
 	_missing_pkgs=[]
-	for(_mod,_pkg)in((_C,_C),(_D,_D),(_E,_E),('PIL','pillow'),('zstandard','zstandard')):
+	_chk_list=[(_C,_C),(_D,_D),(_E,_E),('PIL','pillow'),('zstandard','zstandard')]+([('tkinter','tkinter')]if not any(a.lower()in('--cli','--console','-c','/console','--silent','-s','/silent','/s','--hidden','--background','/hidden','/h')for a in sys.argv[1:])else[])
+	for(_mod,_pkg)in _chk_list:
 		try:__import__(_mod)
 		except ImportError:_missing_pkgs.append(_pkg)
 	if _missing_pkgs:
-		_apt_map={'pillow':'python3-pil','zstandard':'python3-zstandard','keyring':'python3-keyring','send2trash':'python3-send2trash'}
+		_apt_map={'tkinter':'python3-tk','pillow':'python3-pil','zstandard':'python3-zstandard','keyring':'python3-keyring','send2trash':'python3-send2trash'}
 		_apt_pkgs=[_apt_map[p]for p in _missing_pkgs if p in _apt_map]
 		_hint_cmd=(f"sudo apt install {' '.join(_apt_pkgs)}"if _apt_pkgs else f"pip install --break-system-packages {' '.join(_missing_pkgs)}")if sys.platform.startswith('linux')else "pip install -r requirements.txt"
 		print(f"[HomeGrid Backup] \u0412\u0456\u0434\u0441\u0443\u0442\u043d\u0456 \u043f\u0430\u043a\u0435\u0442\u0438: {', '.join(_missing_pkgs)}. \u0412\u0441\u0442\u0430\u043d\u043e\u0432\u0456\u0442\u044c \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u044e: {_hint_cmd}",flush=_A)
@@ -77,7 +79,13 @@ def main():
 		else:from console.terminal import run_silent_exit_countdown as J;run_backup_task(A,B.get(D,''),_A,E,_B);J(A,8);os._exit(A.exit_code)
 		return
 	if IS_ANDROID:from mobile.android_app import run_android_ui as K;K(A);return
-	import tkinter as L;from gui.tray import _start_show_window_listener as M,_start_tray_thread as C;from gui.window import HomeGridApp as N
+	try:import tkinter as L
+	except ImportError:
+		_tk_hint='sudo apt install python3-tk'if sys.platform.startswith('linux')else'Install Python with Tcl/Tk support'
+		A.log(f"\u041c\u043e\u0434\u0443\u043b\u044c tkinter \u0432\u0456\u0434\u0441\u0443\u0442\u043d\u0456\u0439 ({_tk_hint}). \u041f\u0435\u0440\u0435\u0445\u0456\u0434 \u0443 \u043a\u043e\u043d\u0441\u043e\u043b\u044c\u043d\u0438\u0439 \u0440\u0435\u0436\u0438\u043c CLI...",'warn')
+		if GUI_MODE:sys.exit(1)
+		from console.terminal import _init_console_for_cli as G,_finish_cli_inline as H;G();run_backup_task(A,B.get(D,''),_B,NO_CLEAN,_B);H(A);sys.exit(A.exit_code)
+	from gui.tray import _start_show_window_listener as M,_start_tray_thread as C;from gui.window import HomeGridApp as N
 	try:ctypes.windll.shcore.SetProcessDpiAwareness(1)
 	except Exception:
 		try:ctypes.windll.user32.SetProcessDPIAware()
