@@ -1,9 +1,10 @@
+# patch-id: lan-found-dialog-buttons-visible-4.12
 # patch-id: py311-fstring-dialogs-4.11.2
 # patch-id: backup-report-clean-layout-4.08
 # patch-id: report-pct-sync-4.07
 # patch-id: i18n-dialogs-3.99a
 # patch-id: about-repo-url-3.97
-# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.53 | 28.11.2026 08:30)
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.54 | 28.11.2026 08:50)
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: confirm-modal-inverter-image-left-3.94
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.48 | 27.11.2026 01:18)
@@ -347,9 +348,25 @@ class DialogsMixin:
 			self.engine.submit_modal(val)
 		dlg.protocol(_A5,lambda:_done(''if m[_j]==E else _S))
 		if is_lan_dlg:
-			items=m.get('default')or[];hdr_t='\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0434\u0456\u044e \u0434\u043b\u044f \u0432\u0438\u044f\u0432\u043b\u0435\u043d\u043e\u0433\u043e \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0432 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0456\u0439 \u043c\u0435\u0440\u0435\u0436\u0456:'if lang==_B else'Choose an action for the discovered LAN server:';tk.Label(dlg,text=hdr_t,bg=p[_G],fg=p[_D],font=(fam,fs),wraplength=int(620*k)).pack(anchor=_L,padx=18,pady=(18,10));box=tk.Frame(dlg,bg=p[_G]);box.pack(fill=_W,expand=_H,padx=18,pady=(0,8))
-			for(url,t_ms,a_ms)in items:row=tk.Frame(box,bg=p[_A],bd=1,relief=_Y,padx=12,pady=10);row.pack(fill=_C,pady=5);info_f=tk.Frame(row,bg=p[_A]);info_f.pack(side=_J,fill=_C,expand=_H);tk.Label(info_f,text=url,bg=p[_A],fg=p[_Q],font=(fam,fs+1,_I)).pack(anchor=_L);ms_unit='\u043c\u0441'if lang==_B else'ms';tk.Label(info_f,text=f"TCP: {t_ms} {ms_unit}  \u2022  API: {a_ms} {ms_unit}",bg=p[_A],fg=p[_O],font=(fam,max(9,fs-1))).pack(anchor=_L,pady=(2,0));btn_bkp_t='\U0001f50c \u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438 \u0442\u0430 \u0441\u0442\u0432\u043e\u0440\u0438\u0442\u0438 \u043a\u043e\u043f\u0456\u044e'if lang==_B else'\U0001f50c Connect & Create Backup';btn_sav_t='\u2b50 \u0412 \u0406\u0441\u0442\u043e\u0440\u0456\u044e'if lang==_B else'\u2b50 Save to History';tk.Button(row,text=btn_bkp_t,command=lambda u=url:_done({F:'backup',G:u}),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=16,pady=6,cursor=_R).pack(side=_K,padx=(6,0));tk.Button(row,text=btn_sav_t,command=lambda u=url:_done({F:'save',G:u}),bg=p[_y],fg=_l,font=(fam,fs),padx=14,pady=6,cursor=_R).pack(side=_K,padx=6)
-			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14));dlg.bind(_AJ,lambda _e:_done(_S));tk.Button(bf,text=_w if lang==_B else'Close',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6);self._fit_dialog(dlg);return
+			items=m.get('default')or[]
+			hdr_t='\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0434\u0456\u044e \u0434\u043b\u044f \u0432\u0438\u044f\u0432\u043b\u0435\u043d\u043e\u0433\u043e \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0432 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0456\u0439 \u043c\u0435\u0440\u0435\u0436\u0456:'if lang==_B else'Choose an action for the discovered LAN server:'
+			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(6,14))
+			dlg.bind(_AJ,lambda _e:_done(_S))
+			tk.Button(bf,text=_w if lang==_B else'Close',command=lambda:_done(_S),bg=p[_A],fg=p[_D],font=(fam,fs),padx=16,pady=6,cursor=_R).pack(side=_K,padx=6)
+			tk.Label(dlg,text=hdr_t,bg=p[_G],fg=p[_D],font=(fam,fs,_I),wraplength=int(560*k),justify=_J).pack(anchor=_L,padx=18,pady=(14,8))
+			box=tk.Frame(dlg,bg=p[_G]);box.pack(fill=_W,expand=_H,padx=18,pady=(0,6))
+			ms_unit='\u043c\u0441'if lang==_B else'ms'
+			btn_bkp_t='\U0001f50c \u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0438 \u0442\u0430 \u0441\u0442\u0432\u043e\u0440\u0438\u0442\u0438 \u043a\u043e\u043f\u0456\u044e'if lang==_B else'\U0001f50c Connect & Create Backup'
+			btn_sav_t='\u2b50 \u0412 \u0406\u0441\u0442\u043e\u0440\u0456\u044e'if lang==_B else'\u2b50 Save to History'
+			for(url,t_ms,a_ms)in items:
+				row=tk.Frame(box,bg=p[_A],bd=1,relief=_Y,padx=12,pady=10);row.pack(fill=_C,pady=5)
+				top_r=tk.Frame(row,bg=p[_A]);top_r.pack(fill=_C,pady=(0,8))
+				tk.Label(top_r,text=url,bg=p[_A],fg=p[_Q],font=(fam,fs+1,_I)).pack(side=_J)
+				tk.Label(top_r,text=f"TCP: {t_ms} {ms_unit}  \u2022  API: {a_ms} {ms_unit}",bg=p[_A],fg=p[_O],font=(fam,max(9,fs-1))).pack(side=_K)
+				act_r=tk.Frame(row,bg=p[_A]);act_r.pack(fill=_C)
+				tk.Button(act_r,text=btn_bkp_t,command=lambda u=url:_done({F:'backup',G:u}),bg=p[_U],fg=p[_v],font=(fam,fs,_I),padx=14,pady=6,cursor=_R).pack(side=_J,fill=_C,expand=_H,padx=(0,8))
+				tk.Button(act_r,text=btn_sav_t,command=lambda u=url:_done({F:'save',G:u}),bg=p[_y],fg=_l,font=(fam,fs),padx=14,pady=6,cursor=_R).pack(side=_K)
+			self._fit_dialog(dlg);return
 		is_list='\u2022 'in m[_D]
 		if is_list:
 			lines=[ln.strip()for ln in m[_D].splitlines()if ln.strip()];tk.Label(dlg,text=lines[0],bg=p[_G],fg=p[_D],anchor=_L,justify=_J,font=(fam,fs,_I)).pack(pady=(18,8),padx=18,fill=_C);list_box=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=12,pady=10);list_box.pack(padx=18,pady=(0,10),fill=_C)
