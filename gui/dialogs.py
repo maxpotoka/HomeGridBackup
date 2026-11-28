@@ -1,7 +1,8 @@
+# patch-id: backup-report-clean-layout-4.08
 # patch-id: report-pct-sync-4.07
 # patch-id: i18n-dialogs-3.99a
 # patch-id: about-repo-url-3.97
-# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.50 | 27.11.2026 01:30)
+# [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.51 | 28.11.2026 03:45)
 # patch-id: confirm-modal-inverter-image-sync-3.95
 # patch-id: confirm-modal-inverter-image-left-3.94
 # [\u0424\u0410\u0419\u041b: gui/dialogs.py (v2.48 | 27.11.2026 01:18)
@@ -159,10 +160,17 @@ def _render_report_3stage_bar(dlg, p, d, fam, fs, lang, k_sc):
     t_all = max(0.1, t_srv + t_net + t_loc)
     box = tk.Frame(dlg, bg=p['card'], bd=1, relief='solid', padx=14, pady=8)
     box.pack(fill='x', padx=16, pady=(0, 8))
+    hdr_b = tk.Frame(box, bg=p['card'])
+    hdr_b.pack(fill='x', pady=(0, 4))
+    tk.Label(hdr_b, text='\u0420\u043e\u0437\u043f\u043e\u0434\u0456\u043b \u0447\u0430\u0441\u0443' if lang == 'uk' else 'Time distribution', bg=p['card'], fg=p['muted'], font=(fam, max(8, fs - 1), 'bold')).pack(side='left')
+    _tip_lbl = tk.Label(hdr_b, text='', bg=p['card'], fg=p['cyan'], font=(fam, max(8, fs - 1), 'bold'))
+    _tip_lbl.pack(side='right')
     cv = tk.Canvas(box, height=max(24, int(26 * k_sc)), bg=p['log_bg'], highlightthickness=1, highlightbackground=p['border'])
     cv.pack(fill='x')
     leg = tk.Frame(box, bg=p['card'])
-    leg.pack(fill='x', pady=(5, 0))
+    leg.pack(fill='x', pady=(6, 0))
+    leg_in = tk.Frame(leg, bg=p['card'])
+    leg_in.pack(anchor='center')
     items = [
         ('\u0421\u0435\u0440\u0432\u0435\u0440' if lang == 'uk' else 'Server', t_srv, '#818cf8'),
         ('\u041c\u0435\u0440\u0435\u0436\u0430' if lang == 'uk' else 'Network', t_net, '#38bdf8'),
@@ -171,30 +179,39 @@ def _render_report_3stage_bar(dlg, p, d, fam, fs, lang, k_sc):
     raw_p = [val / t_all * 100.0 for _, val, _ in items]
     pcts = [int(x) for x in raw_p]
     for _ri in sorted(range(len(raw_p)), key=lambda i: raw_p[i] - pcts[i], reverse=True)[:max(0, 100 - sum(pcts))]: pcts[_ri] += 1
-    for (name, val, col), pct in zip(items, pcts):
+    for idx_l, ((name, val, col), pct) in enumerate(zip(items, pcts)):
         dur_s = format_duration(val, lang).partition(' (').__getitem__(0)
-        tk.Label(leg, text='\u25a0', bg=p['card'], fg=col, font=(fam, fs, 'bold')).pack(side='left', padx=(0, 3))
-        tk.Label(leg, text=f"{name}: {dur_s} ({pct}%)", bg=p['card'], fg=p['text'], font=(fam, max(8, fs - 1))).pack(side='left', padx=(0, 14))
+        tk.Label(leg_in, text='\u25a0', bg=p['card'], fg=col, font=(fam, fs, 'bold')).pack(side='left', padx=(0, 3))
+        tk.Label(leg_in, text=f"{name}: {dur_s} ({pct}%)", bg=p['card'], fg=p['text'], font=(fam, max(8, fs - 1))).pack(side='left', padx=(0, 16 if idx_l < len(items) - 1 else 0))
+    _segs = []
     def _draw(_e=None):
-        if not cv.winfo_exists():
-            return
+        _segs.clear()
+        if not cv.winfo_exists(): return
         cv.delete('all')
         w_g = max(200, cv.winfo_width())
         h_g = max(20, cv.winfo_height())
         act = [(n, v, c) for (n, v, c) in items if v > 0]
-        if not act:
-            return
+        if not act: return
         raw_w = [max(6.0, w_g * (v / t_all)) for (_, v, _) in act]
         sc_w = w_g / max(1.0, sum(raw_w))
         cx = 0.0
         for idx, ((n, v, c), rw) in enumerate(zip(act, raw_w)):
             sw = (w_g - cx) if idx == len(act) - 1 else (rw * sc_w)
             x2 = cx + sw
+            _segs.append((cx, x2, n, v))
             cv.create_rectangle(cx, 0, x2, h_g, fill=c, outline=p['card'], width=1)
             pct = int(round(v / t_all * 100)) if idx < len(act) - 1 else max(1, 100 - sum(int(round(x[1] / t_all * 100)) for x in act[:-1]))
             if sw >= 54:
                 cv.create_text((cx + x2) / 2, h_g / 2, text=f"{pct}%", fill='#0f172a', font=(fam, max(8, fs - 1), 'bold'))
             cx = x2
+    def _on_mv(ev):
+        for x1, x2, n, v in _segs:
+            if x1 <= ev.x <= x2:
+                ds = format_duration(v, lang).partition(' (').__getitem__(0)
+                _tip_lbl.configure(text=f'{n}: {ds} ({int(round(v / t_all * 100))}%)'); return
+        _tip_lbl.configure(text='')
+    cv.bind('<Motion>', _on_mv)
+    cv.bind('<Leave>', lambda _e: _tip_lbl.configure(text=''))
     cv.bind('<Configure>', _draw)
     dlg.after(30, _draw)
 
@@ -298,13 +315,29 @@ class DialogsMixin:
 			dlg.protocol(_A5,_close_rep);tot_s=max(.1,float(d.get('total_sec',.1)));tot_disp=format_duration(tot_s,lang).partition(_s).__getitem__(0);fn_s=d.get(_AA,'backup.zip');sz_s=d.get('size_mb',_T);fc_s=d.get('files_cnt',0);ts_a=d.get('ts_start',_X);ts_b=d.get('ts_end',_X);spd_s=d.get('spd_mbs',_T);t_srv_all=sum(float(d.get(k)or 0)for k in('srv_db_sec','srv_copy_sec','srv_chk_sec','srv_hist_sec','srv_proc_sec','srv_pack_sec','srv_sec','srv_prep_sec'));srv_spd_s=round(float(sz_s)/t_srv_all,1)if(t_srv_all>0 and float(sz_s or 0)>0)else float(d.get('srv_spd_mbs')or 0);top_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);top_c.pack(fill=_C,padx=16,pady=(12,8));import ipaddress as _ipa;from urllib.parse import urlparse as _up;srv_raw=str(d.get('srv')or self.engine.state.get(_A3,'')).strip();_h=_up(srv_raw).hostname or srv_raw if srv_raw else''
 			try:_is_lan=_ipa.ip_address(_h).is_private or _ipa.ip_address(_h).is_loopback
 			except Exception:_is_lan=_h.endswith('.local')or _h in('localhost',)
-			net_tag=('Локальна мережа / LAN'if _is_lan else'Інтернет / Зовнішній')if lang==_B else'Local Network / LAN'if _is_lan else'Internet / External';srv_disp=f"{srv_raw}  [{net_tag}]"if srv_raw else _X;tk.Label(top_c,text=f"Файл архіву:  {fn_s}"if lang==_B else f"Archive file:  {fn_s}",bg=p[_A],fg=p[_Q],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Джерело (сервер):  {srv_disp}"if lang==_B else f"Source server:  {srv_disp}",bg=p[_A],fg=p[_U]if _is_lan else p[_b],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));_fc_part=(f" ({fc_s} файлів)"if lang==_B else f" ({fc_s} files)")if int(fc_s or 0)>0 else'';tk.Label(top_c,text=f"Розмір:  {sz_s} МБ{_fc_part}   •   CRC32 + SHA-256: Підтверджено"if lang==_B else f"Size:  {sz_s} MB{_fc_part}   •   CRC32 + SHA-256: Verified",bg=p[_A],fg=p[_D],font=(fam,fs+2),anchor=_g,justify=_g).pack(anchor=_g,pady=(0,6));tk.Label(top_c,text=f"Час запуску:  {ts_a}   →   Завершено:  {ts_b}   (Разом: {tot_disp})"if lang==_B else f"Started at:  {ts_a}   →   Finished:  {ts_b}   (Total: {tot_disp})",bg=p[_A],fg=p[_U],font=(fam,fs+2,_I),anchor=_g,justify=_g).pack(anchor=_g);_render_report_3stage_bar(dlg,p,d,fam,fs,lang,self.metrics[_a]);mid_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);mid_c.pack(fill=_C,padx=16,pady=(0,8));mid_c.columnconfigure(0,weight=1);raw_stages=([('Підключення до бази даних:'if lang==_B else'Server database connection:',d.get('srv_db_sec',_T),p[_Q])]if float(d.get('srv_db_sec',0)or 0)>0 else[])+[('Збір та копіювання даних на сервері:'if lang==_B else'Server data collection & copy:',d.get('srv_copy_sec',_T),p[_D]),('Перевірка файлів на сервері:'if lang==_B else'Server file verification:',d.get('srv_chk_sec',_T),p[_D])]+([('Копіювання історії розумних пристроїв:'if lang==_B else'Smart devices history copy:',d.get('srv_hist_sec',_T),p[_Q])]if float(d.get('srv_hist_sec',0)or 0)>0 else[])+[('Обробка на сервері:'if lang==_B else'Processing on server:',d.get('srv_proc_sec',_T),p[_D]),(f'Стиснення та пакування TAR.ZST на сервері ({srv_spd_s} {_AB}):'if lang==_B and srv_spd_s>0 else f'Server TAR.ZST packing ({srv_spd_s} {_AC}):'if srv_spd_s>0 else'Стиснення та пакування TAR.ZST на сервері:'if lang==_B else'Server TAR.ZST archive packing:',d.get('srv_pack_sec',d.get('srv_sec',_T)),p[_D]),('Підготовка та аналіз на сервері:'if lang==_B else'Server preparation & scan:',d.get('srv_prep_sec',_T),p[_D]),(f"Скачування по мережі ({spd_s} {_AB if lang==_B else _AC}):"if lang==_B else f"Network download ({spd_s} MB/s):",d.get('dl_sec',_T),p[_Q]),('Перевірка архіву CRC32 (програма):'if lang==_B else'Local CRC32 integrity check:',d.get('crc_sec',d.get('ver_sec',_T)),p[_D]),('Розрахунок та звірка SHA-256:'if lang==_B else'Local SHA-256 hash verification:',d.get('sha_sec',_T),p[_D])]
+			net_tag=('\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0430 \u043c\u0435\u0440\u0435\u0436\u0430 / LAN'if _is_lan else'\u0406\u043d\u0442\u0435\u0440\u043d\u0435\u0442 / \u0417\u043e\u0432\u043d\u0456\u0448\u043d\u0456\u0439')if lang==_B else'Local Network / LAN'if _is_lan else'Internet / External';srv_disp=f"{srv_raw}  [{net_tag}]"if srv_raw else _X
+			def _cp_clip(val,lbl_w,orig_t):
+				if not val:return
+				try:self.root.clipboard_clear();self.root.clipboard_append(str(val));lbl_w.configure(text=('\u2714 \u0421\u043a\u043e\u043f\u0456\u0439\u043e\u0432\u0430\u043d\u043e \u0432 \u0431\u0443\u0444\u0435\u0440!'if lang==_B else'\u2714 Copied to clipboard!'));dlg.after(1400,lambda:lbl_w.winfo_exists()and lbl_w.configure(text=orig_t))
+				except Exception:0
+			_fn_t=f"\U0001f4cb {fn_s}";lbl_fn=tk.Label(top_c,text=_fn_t,bg=p[_A],fg=p[_Q],font=(fam,fs+3,_I),cursor=_R,anchor=_g);lbl_fn.pack(anchor=_g,pady=(2,3));lbl_fn.bind(_AO,lambda _e:_cp_clip(fn_s,lbl_fn,_fn_t))
+			_sr_t=f"\u0414\u0436\u0435\u0440\u0435\u043b\u043e: {srv_disp}"if lang==_B else f"Source server: {srv_disp}";lbl_sr=tk.Label(top_c,text=_sr_t,bg=p[_A],fg=p[_U]if _is_lan else p[_b],font=(fam,fs+1,_I),cursor=_R,anchor=_g);lbl_sr.pack(anchor=_g,pady=(0,8));lbl_sr.bind(_AO,lambda _e:_cp_clip(srv_raw,lbl_sr,_sr_t))
+			_fc_part=(f" ({fc_s} \u0444\u0430\u0439\u043b\u0456\u0432)"if lang==_B else f" ({fc_s} files)")if int(fc_s or 0)>0 else''
+			r_sz=tk.Frame(top_c,bg=p[_A]);r_sz.pack(fill=_C,pady=2);tk.Label(r_sz,text='\u0420\u043e\u0437\u043c\u0456\u0440'if lang==_B else'Size',bg=p[_A],fg=p[_O],font=(fam,fs+1)).pack(side=_J);tk.Label(r_sz,text=f"{sz_s} \u041c\u0411{_fc_part}"if lang==_B else f"{sz_s} MB{_fc_part}",bg=p[_A],fg=p[_D],font=(fam,fs+1,_I)).pack(side=_K)
+			r_in=tk.Frame(top_c,bg=p[_A]);r_in.pack(fill=_C,pady=(2,8));tk.Label(r_in,text='\u0426\u0456\u043b\u0456\u0441\u043d\u0456\u0441\u0442\u044c'if lang==_B else'Integrity',bg=p[_A],fg=p[_O],font=(fam,fs+1)).pack(side=_J);tk.Label(r_in,text='\u2714 CRC32 + SHA-256 \u041f\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043d\u043e'if lang==_B else'\u2714 CRC32 + SHA-256 Verified',bg='#052e16',fg='#4ade80',bd=1,relief=_Y,highlightbackground='#16a34a',highlightthickness=1,font=(fam,fs,_I),padx=10,pady=1).pack(side=_K)
+			r_tm=tk.Frame(top_c,bg=p[_A]);r_tm.pack(fill=_C,pady=(2,4));tk.Label(r_tm,text=f"{'\u0421\u0442\u0430\u0440\u0442'if lang==_B else'Started'}:  {ts_a}",bg=p[_A],fg=p[_O],font=(fam,fs+1)).pack(side=_J);tk.Label(r_tm,text=f"{'\u0424\u0456\u043d\u0456\u0448'if lang==_B else'Finished'}:  {ts_b}",bg=p[_A],fg=p[_O],font=(fam,fs+1)).pack(side=_K)
+			tk.Label(top_c,text=tot_disp,bg=p[_A],fg='#34d399',font=(fam,fs+5,_I),anchor=_g).pack(anchor=_g,pady=(2,2));_render_report_3stage_bar(dlg,p,d,fam,fs,lang,self.metrics[_a]);mid_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=10);mid_c.pack(fill=_C,padx=16,pady=(0,8));mid_c.columnconfigure(0,weight=1);raw_stages=([('Підключення до бази даних:'if lang==_B else'Server database connection:',d.get('srv_db_sec',_T),p[_Q])]if float(d.get('srv_db_sec',0)or 0)>0 else[])+[('Збір та копіювання даних на сервері:'if lang==_B else'Server data collection & copy:',d.get('srv_copy_sec',_T),p[_D]),('Перевірка файлів на сервері:'if lang==_B else'Server file verification:',d.get('srv_chk_sec',_T),p[_D])]+([('Копіювання історії розумних пристроїв:'if lang==_B else'Smart devices history copy:',d.get('srv_hist_sec',_T),p[_Q])]if float(d.get('srv_hist_sec',0)or 0)>0 else[])+[('Обробка на сервері:'if lang==_B else'Processing on server:',d.get('srv_proc_sec',_T),p[_D]),(f'Стиснення та пакування TAR.ZST на сервері ({srv_spd_s} {_AB}):'if lang==_B and srv_spd_s>0 else f'Server TAR.ZST packing ({srv_spd_s} {_AC}):'if srv_spd_s>0 else'Стиснення та пакування TAR.ZST на сервері:'if lang==_B else'Server TAR.ZST archive packing:',d.get('srv_pack_sec',d.get('srv_sec',_T)),p[_D]),('Підготовка та аналіз на сервері:'if lang==_B else'Server preparation & scan:',d.get('srv_prep_sec',_T),p[_D]),(f"Скачування по мережі ({spd_s} {_AB if lang==_B else _AC}):"if lang==_B else f"Network download ({spd_s} MB/s):",d.get('dl_sec',_T),p[_Q]),('Перевірка архіву CRC32 (програма):'if lang==_B else'Local CRC32 integrity check:',d.get('crc_sec',d.get('ver_sec',_T)),p[_D]),('Розрахунок та звірка SHA-256:'if lang==_B else'Local SHA-256 hash verification:',d.get('sha_sec',_T),p[_D])]
 			if d.get('mir_active'):raw_stages.append(('Дзеркальне копіювання:'if lang==_B else'Mirror folder copy:',d.get('mir_sec',_T),p[_U]))
 			if d.get('net_active'):raw_stages.append(('Копіювання у мережеву папку:'if lang==_B else'Network folder copy:',d.get('net_sec',_T),p[_Q]))
 			raw_stages=[(t,v,c)for(t,v,c)in raw_stages if float(v or 0)>0];stages=[(f"{i}. {t}",v,c)for(i,(t,v,c))in enumerate(raw_stages,1)]
 			st_tot=max(.1,sum(float(x[1]or 0)for x in stages))
 			for(idx_r,(lbl_st,val_s,col_st))in enumerate(stages):pct_v=min(100,int(round(float(val_s)/st_tot*100)));_pct_s=f"  ({pct_v}%)"if pct_v>0 else'';is_spd_row=('/с' in lbl_st or 'MB/s' in lbl_st);tk.Label(mid_c,text=lbl_st,bg=p[_A],fg=p[_U]if('Скачування'in lbl_st or 'Network download'in lbl_st)else col_st,font=(fam,fs+2,_I)if is_spd_row else(fam,fs+2),anchor=_L).grid(row=idx_r,column=0,sticky=_L,pady=4);tk.Label(mid_c,text=f"{format_duration(val_s,lang).partition(_s).__getitem__(0)}{_pct_s}",bg=p[_A],fg=col_st,font=(fam,fs+2,_I),anchor=_i).grid(row=idx_r,column=1,sticky=_i,padx=(12,0),pady=4)
-			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(4,10));bot_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=8);bot_c.pack(side=_Z,fill=_C,padx=16,pady=(0,6));tk.Label(bot_c,text=f"Сховище:  {d.get(A,0)} архівів ({d.get(B,0)} МБ)   •   Вільно:  {d.get(C,0)} ГБ   •   Застарілих GFS:  {d.get(D,0)} шт."if lang==_B else f"Storage:  {d.get(A,0)} archives ({d.get(B,0)} MB)   •   Free:  {d.get(C,0)} GB   •   Outdated GFS:  {d.get(D,0)}",bg=p[_A],fg=p[_O],font=(fam,fs+2),anchor=_L).pack(fill=_C);btn_ok_r=tk.Button(bf,text='ОК'if lang==_B else'OK',command=_close_rep,bg=p[_U],fg=p[_v],font=(fam,fs+2,_I),padx=24,pady=5,cursor=_R);btn_ok_r.pack(side=_K);dlg.after(350,lambda:(dlg.bind(_A7,_close_rep),dlg.bind(_AJ,_close_rep),btn_ok_r.focus_set())if dlg.winfo_exists()else _M);self._fit_dialog(dlg);return
+			bf=tk.Frame(dlg,bg=p[_G]);bf.pack(side=_Z,fill=_C,padx=16,pady=(4,10));bot_c=tk.Frame(dlg,bg=p[_A],bd=1,relief=_Y,padx=14,pady=8);bot_c.pack(side=_Z,fill=_C,padx=16,pady=(0,6));tk.Label(bot_c,text=f"Сховище:  {d.get(A,0)} архівів ({d.get(B,0)} МБ)   •   Вільно:  {d.get(C,0)} ГБ   •   Застарілих GFS:  {d.get(D,0)} шт."if lang==_B else f"Storage:  {d.get(A,0)} archives ({d.get(B,0)} MB)   •   Free:  {d.get(C,0)} GB   •   Outdated GFS:  {d.get(D,0)}",bg=p[_A],fg=p[_O],font=(fam,fs+2),anchor=_L).pack(fill=_C);
+			def _copy_full_rep():
+				_rep_lines=[f"HomeGrid Backup \u2014 {'\u0417\u0432\u0456\u0442 \u043f\u0440\u043e \u0440\u0435\u0437\u0435\u0440\u0432\u043d\u0435 \u043a\u043e\u043f\u0456\u044e\u0432\u0430\u043d\u043d\u044f'if lang==_B else'Backup Report'}",f"Archive: {fn_s}",f"Server: {srv_disp}",f"Size: {sz_s} MB{_fc_part} | CRC32 + SHA-256 Verified",f"Time: {ts_a} -> {ts_b} (Total: {tot_disp})",'-'*42]+[f"{st_n}: {format_duration(st_v,lang).partition(_s).__getitem__(0)}"for(st_n,st_v,_)in stages]+[f"Storage: {d.get(A,0)} archives ({d.get(B,0)} MB) | Free: {d.get(C,0)} GB | Outdated GFS: {d.get(D,0)}"]
+				try:self.root.clipboard_clear();self.root.clipboard_append('\n'.join(_rep_lines));btn_cp_r.configure(text='\u2714 \u0417\u0432\u0456\u0442 \u0441\u043a\u043e\u043f\u0456\u0439\u043e\u0432\u0430\u043d\u043e!'if lang==_B else'\u2714 Report Copied!');dlg.after(1500,lambda:btn_cp_r.winfo_exists()and btn_cp_r.configure(text='\U0001f4cb \u041a\u043e\u043f\u0456\u044e\u0432\u0430\u0442\u0438 \u0437\u0432\u0456\u0442'if lang==_B else'\U0001f4cb Copy Report'))
+				except Exception:0
+			btn_cp_r=tk.Button(bf,text='\U0001f4cb \u041a\u043e\u043f\u0456\u044e\u0432\u0430\u0442\u0438 \u0437\u0432\u0456\u0442'if lang==_B else'\U0001f4cb Copy Report',command=_copy_full_rep,bg=p[_A],fg=p[_Q],bd=1,relief=_Y,font=(fam,fs+1,_I),padx=14,pady=5,cursor=_R);btn_cp_r.pack(side=_J);btn_ok_r=tk.Button(bf,text='\u041e\u041a'if lang==_B else'OK',command=_close_rep,bg=p[_U],fg=p[_v],font=(fam,fs+2,_I),padx=24,pady=5,cursor=_R);btn_ok_r.pack(side=_K);dlg.after(350,lambda:(dlg.bind(_A7,_close_rep),dlg.bind(_AJ,_close_rep),btn_ok_r.focus_set())if dlg.winfo_exists()else _M);self._fit_dialog(dlg);return
 		fs=max(10,self.metrics[_k]);fam=self._ui_fam();k=self.metrics[_a]
 		is_lan_dlg=m[_j]=='lan_found';_has_mimg=(m[_j]=='confirm'and bool(getattr(self.engine,'server_logo_bytes',_M)));dlg,p,_=self._make_dialog(m[_AD],680 if is_lan_dlg else(600 if _has_mimg else 520),340 if is_lan_dlg else(245 if _has_mimg else 225))
 		def _done(val):

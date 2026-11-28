@@ -498,7 +498,7 @@ class HomeGridApp(DialogsMixin):
 	def _on_spark_hover(A,e):
 		ns=getattr(A,'_spark_nodes',[])
 		if not ns:return
-		px,py,v,ds,d_txt=min(ns,key=lambda n:abs(n-e.x));P=A._get_palette();C=A.engine.state.get(_U,_V)
+		px,py,v,ds,d_txt=min(ns,key=lambda n:abs(n[0]-e.x));P=A._get_palette();C=A.engine.state.get(_U,_V)
 		ch_h=max(96,A.spark_cv.winfo_height()-max(22,int(A.metrics[_L]*1.8)))
 		A.spark_cv.delete('hm');A.spark_cv.create_line(px,4,px,ch_h,fill=P[_P],dash=(2,2),tags='hm')
 		A.spark_cv.create_oval(px-4,py-4,px+4,py+4,fill=P[_P],outline=P[_H],tags='hm')
