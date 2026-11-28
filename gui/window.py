@@ -1,3 +1,4 @@
+# patch-id: py311-fstring-no-backslash-4.11.1
 # patch-id: storage-analytics-chart-polish-4.07
 # patch-id: chart-journal-only-4.05
 # patch-id: hide-inv-img-in-lite-and-en-hw-4.04b
@@ -6,7 +7,7 @@
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.56 | 28.11.2026 03:35) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.57 | 28.11.2026 08:25) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -502,7 +503,7 @@ class HomeGridApp(DialogsMixin):
 		ch_h=max(96,A.spark_cv.winfo_height()-max(22,int(A.metrics[_L]*1.8)))
 		A.spark_cv.delete('hm');A.spark_cv.create_line(px,4,px,ch_h,fill=P[_P],dash=(2,2),tags='hm')
 		A.spark_cv.create_oval(px-4,py-4,px+4,py+4,fill=P[_P],outline=P[_H],tags='hm')
-		A.var_spark_lbl.set(f"{ds}  \u2022  {v} {'\u041c\u0411'if C=='uk'else'MB'}{d_txt}")
+		_unit='\u041c\u0411'if C=='uk'else'MB';A.var_spark_lbl.set(f"{ds}  \u2022  {v} {_unit}{d_txt}")
 	def _on_spark_leave(A,e=_B):
 		A.spark_cv.delete('hm')
 		if getattr(A,'_spark_base_lbl',''):A.var_spark_lbl.set(A._spark_base_lbl)
