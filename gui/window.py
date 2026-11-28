@@ -1,3 +1,4 @@
+# patch-id: footer-logo-subsample-fallback-4.15.1
 # patch-id: window-layout-grid-fix-4.15
 # patch-id: hide-pcloud-status-row-4.13
 # patch-id: py311-fstring-no-backslash-4.11.1
@@ -9,7 +10,7 @@
 # patch-id: server-inverter-image-preview-3.91
 # patch-id: pingpong-and-3stage-1-100-3.83
 # patch-id: disk-gauge-order-2.42
-# [\u0424\u0410\u0419\u041b: gui/window.py (v2.59 | 28.11.2026 09:00) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
+# [\u0424\u0410\u0419\u041b: gui/window.py (v2.59 | 28.11.2026 10:05) \u2014 \u0413\u041b\u0410\u0412\u041d\u041e\u0415 \u041e\u041a\u041d\u041e HOMEGRIDAPP \u0418 \u0424\u041e\u041d\u041e\u0412\u042b\u0419 \u0426\u0418\u041a\u041b UI]
 _AR='discovered_servers'
 _AQ='dest_rows'
 _AP='\U0001f6e1 \u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430 SHA'
@@ -621,7 +622,7 @@ class HomeGridApp(DialogsMixin):
 							import io as _io;from PIL import Image as _PIL_I,ImageTk as _PIL_T
 							_im=_PIL_I.open(_io.BytesIO(_lraw));_im.thumbnail((int(_th_h*1.6),_th_h),_PIL_I.LANCZOS);_pimg=_PIL_T.PhotoImage(_im)
 						except Exception:
-							try:import base64 as _b64;_pimg=tk.PhotoImage(data=_b64.b64encode(_lraw))
+							try:import base64 as _b64;_raw_tk=tk.PhotoImage(data=_b64.b64encode(_lraw));_sub=max(1,int(round(_raw_tk.height()/max(1,_th_h))));_pimg=_raw_tk.subsample(_sub,_sub)if _sub>1 else _raw_tk
 							except Exception:_pimg=_B
 						if _pimg is not _B:
 							_pal_l=A._get_palette();A._srv_logo_img=_pimg;A.lbl_srv_logo.configure(image=_pimg,bg=_pal_l[_N],highlightbackground=_pal_l[_O]);A.lbl_srv_logo.pack(side=_E,padx=(0,8))
